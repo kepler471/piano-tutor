@@ -1,12 +1,19 @@
 <script lang="ts">
-  import { renderScore, type HighlightState, type ScoreModel } from '../lib/notation/vexScore'
+  import {
+    isGrandScore,
+    renderGrandScore,
+    renderScore,
+    type GrandScoreModel,
+    type HighlightState,
+    type ScoreModel,
+  } from '../lib/notation/vexScore'
 
   let {
     score,
     highlights,
     minWidth = 320,
   }: {
-    score: ScoreModel
+    score: ScoreModel | GrandScoreModel
     highlights?: Map<number, HighlightState>
     minWidth?: number
   } = $props()
@@ -16,7 +23,8 @@
   $effect(() => {
     if (container && score) {
       try {
-        renderScore(container, score, highlights, minWidth)
+        if (isGrandScore(score)) renderGrandScore(container, score, highlights, minWidth)
+        else renderScore(container, score, highlights, minWidth)
       } catch (err) {
         console.error('Sheet music render failed', err)
       }

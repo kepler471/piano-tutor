@@ -1,23 +1,32 @@
 <script lang="ts">
-  import MicButton from './MicButton.svelte'
+  import InputPicker from './InputPicker.svelte'
   import PianoKeyboard from './PianoKeyboard.svelte'
   import SheetMusic from './SheetMusic.svelte'
   import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
-  import { mic } from '../lib/audio/mic.svelte'
-  import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
-  import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
-  import { playChord, playSequence } from '../lib/audio/playback'
+  import { playChord, playChordSequence, playSequence } from '../lib/audio/playback'
+  import { noteInput, onInput } from '../lib/input/noteInput.svelte'
   import type { Lesson } from '../lib/data/lessons'
   import { scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
+  import { gradeTiming } from '../lib/practice/timingGrader'
   import type { Finger } from '../lib/theory/types'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
-  let { lesson, onexit }: { lesson: Lesson; onexit?: () => void } = $props()
+  let {
+    lesson,
+    onexit,
+    oncomplete,
+  }: {
+    lesson: Lesson
+    onexit?: () => void
+    oncomplete?: (info: { mistakes: number }) => void
+  } = $props()
 
   let segIndex = $state(0)
   const segment = $derived(lesson.segments[segIndex])
+  // Hands-together segments override to chord detection when on the mic.
+  const effectiveMode = $derived(segment.detectionMode ?? lesson.detectionMode)
 
   let version = $state(0) // bumped on every matcher mutation to drive reactivity
   let resetKey = $state(0)
@@ -34,6 +43,16 @@
     return new StepMatcher(lesson.segments[segIndex].steps)
   })
 
+  // Wall-clock times of each step advance — graded against the beat grid
+  // when the metronome is on and the material carries startBeats.
+  let advanceTimes: number[] = []
+  let timingPct = $state<number | null>(null)
+  $effect(() => {
+    void matcher
+    advanceTimes = []
+    timingPct = null
+  })
+
   function restartSegment(index = segIndex) {
     segIndex = index
     resetKey++
@@ -41,13 +60,13 @@
   }
 
   $effect(() => {
-    // Grading uses the lesson's designated detection source: fast mono for
-    // melodic lessons, the chord model for chordal ones.
-    const subscribe = lesson.detectionMode === 'poly' ? onPolyEvent : onNoteEvent
-    return subscribe((ev) => {
+    // Grading hears the hub's active source: MIDI when a keyboard is
+    // connected, otherwise the lesson's designated mic detector.
+    return onInput((ev) => {
       if (ev.kind !== 'on' || matcher.done) return
       const outcome = matcher.onOnset(ev.midi)
       version++
+      if (outcome.advanced) advanceTimes.push(ev.tMs ?? performance.now())
       if (outcome.wrong) {
         const flashed = ev.midi
         wrongFlash = new Set([...wrongFlash, flashed])
@@ -56,6 +75,16 @@
         }, 350)
       }
     })
+  })
+
+  // If the segment's detection needs change while listening on the mic
+  // (e.g. moving to a hands-together segment), restart with the right detector.
+  $effect(() => {
+    const mode = effectiveMode
+    if (noteInput.activeSource === (mode === 'poly' ? 'mic-mono' : 'mic-poly')) {
+      noteInput.stop()
+      void noteInput.start(mode)
+    }
   })
 
   $effect(() => {
@@ -100,13 +129,9 @@
     return map
   })
 
-  // Keyboard shows the union of both detectors; grading uses only the designated one.
-  const pressed = $derived(
-    new Set([
-      ...(monoPitch.midi !== null ? [monoPitch.midi] : []),
-      ...(lesson.detectionMode === 'poly' ? polyPitch.activeNotes : []),
-    ]),
-  )
+  // Keyboard shows everything the active input hears; grading uses only the
+  // hub-forwarded events.
+  const pressed = $derived(noteInput.activeNotes)
   const done = $derived.by(() => {
     void version
     return matcher.done
@@ -125,6 +150,19 @@
   $effect(() => {
     if (done && !loggedDone) {
       loggedDone = true
+      // Rhythm read-through grade, relative to the player's own first note.
+      const steps = segment.steps
+      if (metronomeOn && steps.length > 1 && steps.every((s) => s.startBeat !== undefined) && advanceTimes.length === steps.length) {
+        const beatMs = 60000 / bpm
+        const anchor = advanceTimes[0] - steps[0].startBeat! * beatMs
+        const result = gradeTiming(
+          steps.map((s) => ({ startBeat: s.startBeat! })),
+          advanceTimes.map((tMs) => ({ tMs })),
+          bpm,
+          anchor,
+        )
+        timingPct = Math.round(result.accuracy * 100)
+      }
       addRecord({
         lessonId: lesson.id,
         title: lesson.title,
@@ -132,6 +170,7 @@
         mistakes: matcher.mistakes,
         steps: segment.steps.length,
       })
+      oncomplete?.({ mistakes: matcher.mistakes })
     } else if (!done) {
       loggedDone = false
     }
@@ -146,7 +185,10 @@
     demoPlaying = true
     try {
       const chordal = segment.steps.some((s) => s.midis.length > 1)
-      if (chordal) {
+      if (segment.hand === 'both') {
+        // Parallel-motion lines: play the pairs in tempo, not as slow chords.
+        await playChordSequence(segment.steps.map((s) => s.midis), bpm)
+      } else if (chordal) {
         for (const step of segment.steps) {
           await playChord(step.midis, { duration: 1.1 })
         }
@@ -200,13 +242,10 @@
           }
           case 'mic':
             if (intent.action === 'start') {
-              void startMonoDetection().then(() => {
-                if (lesson.detectionMode === 'poly' && mic.status === 'running') return startPolyDetection()
-              })
+              void noteInput.start(effectiveMode)
               return { say: 'Listening.' }
             }
-            if (lesson.detectionMode === 'poly') stopPolyDetection()
-            stopMonoDetection()
+            noteInput.stop()
             return { say: 'Stopped.' }
           default:
             return null
@@ -246,12 +285,21 @@
     </label>
   </div>
 
-  <MicButton poly={lesson.detectionMode === 'poly'} />
+  <InputPicker preferred={effectiveMode} />
+  {#if effectiveMode === 'poly' && noteInput.activeSource !== 'midi' && segment.hand === 'both'}
+    <p class="hint">
+      🎹 Hands-together grading works best with a MIDI keyboard — mic chord detection runs about a
+      second behind your playing.
+    </p>
+  {/if}
 
   {#if done}
     <div class="complete">
       🎉 Segment complete — {segment.steps.length} notes,
       {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong note${mistakes === 1 ? '' : 's'} along the way.`}
+      {#if timingPct !== null}
+        Timing: {timingPct}% in the pocket.
+      {/if}
       {#if segIndex < lesson.segments.length - 1}
         <button class="primary" onclick={() => restartSegment(segIndex + 1)}>
           Next: {lesson.segments[segIndex + 1].label} →

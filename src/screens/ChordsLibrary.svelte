@@ -8,8 +8,9 @@
   import { onPolyEvent, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
   import { playChord, playNote } from '../lib/audio/playback'
   import { chordFingering } from '../lib/data/chordFingerings'
-  import { scoreFromChord } from '../lib/notation/vexScore'
+  import { scoreFromChord, scoreFromSteps, type ScoreModel } from '../lib/notation/vexScore'
   import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
+  import { SHELL_QUALITIES, shellVoicing } from '../lib/theory/voicings'
   import type { ChordQualityId, Finger, Hand } from '../lib/theory/types'
   import { matchRoot } from '../lib/voice/parser'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
@@ -28,15 +29,29 @@
     if (inversion >= size) inversion = 0
   }
 
+  // Shell voicings (LH root + 3rd or 7th) for qualities that have a 7th.
+  type Voicing = 'full' | 'A' | 'B'
+  let voicing = $state<Voicing>('full')
+  const shellAvailable = $derived(SHELL_QUALITIES.includes(quality))
+  const activeVoicing = $derived(shellAvailable ? voicing : 'full')
+
   const chord = $derived(getChord(root, quality, inversion))
   const fingering = $derived(chordFingering(qualityDef.size, inversion))
-  const score = $derived(scoreFromChord(chord, hand, fingering))
+  const shell = $derived(activeVoicing === 'full' ? null : shellVoicing(root, quality, activeVoicing))
 
-  const handMidi = $derived(hand === 'R' ? chord.midi : chord.midi.map((m) => m - 12))
+  const score = $derived.by(() => {
+    if (!shell) return scoreFromChord(chord, hand, fingering)
+    // Shells are a left-hand device; render them on the bass stave.
+    return scoreFromSteps([{ midis: shell.midis, fingers: [5, 1], durationBeats: 4 }], 'C', 'bass') as ScoreModel
+  })
+
+  const handMidi = $derived(
+    shell ? shell.midis : hand === 'R' ? chord.midi : chord.midi.map((m) => m - 12),
+  )
   const expected = $derived(new Set(handMidi))
   const fingerMap = $derived.by(() => {
     const map = new Map<number, Finger>()
-    const fingers = hand === 'R' ? fingering.rh : fingering.lh
+    const fingers: Finger[] = shell ? [5, 1] : hand === 'R' ? fingering.rh : fingering.lh
     handMidi.forEach((m, i) => map.set(m, fingers[i]))
     return map
   })
@@ -170,25 +185,41 @@
       <button class:active={hand === 'R'} onclick={() => (hand = 'R')}>Right</button>
       <button class:active={hand === 'L'} onclick={() => (hand = 'L')}>Left</button>
     </div>
+    {#if shellAvailable}
+      <div class="control-group">
+        <span class="control-label">Voicing</span>
+        <button class:active={activeVoicing === 'full'} onclick={() => (voicing = 'full')}>Full chord</button>
+        <button class:active={activeVoicing === 'A'} onclick={() => (voicing = 'A')}>Shell A (1+7)</button>
+        <button class:active={activeVoicing === 'B'} onclick={() => (voicing = 'B')}>Shell B (1+3)</button>
+      </div>
+    {/if}
   </div>
 
   <div class="card">
     <div class="card-head">
-      <h2>{chord.id}</h2>
+      <h2>{shell ? shell.label : chord.id}</h2>
       <div>
         <button class="primary" onclick={() => play(false)} disabled={playing}>▶ Block</button>
         <button class="primary" onclick={() => play(true)} disabled={playing}>▶ Arpeggio</button>
       </div>
     </div>
-    <p class="hint">
-      Notes: {chord.noteNames.map((n) => Note.pitchClass(n)).join(' – ')} · Fingers
-      ({hand === 'R' ? 'right' : 'left'} hand, bottom to top):
-      {(hand === 'R' ? fingering.rh : fingering.lh).join(' – ')}
-    </p>
+    {#if shell}
+      <p class="hint">
+        Notes: {shell.midis.map((m) => Note.pitchClass(Note.fromMidi(m))).join(' – ')} · Left hand,
+        fingers 5 and 1. Jazz players sketch the harmony with just these two notes — the other hand
+        is free for melody.
+      </p>
+    {:else}
+      <p class="hint">
+        Notes: {chord.noteNames.map((n) => Note.pitchClass(n)).join(' – ')} · Fingers
+        ({hand === 'R' ? 'right' : 'left'} hand, bottom to top):
+        {(hand === 'R' ? fingering.rh : fingering.lh).join(' – ')}
+      </p>
+    {/if}
     <SheetMusic {score} />
     <PianoKeyboard
-      from={hand === 'R' ? 55 : 43}
-      to={hand === 'R' ? 89 : 77}
+      from={shell ? 36 : hand === 'R' ? 55 : 43}
+      to={shell ? 72 : hand === 'R' ? 89 : 77}
       expected={expected}
       fingers={fingerMap}
       onkeyclick={(m) => playNote(m)}

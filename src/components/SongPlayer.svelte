@@ -1,0 +1,285 @@
+<script lang="ts">
+  import GrandSheetMusic from './GrandSheetMusic.svelte'
+  import InputPicker from './InputPicker.svelte'
+  import PianoKeyboard from './PianoKeyboard.svelte'
+  import { playSong } from '../lib/audio/playback'
+  import { beatsPerMeasure, type Song } from '../lib/data/songs/types'
+  import { noteInput, onInput } from '../lib/input/noteInput.svelte'
+  import { songSystems } from '../lib/notation/songScore'
+  import type { HighlightState } from '../lib/notation/vexScore'
+  import { addRecord } from '../lib/practice/history.svelte'
+  import { StepMatcher } from '../lib/practice/matcher'
+  import { stepsFromSong } from '../lib/practice/songSteps'
+  import type { Finger } from '../lib/theory/types'
+
+  let { song, onexit }: { song: Song; onexit?: () => void } = $props()
+
+  type Hands = 'both' | 'R' | 'L'
+  let hands = $state<Hands>('both')
+  let fromMeasure = $state(0)
+  // The player is keyed per song, so capturing the initial length is intended.
+  // svelte-ignore state_referenced_locally
+  let toMeasure = $state(song.measures.length - 1)
+  let version = $state(0)
+  let resetKey = $state(0)
+  let wrongFlash = $state(new Set<number>())
+  let demoPlaying = $state(false)
+
+  function selectSection(from: number, to: number) {
+    fromMeasure = from
+    toMeasure = to
+    resetKey++
+    version++
+  }
+
+  const range = $derived({ hands, fromMeasure, toMeasure })
+  const steps = $derived(stepsFromSong(song, range))
+  const systems = $derived(songSystems(song, range))
+
+  const matcher = $derived.by(() => {
+    void resetKey
+    return new StepMatcher(steps)
+  })
+
+  $effect(() => {
+    return onInput((ev) => {
+      if (ev.kind !== 'on' || matcher.done) return
+      const outcome = matcher.onOnset(ev.midi)
+      version++
+      if (outcome.wrong) {
+        const flashed = ev.midi
+        wrongFlash = new Set([...wrongFlash, flashed])
+        setTimeout(() => {
+          wrongFlash = new Set([...wrongFlash].filter((m) => m !== flashed))
+        }, 350)
+      }
+    })
+  })
+
+  const highlights = $derived.by(() => {
+    void version
+    const map = new Map<number, HighlightState>()
+    matcher.results.forEach((r, i) => {
+      if (r === 'correct') map.set(i, 'correct')
+      else if (r === 'corrected') map.set(i, 'played')
+    })
+    if (!matcher.done) map.set(matcher.cursor, 'next')
+    return map
+  })
+
+  const expected = $derived.by(() => {
+    void version
+    return matcher.done ? new Set<number>() : matcher.remaining
+  })
+
+  const fingerMap = $derived.by(() => {
+    void version
+    const map = new Map<number, Finger>()
+    const cur = matcher.current
+    cur?.midis.forEach((m, i) => {
+      const f = cur.fingers[i]
+      if (f) map.set(m, f)
+    })
+    return map
+  })
+
+  const done = $derived.by(() => {
+    void version
+    return matcher.done
+  })
+  const mistakes = $derived.by(() => {
+    void version
+    return matcher.mistakes
+  })
+  const progress = $derived.by(() => {
+    void version
+    return matcher.cursor
+  })
+
+  let loggedDone = false
+  $effect(() => {
+    if (done && steps.length > 0 && !loggedDone) {
+      loggedDone = true
+      addRecord({
+        lessonId: `song-${song.id}`,
+        title: song.title,
+        segment: `bars ${fromMeasure + 1}–${toMeasure + 1}${hands === 'both' ? '' : hands === 'R' ? ' (RH)' : ' (LH)'}`,
+        mistakes: matcher.mistakes,
+        steps: steps.length,
+        kind: 'song',
+      })
+    } else if (!done) {
+      loggedDone = false
+    }
+  })
+
+  const allMidis = $derived(steps.flatMap((s) => s.midis))
+  const kbFrom = $derived(allMidis.length ? Math.floor((Math.min(...allMidis) - 2) / 12) * 12 : 48)
+  const kbTo = $derived(allMidis.length ? Math.ceil((Math.max(...allMidis) + 2) / 12) * 12 : 84)
+
+  async function demo() {
+    if (demoPlaying) return
+    demoPlaying = true
+    try {
+      const bpm = beatsPerMeasure(song)
+      const notes = []
+      for (let m = fromMeasure; m <= toMeasure; m++) {
+        for (const n of song.measures[m].notes) {
+          if (hands !== 'both' && n.hand !== hands) continue
+          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * bpm + n.startBeat, durationBeats: n.durationBeats })
+        }
+      }
+      await playSong(notes, song.tempoBpm, song.swing)
+    } finally {
+      demoPlaying = false
+    }
+  }
+
+  const needsChords = $derived(steps.some((s) => s.midis.length > 1))
+</script>
+
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{song.title}</h2>
+      <p class="hint">
+        {song.composer} · Grade {song.grade} · {song.timeSignature[0]}/{song.timeSignature[1]} · ♩=
+        {song.tempoBpm}{song.swing ? ' · swing' : ''}
+      </p>
+    </div>
+    {#if onexit}
+      <button class="ghost" onclick={onexit}>← All songs</button>
+    {/if}
+  </div>
+
+  <div class="controls-row">
+    <span class="control-label">Section:</span>
+    <button
+      class="seg"
+      class:active={fromMeasure === 0 && toMeasure === song.measures.length - 1}
+      onclick={() => selectSection(0, song.measures.length - 1)}
+    >
+      Whole piece
+    </button>
+    {#each song.sections as s (s.label)}
+      <button
+        class="seg"
+        class:active={fromMeasure === s.fromMeasure && toMeasure === s.toMeasure}
+        onclick={() => selectSection(s.fromMeasure, s.toMeasure)}
+      >
+        {s.label}
+      </button>
+    {/each}
+  </div>
+
+  <div class="controls-row">
+    <span class="control-label">Hands:</span>
+    {#each [['both', 'Both'], ['R', 'Right'], ['L', 'Left']] as const as [value, label] (value)}
+      <button
+        class="seg"
+        class:active={hands === value}
+        onclick={() => {
+          hands = value
+          resetKey++
+          version++
+        }}
+      >
+        {label}
+      </button>
+    {/each}
+    <span class="spacer"></span>
+    <button class="primary" onclick={demo} disabled={demoPlaying}>
+      {demoPlaying ? 'Playing…' : '▶ Demo'}
+    </button>
+    <button
+      class="primary"
+      onclick={() => {
+        resetKey++
+        version++
+      }}
+    >
+      ↺ Restart
+    </button>
+  </div>
+
+  <InputPicker preferred={needsChords ? 'poly' : 'mono'} />
+  {#if needsChords && noteInput.activeSource !== 'midi'}
+    <p class="hint">
+      🎹 This piece has chords or both hands — it works best with a MIDI keyboard. Mic chord
+      detection runs about a second behind.
+    </p>
+  {/if}
+
+  {#if done && steps.length > 0}
+    <div class="complete">
+      🎉 Passage complete — {steps.length} steps,
+      {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong note${mistakes === 1 ? '' : 's'} along the way.`}
+      <button
+        class="primary"
+        onclick={() => {
+          resetKey++
+          version++
+        }}
+      >
+        Play it again
+      </button>
+    </div>
+  {:else}
+    <p class="hint">
+      Wait-mode: the orange note is next; the score waits until you play it. Progress: {progress} /
+      {steps.length}.
+      {#if mistakes > 0}Wrong notes so far: {mistakes}.{/if}
+    </p>
+  {/if}
+
+  <GrandSheetMusic {systems} stepHighlights={highlights} />
+  <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.activeNotes} {expected} wrong={wrongFlash} fingers={fingerMap} />
+</div>
+
+<style>
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .control-label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .seg {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .seg.active {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+  }
+  .ghost {
+    border: none;
+    background: none;
+    color: #1d4ed8;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .complete {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    font-weight: 600;
+    color: #166534;
+  }
+</style>

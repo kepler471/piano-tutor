@@ -1,8 +1,8 @@
 # 🎹 Piano Tutor
 
-A piano practice companion that runs in your browser and **listens to your playing through the
-microphone** — no MIDI cable needed. Built for beginners learning on an acoustic or electric
-piano.
+A piano practice companion that runs in your browser. Plug in a **MIDI keyboard** for instant,
+polyphonic-accurate feedback, or use no gear at all and let it **listen through the
+microphone**. Built for beginner-to-intermediate players on any piano.
 
 Play a note and watch it light up on the on-screen keyboard. Play a scale and the app follows
 you note by note, checking your fingering. Play a chord and it tells you what you played — and
@@ -14,16 +14,20 @@ what you missed.
 
 ### 📚 Reference library
 
-- **All 36 scales** — major, natural minor, and harmonic minor in every key — with sheet music,
-  correct key signatures, and standard fingering (ABRSM/Hanon convention) for each hand, shown
-  on both the staff and the keyboard.
-- **Every common chord** — major, minor, diminished, augmented triads and dominant/major/minor
-  7ths, in all 12 roots and every inversion — with notation and fingering.
+- **56 scales** — major, natural minor, and harmonic minor in every key, plus blues, dorian,
+  mixolydian, and major pentatonic — with sheet music, correct key signatures, and standard
+  fingering (ABRSM/Hanon convention) for each hand, shown on both the staff and the keyboard.
+- **Every common chord** — major, minor, diminished, augmented triads; dominant/major/minor
+  7ths, half-diminished, diminished 7th, and major 6th — in all 12 roots and every inversion,
+  with notation and fingering, plus jazz **shell voicings** (root+3rd / root+7th).
 - Everything is **playable**: hear any scale or chord on a sampled grand piano (block or
   arpeggiated).
 
-### 🎤 Listening (the fun part)
+### 🎹 Input: MIDI or microphone
 
+- **Web MIDI** (Chromium browsers): connect a keyboard and every mode grades your playing
+  instantly and polyphonically — the app prefers MIDI automatically whenever a device is
+  connected. The mic remains the universal fallback.
 - **Instant note detection** for melodies and scales — keys light up as you play, and the Note
   Detector screen doubles as a tuner (note name, frequency, cents offset).
 - **Chord detection** via [Spotify's Basic Pitch](https://github.com/spotify/basic-pitch)
@@ -49,10 +53,33 @@ fail"):
 
 - **Five-finger positions** in C, G, and F
 - **Hanon No. 1** (the famous finger-independence exercise, first 8 bars)
-- **Scale routine** with correct thumb crossings
+- **Scale routine** in all 24 keys — one and two octaves, hands separate and **hands together
+  on a grand staff**
+- **Arpeggios and broken chords** with standard fingerings
 - **I–IV–V–I cadence drills** — chord progressions with hand-friendly voicings (uses chord
   detection)
-- **Sight-reading** — randomly generated melodies you've never seen, new one every time
+- **Leveled sight-reading** — five difficulty levels from C-position quarters to grand-staff
+  hands-together, with a clean-streak level-up system; new melody every time
+- **Jazz & blues** — blues scales, ii–V–I guide-tone drills with smooth voice-leading, and
+  12-bar blues comping with shell voicings
+
+### 👂 Ear training
+
+Interval recognition, chord-quality quizzes (10 qualities by level 4), and **call-and-response**:
+the app plays a short phrase, you play it back from memory.
+
+### 🥁 Rhythm trainer
+
+Tap rhythms on any key against the metronome — four leveled pattern sets from steady quarters
+to **swing eighths, the Charleston, and jazz comping** — with per-note timing feedback
+(perfect ±40 ms, good ±100 ms, early/late) painted onto the score.
+
+### 🎼 Songs (graded repertoire)
+
+Real pieces rendered on a multi-system grand staff in **wait-mode**: the score waits for the
+right note, section by section, hands separate or together. Ships with a graded starter set
+(Ode to Joy, Minuet in G, a swung When the Saints, a 12-bar blues with shells, and more) and
+**imports your own MusicXML or MIDI files**.
 
 Completed segments are saved to a local practice history on the Home screen.
 
@@ -116,7 +143,10 @@ plain static files.
 
 ## Roadmap ideas
 
-- Two-octave scale fingerings and arpeggio lessons
+- More graded repertoire (grades 3–4: Burgmüller, Clementi, Bach Prelude in C, Joplin) via a
+  MusicXML → JSON build pipeline (`src/lib/songs/musicxml.ts` already parses; wire it to a
+  `scripts/convert-songs.ts` over `content/musicxml/`)
 - MusicXML export of transcriptions
 - A4 calibration and adjustable detection thresholds
-- Grand-staff (both hands) lesson rendering
+- Timed song mode (grade timing against the metronome, not just pitches)
+- Lead-sheet comping practice (chord symbols graded as poly chords)

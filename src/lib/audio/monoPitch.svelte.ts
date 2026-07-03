@@ -28,7 +28,11 @@ export function onNoteEvent(fn: NoteEventListener): () => void {
 }
 
 function emitAll(events: NoteEvent[]) {
-  for (const ev of events) listeners.forEach((fn) => fn(ev))
+  const tMs = performance.now()
+  for (const ev of events) {
+    ev.tMs = tMs
+    listeners.forEach((fn) => fn(ev))
+  }
 }
 
 function syncState() {

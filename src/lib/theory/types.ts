@@ -1,7 +1,14 @@
 export type Finger = 1 | 2 | 3 | 4 | 5
 export type Hand = 'L' | 'R'
 
-export type ScaleTypeId = 'major' | 'natural minor' | 'harmonic minor'
+export type ScaleTypeId =
+  | 'major'
+  | 'natural minor'
+  | 'harmonic minor'
+  | 'blues'
+  | 'dorian'
+  | 'mixolydian'
+  | 'major pentatonic'
 
 export interface ScaleInfo {
   /** e.g. 'C major', 'F# natural minor' — also the key into scaleFingerings */
@@ -25,6 +32,9 @@ export type ChordQualityId =
   | 'dominant 7th'
   | 'major 7th'
   | 'minor 7th'
+  | 'half-diminished'
+  | 'diminished 7th'
+  | 'major 6th'
 
 export interface ChordInfo {
   /** e.g. 'C major (1st inversion)' */

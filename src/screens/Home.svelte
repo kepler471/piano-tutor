@@ -21,6 +21,21 @@
       desc: 'Guided beginner routines — five-finger positions, Hanon, scales, cadences and sight-reading — with live feedback from your piano.',
     },
     {
+      route: '/ear',
+      title: 'Ear Training',
+      desc: 'Name intervals and chord qualities by ear, and play back short phrases from memory.',
+    },
+    {
+      route: '/rhythm',
+      title: 'Rhythm Trainer',
+      desc: 'Tap rhythms against the metronome — from steady quarters to swing and jazz comping — with millisecond feedback.',
+    },
+    {
+      route: '/songs',
+      title: 'Songs',
+      desc: 'Graded sheet music from Ode to Joy to the blues — the score waits for you. Import your own MusicXML or MIDI.',
+    },
+    {
       route: '/play',
       title: 'Free Play',
       desc: 'Play anything: the app listens through the microphone, lights up the keys you press, and writes what you play as sheet music.',
@@ -36,7 +51,8 @@
 <section>
   <h1>Piano Tutor</h1>
   <p class="hint">
-    A practice companion for your piano. No MIDI needed — it listens through your microphone.
+    A practice companion for your piano. Plug in a MIDI keyboard for instant, accurate feedback —
+    or use no gear at all and let it listen through your microphone.
   </p>
   <div class="grid">
     {#each sections as s (s.route)}
@@ -58,7 +74,11 @@
       {#each recent as r (r.at)}
         <li>
           <strong>{r.title}</strong> · {r.segment} ·
-          {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes} wrong note${r.mistakes === 1 ? '' : 's'}`}
+          {#if r.score}
+            {r.score.correct}/{r.score.total} correct{r.score.correct === r.score.total ? ' ✨' : ''}
+          {:else}
+            {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes} wrong note${r.mistakes === 1 ? '' : 's'}`}
+          {/if}
           <span class="when">{new Date(r.at).toLocaleString()}</span>
         </li>
       {/each}

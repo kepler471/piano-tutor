@@ -1,0 +1,116 @@
+import { describe, expect, it } from 'vitest'
+import {
+  ECHO_LEVELS,
+  ECHO_POSITIONS,
+  INTERVAL_LEVELS,
+  makeChordQuestion,
+  makeEchoQuestion,
+  makeIntervalQuestion,
+  type Rng,
+} from '../lib/ear/quiz'
+
+/** Deterministic LCG so every generator path is reproducible. */
+function seededRng(seed: number): Rng {
+  let s = seed >>> 0
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0
+    return s / 2 ** 32
+  }
+}
+
+const seeds = Array.from({ length: 50 }, (_, i) => i + 1)
+
+describe('makeIntervalQuestion', () => {
+  it('always includes the answer exactly once among unique options', () => {
+    for (const seed of seeds) {
+      const q = makeIntervalQuestion(4, seededRng(seed))
+      expect(q.options.filter((o) => o === q.answer)).toHaveLength(1)
+      expect(new Set(q.options).size).toBe(q.options.length)
+      expect(q.options.length).toBeLessThanOrEqual(4)
+      expect(q.options.length).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('keeps the interval inside the level set', () => {
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of seeds) {
+        const q = makeIntervalQuestion(level, seededRng(seed))
+        const semitones = Math.abs(q.midis[1] - q.midis[0])
+        expect(INTERVAL_LEVELS[level - 1]).toContain(semitones)
+      }
+    }
+  })
+
+  it('stays in a comfortable playback range', () => {
+    for (const seed of seeds) {
+      const q = makeIntervalQuestion(4, seededRng(seed))
+      for (const m of q.midis) {
+        expect(m).toBeGreaterThanOrEqual(43) // G2
+        expect(m).toBeLessThanOrEqual(79) // G5
+      }
+    }
+  })
+
+  it('is deterministic under a fixed seed', () => {
+    expect(makeIntervalQuestion(3, seededRng(7))).toEqual(makeIntervalQuestion(3, seededRng(7)))
+  })
+})
+
+describe('makeChordQuestion', () => {
+  it('answer is in options and options come from the level set', () => {
+    for (const level of [1, 2, 3]) {
+      for (const seed of seeds) {
+        const q = makeChordQuestion(level, seededRng(seed))
+        expect(q.options).toContain(q.answer)
+        expect(new Set(q.options).size).toBe(q.options.length)
+        expect(q.midis.length === 3 || q.midis.length === 4).toBe(true)
+      }
+    }
+  })
+
+  it('level 1 offers only major and minor', () => {
+    for (const seed of seeds) {
+      const q = makeChordQuestion(1, seededRng(seed))
+      for (const o of q.options) expect(['Major', 'Minor']).toContain(o)
+    }
+  })
+
+  it('midis ascend', () => {
+    for (const seed of seeds) {
+      const q = makeChordQuestion(3, seededRng(seed))
+      for (let i = 1; i < q.midis.length; i++) expect(q.midis[i]).toBeGreaterThan(q.midis[i - 1])
+    }
+  })
+})
+
+describe('makeEchoQuestion', () => {
+  it('starts on the position root and stays inside the five-finger position', () => {
+    for (const level of [1, 2, 3]) {
+      for (const seed of seeds) {
+        const q = makeEchoQuestion(level, seededRng(seed))
+        const root = ECHO_POSITIONS[q.positionLabel]
+        expect(q.midis[0]).toBe(root)
+        for (const m of q.midis) expect([0, 2, 4, 5, 7]).toContain(m - root)
+      }
+    }
+  })
+
+  it('respects the level phrase length and position pool', () => {
+    for (const level of [1, 2, 3]) {
+      const def = ECHO_LEVELS[level - 1]
+      for (const seed of seeds) {
+        const q = makeEchoQuestion(level, seededRng(seed))
+        expect(q.midis.length).toBeGreaterThanOrEqual(def.minLen)
+        expect(q.midis.length).toBeLessThanOrEqual(def.maxLen)
+        expect(def.positions).toContain(q.positionLabel)
+      }
+    }
+  })
+
+  it('never repeats a note back-to-back (phrases always move)', () => {
+    for (const seed of seeds) {
+      const q = makeEchoQuestion(3, seededRng(seed))
+      for (let i = 1; i < q.midis.length; i++) expect(q.midis[i]).not.toBe(q.midis[i - 1])
+    }
+  })
+})

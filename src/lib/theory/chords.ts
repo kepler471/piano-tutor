@@ -11,6 +11,9 @@ export const CHORD_QUALITIES: { id: ChordQualityId; tonalType: string; suffix: s
   { id: 'dominant 7th', tonalType: '7', suffix: '7', size: 4 },
   { id: 'major 7th', tonalType: 'maj7', suffix: 'maj7', size: 4 },
   { id: 'minor 7th', tonalType: 'm7', suffix: 'm7', size: 4 },
+  { id: 'half-diminished', tonalType: 'm7b5', suffix: 'm7♭5', size: 4 },
+  { id: 'diminished 7th', tonalType: 'dim7', suffix: 'dim7', size: 4 },
+  { id: 'major 6th', tonalType: '6', suffix: '6', size: 4 },
 ]
 
 const INVERSION_LABELS = ['root position', '1st inversion', '2nd inversion', '3rd inversion']

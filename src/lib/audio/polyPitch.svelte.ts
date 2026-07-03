@@ -44,7 +44,7 @@ function handleWorkerMessage(e: MessageEvent) {
   } else if (msg.type === 'notes') {
     lastInferMs = msg.inferMs ?? 0
     for (const n of msg.notes) {
-      emit({ kind: 'on', midi: n.midi, t: n.onset, confidence: n.amplitude, source: 'poly' })
+      emit({ kind: 'on', midi: n.midi, t: n.onset, tMs: performance.now(), confidence: n.amplitude, source: 'poly' })
       // display-only "sounding" set
       activeNotes = new Set([...activeNotes, n.midi])
       const midi = n.midi

@@ -3,8 +3,8 @@ import { allScales, getScale, MAJOR_ROOTS, MINOR_ROOTS } from '../lib/theory/sca
 import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
 
 describe('scales', () => {
-  it('builds all 36 scales', () => {
-    expect(allScales()).toHaveLength(36)
+  it('builds the full library (36 classical + 20 jazz)', () => {
+    expect(allScales()).toHaveLength(56)
   })
 
   it('C major has the right notes', () => {
@@ -26,12 +26,36 @@ describe('scales', () => {
 
   it('every scale spans exactly one octave', () => {
     for (const s of allScales()) {
-      expect(s.midi).toHaveLength(8)
-      expect(s.midi[7] - s.midi[0]).toBe(12)
+      expect(s.midi.length, s.id).toBe(s.notes.length + 1)
+      expect(s.midi[s.midi.length - 1] - s.midi[0], s.id).toBe(12)
       for (let i = 1; i < s.midi.length; i++) {
         expect(s.midi[i]).toBeGreaterThan(s.midi[i - 1])
       }
     }
+  })
+
+  it('blues scale has six notes with the blue b3, b5 and b7', () => {
+    const s = getScale('C', 'blues')
+    expect(s.midi).toEqual([60, 63, 65, 66, 67, 70, 72]) // C Eb F Gb G Bb C
+    expect(s.keySignature).toBe('C')
+  })
+
+  it('modes take the parent major key signature', () => {
+    expect(getScale('D', 'dorian').keySignature).toBe('C')
+    expect(getScale('G', 'dorian').keySignature).toBe('F')
+    expect(getScale('G', 'mixolydian').keySignature).toBe('C')
+    expect(getScale('D', 'mixolydian').keySignature).toBe('G')
+  })
+
+  it('dorian and mixolydian have the right character tones', () => {
+    // D dorian: natural 6 (B); G mixolydian: flat 7 (F)
+    expect(getScale('D', 'dorian').notes).toEqual(['D', 'E', 'F', 'G', 'A', 'B', 'C'])
+    expect(getScale('G', 'mixolydian').notes).toEqual(['G', 'A', 'B', 'C', 'D', 'E', 'F'])
+  })
+
+  it('major pentatonic is a five-note subset of the major scale', () => {
+    const s = getScale('C', 'major pentatonic')
+    expect(s.midi).toEqual([60, 62, 64, 67, 69, 72])
   })
 
   it('root lists cover all 12 pitch classes', () => {
@@ -64,6 +88,12 @@ describe('chords', () => {
     const c = getChord('G', 'dominant 7th')
     expect(c.midi).toEqual([67, 71, 74, 77])
     expect(inversionsFor('dominant 7th')).toEqual([0, 1, 2, 3])
+  })
+
+  it('jazz chord qualities build correctly', () => {
+    expect(getChord('C', 'half-diminished').midi).toEqual([60, 63, 66, 70]) // C Eb Gb Bb
+    expect(getChord('C', 'diminished 7th').midi).toEqual([60, 63, 66, 69]) // C Eb Gb Bbb
+    expect(getChord('C', 'major 6th').midi).toEqual([60, 64, 67, 69]) // C E G A
   })
 
   it('every root × quality × inversion builds cleanly with ascending notes', () => {

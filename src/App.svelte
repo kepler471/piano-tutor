@@ -6,6 +6,9 @@
   import ScalesLibrary from './screens/ScalesLibrary.svelte'
   import ChordsLibrary from './screens/ChordsLibrary.svelte'
   import Practice from './screens/Practice.svelte'
+  import EarTraining from './screens/EarTraining.svelte'
+  import RhythmTrainer from './screens/RhythmTrainer.svelte'
+  import Songs from './screens/Songs.svelte'
   import FreePlay from './screens/FreePlay.svelte'
   import Tuner from './screens/Tuner.svelte'
 
@@ -14,6 +17,9 @@
     { route: '/scales', label: 'Scales' },
     { route: '/chords', label: 'Chords' },
     { route: '/practice', label: 'Practice' },
+    { route: '/ear', label: 'Ear Training' },
+    { route: '/rhythm', label: 'Rhythm' },
+    { route: '/songs', label: 'Songs' },
     { route: '/play', label: 'Free Play' },
     { route: '/tuner', label: 'Note Detector' },
   ]
@@ -38,6 +44,12 @@
     <ChordsLibrary />
   {:else if route === '/practice'}
     <Practice />
+  {:else if route === '/ear'}
+    <EarTraining />
+  {:else if route === '/rhythm'}
+    <RhythmTrainer />
+  {:else if route === '/songs'}
+    <Songs />
   {:else if route === '/play'}
     <FreePlay />
   {:else if route === '/tuner'}

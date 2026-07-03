@@ -102,6 +102,48 @@ export async function playChord(
   }
 }
 
+/** Plays note groups evenly at the given tempo (eighth notes) — for hands-together demos. */
+export async function playChordSequence(groups: number[][], bpm = 92): Promise<void> {
+  await ensurePiano()
+  const step = 60 / bpm / 2
+  const now = Tone.now()
+  groups.forEach((midis, i) => {
+    if (midis.length === 0) return
+    sampler!.triggerAttackRelease(midis.map(midiToName), step * 0.95, now + i * step)
+  })
+  await withPlayingFlag(groups.length * step)
+}
+
+export interface PlayableNote {
+  midi: number
+  /** Absolute onset in beats */
+  startBeat: number
+  durationBeats: number
+}
+
+/**
+ * Demo playback for songs: schedules every note at its beat time. With
+ * swing, off-beat eighths land at 2/3 of the beat.
+ */
+export async function playSong(notes: PlayableNote[], bpm: number, swing = false): Promise<void> {
+  await ensurePiano()
+  const beatSec = 60 / bpm
+  const swung = (beat: number) => {
+    if (!swing) return beat
+    const frac = beat - Math.floor(beat)
+    return Math.abs(frac - 0.5) < 1e-6 ? Math.floor(beat) + 2 / 3 : beat
+  }
+  const now = Tone.now() + 0.05
+  let endSec = 0
+  for (const n of notes) {
+    const start = swung(n.startBeat) * beatSec
+    const dur = Math.max(0.1, n.durationBeats * beatSec * 0.95)
+    sampler!.triggerAttackRelease(midiToName(n.midi), dur, now + start)
+    endSec = Math.max(endSec, start + dur)
+  }
+  await withPlayingFlag(endSec + 0.05)
+}
+
 /** Plays notes evenly at the given tempo; resolves when the last note has ended. */
 export async function playSequence(midis: number[], bpm = 92): Promise<void> {
   await ensurePiano()

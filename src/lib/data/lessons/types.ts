@@ -7,12 +7,20 @@ export interface LessonStep {
   fingers: (Finger | null)[]
   /** Optional label shown under the step, e.g. a chord symbol */
   label?: string
+  /** Per-midi hand, same order as midis — routes notes to staves on a grand staff */
+  hands?: (Hand | null)[]
+  /** Timed material (songs, rhythm-graded reads): onset in beats from segment start */
+  startBeat?: number
+  /** Note length in beats (quarter note = 1); rendering defaults to 1 when absent */
+  durationBeats?: number
 }
 
 export interface LessonSegment {
   label: string
-  hand: Hand
-  clef: 'treble' | 'bass'
+  hand: Hand | 'both'
+  clef: 'treble' | 'bass' | 'grand'
+  /** Overrides the lesson's detectionMode (e.g. hands-together needs chords on mic) */
+  detectionMode?: 'mono' | 'poly'
   steps: LessonStep[]
 }
 

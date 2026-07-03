@@ -4,6 +4,10 @@ export interface PracticeRecord {
   segment: string
   mistakes: number
   steps: number
+  /** What kind of practice this was; older records have none (= 'lesson'). */
+  kind?: 'lesson' | 'ear' | 'rhythm' | 'song'
+  /** Quiz-style activities: questions answered correctly out of total. */
+  score?: { correct: number; total: number }
   /** ISO timestamp */
   at: string
 }

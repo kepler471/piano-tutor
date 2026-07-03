@@ -1,15 +1,23 @@
-export type NoteSource = 'mono' | 'poly'
+export type NoteSource = 'mono' | 'poly' | 'midi'
 
 export interface NoteEvent {
   kind: 'on' | 'off'
   /** MIDI note number 21..108 */
   midi: number
-  /** AudioContext time in seconds */
+  /**
+   * Time in seconds in the source's own clock (AudioContext time for mic
+   * sources, performance.now()/1000 for MIDI). Only comparable within one
+   * source — use tMs to relate events across sources or to the metronome.
+   */
   t: number
-  /** Detection confidence 0..1 (mono: pitchy clarity; poly: model amplitude) */
+  /** Wall-clock timestamp (performance.now() ms), stamped at emit time. */
+  tMs?: number
+  /** Detection confidence 0..1 (mono: pitchy clarity; poly: model amplitude; midi: 1) */
   confidence: number
   /** Mono only: cents offset from equal temperament, for the tuner */
   cents?: number
+  /** MIDI only: key velocity 0..1 */
+  velocity?: number
   source: NoteSource
 }
 
