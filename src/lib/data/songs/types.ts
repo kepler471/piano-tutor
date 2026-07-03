@@ -24,8 +24,8 @@ export interface Song {
   id: string
   title: string
   composer: string
-  /** Difficulty grade, roughly aligned with early exam grades */
-  grade: 1 | 2 | 3 | 4
+  /** Difficulty grade, roughly aligned with exam grades */
+  grade: 1 | 2 | 3 | 4 | 5 | 6 | 7
   style: 'classical' | 'folk' | 'jazz' | 'blues'
   keySignature: string
   timeSignature: [number, number]

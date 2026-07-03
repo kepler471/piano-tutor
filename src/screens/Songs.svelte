@@ -10,7 +10,7 @@
   let importError = $state('')
   let fileInput: HTMLInputElement | undefined = $state()
 
-  const grades = [1, 2, 3, 4] as const
+  const grades = [1, 2, 3, 4, 5, 6, 7] as const
   const byGrade = (g: number) => SONG_CATALOG.filter((s) => s.grade === g)
 
   const STYLE_ICONS: Record<Song['style'], string> = {

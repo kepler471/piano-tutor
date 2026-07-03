@@ -18,6 +18,8 @@ import { getScale, allScales } from '../lib/theory/scales'
 import { getChord } from '../lib/theory/chords'
 import { scaleFingerings } from '../lib/data/scaleFingerings'
 import { chordFingering } from '../lib/data/chordFingerings'
+import { SONG_CATALOG } from '../lib/data/songs/catalog'
+import { songSystems } from '../lib/notation/songScore'
 
 describe('vex keys', () => {
   it('converts note names', () => {
@@ -146,6 +148,16 @@ describe('rendering (jsdom smoke test)', () => {
     const score = scoreFromSteps(steps, 'C', 'grand') as GrandScoreModel
     renderGrandScore(container, score, new Map([[0, 'next']]))
     expect(container.querySelector('svg')).toBeTruthy()
+  })
+
+  it('renders every catalog song (all key/time signatures) without throwing', () => {
+    const container = document.createElement('div')
+    for (const song of SONG_CATALOG) {
+      for (const system of songSystems(song, { hands: 'both' })) {
+        renderGrandScore(container, system.model)
+        expect(container.querySelector('svg'), `${song.id} @${system.fromMeasure}`).toBeTruthy()
+      }
+    }
   })
 
   it('renders dotted and 16th durations with a time signature', () => {
