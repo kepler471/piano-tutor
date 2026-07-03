@@ -1,0 +1,175 @@
+<script lang="ts">
+  import { Chord, Note } from 'tonal'
+  import MicButton from '../components/MicButton.svelte'
+  import PianoKeyboard from '../components/PianoKeyboard.svelte'
+  import SheetMusic from '../components/SheetMusic.svelte'
+  import { mic } from '../lib/audio/mic.svelte'
+  import { onPolyEvent } from '../lib/audio/polyPitch.svelte'
+  import { playChord, playNote } from '../lib/audio/playback'
+  import { chordFingering } from '../lib/data/chordFingerings'
+  import { scoreFromChord } from '../lib/notation/vexScore'
+  import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
+  import type { ChordQualityId, Finger, Hand } from '../lib/theory/types'
+
+  let root = $state('C')
+  let quality: ChordQualityId = $state('major')
+  let inversion = $state(0)
+  let hand: Hand = $state('R')
+  let playing = $state(false)
+
+  const qualityDef = $derived(CHORD_QUALITIES.find((q) => q.id === quality)!)
+
+  function selectQuality(id: ChordQualityId) {
+    quality = id
+    const size = CHORD_QUALITIES.find((q) => q.id === id)!.size
+    if (inversion >= size) inversion = 0
+  }
+
+  const chord = $derived(getChord(root, quality, inversion))
+  const fingering = $derived(chordFingering(qualityDef.size, inversion))
+  const score = $derived(scoreFromChord(chord, hand, fingering))
+
+  const handMidi = $derived(hand === 'R' ? chord.midi : chord.midi.map((m) => m - 12))
+  const expected = $derived(new Set(handMidi))
+  const fingerMap = $derived.by(() => {
+    const map = new Map<number, Finger>()
+    const fingers = hand === 'R' ? fingering.rh : fingering.lh
+    handMidi.forEach((m, i) => map.set(m, fingers[i]))
+    return map
+  })
+
+  const INV_LABELS = ['Root', '1st inv', '2nd inv', '3rd inv']
+
+  // "Check my chord": collect chord-model onsets over a rolling window and
+  // compare against the selected chord.
+  let checkOnsets = $state<{ midi: number; t: number }[]>([])
+
+  $effect(() => {
+    return onPolyEvent((ev) => {
+      if (ev.kind !== 'on') return
+      checkOnsets = [...checkOnsets.filter((o) => ev.t - o.t < 1.2), { midi: ev.midi, t: ev.t }]
+    })
+  })
+
+  const heardMidis = $derived([...new Set(checkOnsets.map((o) => o.midi))].sort((a, b) => a - b))
+  const heardNames = $derived(heardMidis.map((m) => Note.fromMidi(m)))
+  const heardChordNames = $derived(Chord.detect(heardNames))
+
+  const verdict = $derived.by(() => {
+    if (!heardMidis.length) return null
+    const expectedSet = new Set(handMidi)
+    const heardSet = new Set(heardMidis)
+    const exact = handMidi.every((m) => heardSet.has(m)) && heardMidis.every((m) => expectedSet.has(m))
+    if (exact) return { ok: true, text: `✓ That's ${chord.id}!` }
+    const pcs = (ms: Iterable<number>) => new Set([...ms].map((m) => m % 12))
+    const expPcs = pcs(handMidi)
+    const heardPcs = pcs(heardMidis)
+    if (expPcs.size === heardPcs.size && [...expPcs].every((p) => heardPcs.has(p)))
+      return { ok: true, text: `✓ Right notes — just in a different octave.` }
+    const missing = handMidi.filter((m) => !heardPcs.has(m % 12)).map((m) => Note.pitchClass(Note.fromMidi(m)))
+    const extra = heardMidis.filter((m) => !expPcs.has(m % 12)).map((m) => Note.pitchClass(Note.fromMidi(m)))
+    const parts: string[] = []
+    if (missing.length) parts.push(`missing ${missing.join(', ')}`)
+    if (extra.length) parts.push(`extra ${extra.join(', ')}`)
+    return { ok: false, text: `Not quite — ${parts.join('; ')}.` }
+  })
+
+  async function play(arpeggiate: boolean) {
+    if (playing) return
+    playing = true
+    try {
+      await playChord(handMidi, { arpeggiate })
+    } finally {
+      playing = false
+    }
+  }
+</script>
+
+<section>
+  <h1>Chords</h1>
+
+  <div class="controls">
+    <div class="control-group">
+      <span class="control-label">Root</span>
+      {#each CHORD_ROOTS as r (r)}
+        <button class:active={root === r} onclick={() => (root = r)}>{r}</button>
+      {/each}
+    </div>
+    <div class="control-group">
+      <span class="control-label">Quality</span>
+      {#each CHORD_QUALITIES as q (q.id)}
+        <button class:active={quality === q.id} onclick={() => selectQuality(q.id)}>{q.id}</button>
+      {/each}
+    </div>
+    <div class="control-group">
+      <span class="control-label">Inversion</span>
+      {#each inversionsFor(quality) as inv (inv)}
+        <button class:active={inversion === inv} onclick={() => (inversion = inv)}>
+          {INV_LABELS[inv]}
+        </button>
+      {/each}
+    </div>
+    <div class="control-group">
+      <span class="control-label">Hand</span>
+      <button class:active={hand === 'R'} onclick={() => (hand = 'R')}>Right</button>
+      <button class:active={hand === 'L'} onclick={() => (hand = 'L')}>Left</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>{chord.id}</h2>
+      <div>
+        <button class="primary" onclick={() => play(false)} disabled={playing}>▶ Block</button>
+        <button class="primary" onclick={() => play(true)} disabled={playing}>▶ Arpeggio</button>
+      </div>
+    </div>
+    <p class="hint">
+      Notes: {chord.noteNames.map((n) => Note.pitchClass(n)).join(' – ')} · Fingers
+      ({hand === 'R' ? 'right' : 'left'} hand, bottom to top):
+      {(hand === 'R' ? fingering.rh : fingering.lh).join(' – ')}
+    </p>
+    <SheetMusic {score} />
+    <PianoKeyboard
+      from={hand === 'R' ? 55 : 43}
+      to={hand === 'R' ? 89 : 77}
+      expected={expected}
+      fingers={fingerMap}
+      onkeyclick={(m) => playNote(m)}
+    />
+  </div>
+
+  <div class="card" style="margin-top: 16px">
+    <div class="card-head">
+      <h2>Check my chord</h2>
+      <MicButton poly={true} />
+    </div>
+    <p class="hint">
+      Start listening, then play <strong>{chord.id}</strong> on your piano and hold it. Chord
+      detection runs about a second behind — give it a moment.
+    </p>
+    {#if mic.status === 'running'}
+      {#if verdict}
+        <p class="verdict" class:ok={verdict.ok}>{verdict.text}</p>
+        <p class="hint">
+          Heard: {heardNames.join(' ')}
+          {#if heardChordNames.length}
+            — looks like {heardChordNames[0]}{/if}
+        </p>
+      {:else}
+        <p class="hint">Listening… play the chord.</p>
+      {/if}
+    {/if}
+  </div>
+</section>
+
+<style>
+  .verdict {
+    margin: 0;
+    font-weight: 600;
+    color: #b45309;
+  }
+  .verdict.ok {
+    color: #16a34a;
+  }
+</style>

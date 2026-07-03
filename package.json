@@ -1,0 +1,33 @@
+{
+  "name": "piano-tutor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^24.13.2",
+    "jsdom": "^27.0.1",
+    "playwright": "^1.61.1",
+    "svelte": "^5.56.4",
+    "svelte-check": "^4.7.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^3.2.6"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tensorflow/tfjs-backend-wasm": "^3.21.0",
+    "pitchy": "^4.1.0",
+    "tonal": "^6.4.3",
+    "tone": "^15.1.22",
+    "vexflow": "^5.0.0"
+  }
+}
