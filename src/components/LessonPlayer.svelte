@@ -3,14 +3,16 @@
   import PianoKeyboard from './PianoKeyboard.svelte'
   import SheetMusic from './SheetMusic.svelte'
   import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
-  import { monoPitch, onNoteEvent } from '../lib/audio/monoPitch.svelte'
-  import { onPolyEvent, polyPitch } from '../lib/audio/polyPitch.svelte'
+  import { mic } from '../lib/audio/mic.svelte'
+  import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
+  import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
   import { playChord, playSequence } from '../lib/audio/playback'
   import type { Lesson } from '../lib/data/lessons'
   import { scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import type { Finger } from '../lib/theory/types'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let { lesson, onexit }: { lesson: Lesson; onexit?: () => void } = $props()
 
@@ -155,6 +157,63 @@
       demoPlaying = false
     }
   }
+
+  const clampBpm = (n: number) => Math.max(40, Math.min(160, n))
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Lesson',
+      phrases: ['demo', 'restart', 'next part', 'metronome on at eighty', 'slower / faster', 'start listening'],
+      handle(intent) {
+        switch (intent.kind) {
+          case 'play-demo':
+            void demo()
+            return { say: '' }
+          case 'lesson':
+            if (intent.action === 'restart') {
+              restartSegment()
+              return { say: 'From the top.' }
+            }
+            if (intent.action === 'next') {
+              if (segIndex >= lesson.segments.length - 1) return { say: 'This is the last part.' }
+              restartSegment(segIndex + 1)
+              return { say: lesson.segments[segIndex].label }
+            }
+            if (intent.action === 'previous') {
+              if (segIndex === 0) return { say: 'Already at the first part.' }
+              restartSegment(segIndex - 1)
+              return { say: lesson.segments[segIndex].label }
+            }
+            return null // exit / new-melody belong to the Practice screen beneath
+          case 'metronome':
+            if (intent.action === 'stop') {
+              metronomeOn = false
+              return { say: '' }
+            }
+            if (intent.bpm !== undefined) bpm = clampBpm(intent.bpm)
+            metronomeOn = true
+            return { say: '' }
+          case 'set-bpm': {
+            const next = intent.bpm !== undefined ? intent.bpm : bpm + (intent.delta ?? 0)
+            bpm = clampBpm(next)
+            return { say: `${bpm}.` }
+          }
+          case 'mic':
+            if (intent.action === 'start') {
+              void startMonoDetection().then(() => {
+                if (lesson.detectionMode === 'poly' && mic.status === 'running') return startPolyDetection()
+              })
+              return { say: 'Listening.' }
+            }
+            if (lesson.detectionMode === 'poly') stopPolyDetection()
+            stopMonoDetection()
+            return { say: 'Stopped.' }
+          default:
+            return null
+        }
+      },
+    }),
+  )
 </script>
 
 <div class="card">

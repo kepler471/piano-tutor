@@ -1,0 +1,353 @@
+import { describe, expect, it } from 'vitest'
+import { allLessons } from '../lib/data/lessons'
+import { MAJOR_ROOTS, MINOR_ROOTS } from '../lib/theory/scales'
+import { buildGrammar, matchLesson, matchRoot, parseTranscript, wordsToNumber } from '../lib/voice/parser'
+
+describe('wake word', () => {
+  it('ignores utterances without the wake word', () => {
+    expect(parseTranscript('show me d major')).toBeNull()
+    expect(parseTranscript('[unk] [unk] stop')).toBeNull()
+    expect(parseTranscript('')).toBeNull()
+  })
+
+  it('wake word alone arms', () => {
+    expect(parseTranscript('piano')).toEqual({ kind: 'wake' })
+    expect(parseTranscript('hey piano')).toEqual({ kind: 'wake' })
+    expect(parseTranscript('okay piano')).toEqual({ kind: 'wake' })
+  })
+
+  it('parses without prefix when armed', () => {
+    expect(parseTranscript('go home', { armed: true })).toEqual({ kind: 'navigate', route: '/' })
+    expect(parseTranscript('go home', { armed: false })).toBeNull()
+  })
+
+  it('tolerates [unk] noise around the command', () => {
+    // Leading noise (a piano note before speaking) is stripped, not fatal.
+    expect(parseTranscript('[unk] piano stop [unk]')).toEqual({ kind: 'stop-all' })
+    expect(parseTranscript('piano [unk] stop')).toEqual({ kind: 'stop-all' })
+  })
+
+  it('wake word heard but gibberish → unknown', () => {
+    const intent = parseTranscript('piano purple monkey dishwasher')
+    expect(intent).toMatchObject({ kind: 'unknown' })
+  })
+})
+
+describe('navigation', () => {
+  const cases: [string, string][] = [
+    ['piano go home', '/'],
+    ['piano home', '/'],
+    ['piano open scales', '/scales'],
+    ['piano show scales', '/scales'],
+    ['piano scales', '/scales'],
+    ['piano go to chords', '/chords'],
+    ['piano open practice', '/practice'],
+    ['piano practice', '/practice'],
+    ['piano free play', '/play'],
+    ['piano open free play', '/play'],
+    ['piano tuner', '/tuner'],
+    ['piano note detector', '/tuner'],
+  ]
+  for (const [phrase, route] of cases) {
+    it(phrase, () => {
+      expect(parseTranscript(phrase)).toEqual({ kind: 'navigate', route })
+    })
+  }
+})
+
+describe('scales', () => {
+  it('show me the d major scale', () => {
+    expect(parseTranscript('piano show me the d major scale')).toEqual({
+      kind: 'show-scale',
+      root: 'D',
+      scaleType: 'major',
+      hand: undefined,
+      explicit: true,
+    })
+    // Without the word "scale" the intent is implicit (screens may reinterpret).
+    expect(parseTranscript('piano show me d major')).toMatchObject({ explicit: undefined })
+  })
+
+  it('be flat major → Bb (homophone)', () => {
+    expect(parseTranscript('piano show me be flat major')).toMatchObject({
+      kind: 'show-scale',
+      root: 'Bb',
+      scaleType: 'major',
+    })
+  })
+
+  it('e flat harmonic minor', () => {
+    expect(parseTranscript('piano e flat harmonic minor')).toMatchObject({
+      kind: 'show-scale',
+      root: 'Eb',
+      scaleType: 'harmonic minor',
+    })
+  })
+
+  it('bare minor maps to natural minor', () => {
+    expect(parseTranscript('piano show me b minor')).toMatchObject({
+      kind: 'show-scale',
+      root: 'B',
+      scaleType: 'natural minor',
+    })
+  })
+
+  it('"show me a d major" does not mistake the article for a root', () => {
+    expect(parseTranscript('piano show me a d major')).toMatchObject({
+      kind: 'show-scale',
+      root: 'D',
+    })
+  })
+
+  it('"a major" is a root when quality follows', () => {
+    expect(parseTranscript('piano a major scale')).toMatchObject({
+      kind: 'show-scale',
+      root: 'A',
+      scaleType: 'major',
+    })
+  })
+
+  it('left hand / right hand', () => {
+    expect(parseTranscript('piano left hand')).toEqual({ kind: 'set-hand', hand: 'L' })
+    expect(parseTranscript('piano right hand')).toEqual({ kind: 'set-hand', hand: 'R' })
+  })
+})
+
+describe('chords', () => {
+  it('d minor seventh first inversion', () => {
+    expect(parseTranscript('piano show me d minor seventh first inversion')).toEqual({
+      kind: 'show-chord',
+      root: 'D',
+      quality: 'minor 7th',
+      inversion: 1,
+      hand: undefined,
+    })
+  })
+
+  it('c sharp diminished', () => {
+    expect(parseTranscript('piano c sharp diminished')).toMatchObject({
+      kind: 'show-chord',
+      root: 'C#',
+      quality: 'diminished',
+    })
+  })
+
+  it('f dominant seventh', () => {
+    expect(parseTranscript('piano f dominant seventh')).toMatchObject({
+      kind: 'show-chord',
+      root: 'F',
+      quality: 'dominant 7th',
+    })
+  })
+
+  it('"d major chord" is a chord, not a scale', () => {
+    expect(parseTranscript('piano show me the d major chord')).toMatchObject({
+      kind: 'show-chord',
+      root: 'D',
+      quality: 'major',
+    })
+  })
+
+  it('bare "d major" defaults to scale', () => {
+    expect(parseTranscript('piano d major')).toMatchObject({ kind: 'show-scale' })
+  })
+
+  it('inversion without root', () => {
+    expect(parseTranscript('piano first inversion')).toEqual({ kind: 'set-inversion', inversion: 1 })
+    expect(parseTranscript('piano root position')).toEqual({ kind: 'set-inversion', inversion: 0 })
+    expect(parseTranscript('piano third inversion')).toEqual({ kind: 'set-inversion', inversion: 3 })
+  })
+
+  it('block and arpeggio demos', () => {
+    expect(parseTranscript('piano block')).toEqual({ kind: 'play-demo', variant: 'block' })
+    expect(parseTranscript('piano arpeggio')).toEqual({ kind: 'play-demo', variant: 'arpeggio' })
+    expect(parseTranscript('piano break it up')).toEqual({ kind: 'play-demo', variant: 'arpeggio' })
+  })
+})
+
+describe('metronome and tempo', () => {
+  it('start with bpm', () => {
+    expect(parseTranscript('piano start the metronome at ninety')).toEqual({
+      kind: 'metronome',
+      action: 'start',
+      bpm: 90,
+    })
+    expect(parseTranscript('piano metronome on at one hundred and twenty')).toMatchObject({
+      kind: 'metronome',
+      bpm: 120,
+    })
+  })
+
+  it('start without bpm', () => {
+    expect(parseTranscript('piano start the metronome')).toEqual({
+      kind: 'metronome',
+      action: 'start',
+      bpm: undefined,
+    })
+  })
+
+  it('stop', () => {
+    expect(parseTranscript('piano stop the metronome')).toEqual({ kind: 'metronome', action: 'stop' })
+    expect(parseTranscript('piano metronome off')).toEqual({ kind: 'metronome', action: 'stop' })
+  })
+
+  it('set tempo', () => {
+    expect(parseTranscript('piano set tempo to ninety')).toEqual({ kind: 'set-bpm', bpm: 90 })
+    expect(parseTranscript('piano tempo 120')).toEqual({ kind: 'set-bpm', bpm: 120 })
+  })
+
+  it('slower / faster', () => {
+    expect(parseTranscript('piano slower')).toEqual({ kind: 'set-bpm', delta: -10 })
+    expect(parseTranscript('piano faster')).toEqual({ kind: 'set-bpm', delta: 10 })
+  })
+})
+
+describe('global commands', () => {
+  it('stop / cancel', () => {
+    expect(parseTranscript('piano stop')).toEqual({ kind: 'stop-all' })
+    expect(parseTranscript('piano cancel')).toEqual({ kind: 'stop-all' })
+  })
+
+  it('help', () => {
+    expect(parseTranscript('piano help')).toEqual({ kind: 'help' })
+    expect(parseTranscript('piano what can i say')).toEqual({ kind: 'help' })
+  })
+
+  it('voice off', () => {
+    expect(parseTranscript('piano voice off')).toEqual({ kind: 'voice-off' })
+    expect(parseTranscript('piano go to sleep')).toEqual({ kind: 'voice-off' })
+  })
+
+  it('mic start/stop', () => {
+    expect(parseTranscript('piano start listening')).toEqual({ kind: 'mic', action: 'start' })
+    expect(parseTranscript('piano check my chord')).toEqual({ kind: 'mic', action: 'start' })
+    expect(parseTranscript('piano stop listening')).toEqual({ kind: 'mic', action: 'stop' })
+    expect(parseTranscript('piano stop the mic')).toEqual({ kind: 'mic', action: 'stop' })
+  })
+})
+
+describe('lessons and free play', () => {
+  it('practice five finger', () => {
+    expect(parseTranscript('piano practice five finger')).toEqual({
+      kind: 'open-lesson',
+      query: 'five finger',
+    })
+  })
+
+  it('bare lesson keyword', () => {
+    expect(parseTranscript('piano sight reading')).toMatchObject({ kind: 'open-lesson' })
+  })
+
+  it('lesson flow', () => {
+    expect(parseTranscript('piano restart')).toEqual({ kind: 'lesson', action: 'restart' })
+    expect(parseTranscript('piano next part')).toEqual({ kind: 'lesson', action: 'next' })
+    expect(parseTranscript('piano next')).toEqual({ kind: 'lesson', action: 'next' })
+    expect(parseTranscript('piano back to lessons')).toEqual({ kind: 'lesson', action: 'exit' })
+    expect(parseTranscript('piano new melody')).toEqual({ kind: 'lesson', action: 'new-melody' })
+  })
+
+  it('demo', () => {
+    expect(parseTranscript('piano demo')).toEqual({ kind: 'play-demo' })
+    expect(parseTranscript('piano play it')).toEqual({ kind: 'play-demo' })
+  })
+
+  it('free play controls', () => {
+    expect(parseTranscript('piano melody mode')).toEqual({
+      kind: 'free-play',
+      action: 'set-mode',
+      mode: 'melody',
+    })
+    expect(parseTranscript('piano chord mode')).toMatchObject({ mode: 'chords' })
+    expect(parseTranscript('piano record at one hundred')).toEqual({
+      kind: 'free-play',
+      action: 'record',
+      bpm: 100,
+    })
+    expect(parseTranscript('piano stop recording')).toEqual({
+      kind: 'free-play',
+      action: 'stop-recording',
+    })
+    expect(parseTranscript('piano clear')).toEqual({ kind: 'free-play', action: 'clear' })
+    expect(parseTranscript('piano copy the notes')).toEqual({ kind: 'free-play', action: 'copy' })
+  })
+})
+
+describe('wordsToNumber', () => {
+  it('parses words and digits', () => {
+    expect(wordsToNumber(['ninety'])).toBe(90)
+    expect(wordsToNumber(['one', 'hundred', 'and', 'twenty'])).toBe(120)
+    expect(wordsToNumber(['one', 'hundred', 'twenty'])).toBe(120)
+    expect(wordsToNumber(['a', 'hundred'])).toBe(100)
+    expect(wordsToNumber(['120'])).toBe(120)
+    expect(wordsToNumber(['sixty'])).toBe(60)
+  })
+
+  it('rejects absurd or missing values', () => {
+    expect(wordsToNumber(['five'])).toBeNull() // < 30
+    expect(wordsToNumber(['nine', 'hundred'])).toBeNull() // > 240
+    expect(wordsToNumber(['hello'])).toBeNull()
+    expect(wordsToNumber([])).toBeNull()
+  })
+})
+
+describe('matchRoot', () => {
+  it('maps enharmonics onto the available spelling', () => {
+    expect(matchRoot('C#', MAJOR_ROOTS)).toBe('Db')
+    expect(matchRoot('Db', MAJOR_ROOTS)).toBe('Db')
+    expect(matchRoot('Eb', MINOR_ROOTS)).toBe('Eb')
+    expect(matchRoot('D#', MINOR_ROOTS)).toBe('Eb')
+    expect(matchRoot('C', MAJOR_ROOTS)).toBe('C')
+  })
+
+  it('returns null for junk', () => {
+    expect(matchRoot('X', MAJOR_ROOTS)).toBeNull()
+  })
+})
+
+describe('matchLesson', () => {
+  const lessons = allLessons()
+
+  it('matches five finger with a root', () => {
+    const id = matchLesson('five finger in c', lessons)
+    expect(id).toBe('five-finger-C')
+  })
+
+  it('matches Hanon via alias', () => {
+    expect(matchLesson('finger exercise', lessons)).toBe('hanon-1')
+    expect(matchLesson('hanon', lessons)).toBe('hanon-1')
+  })
+
+  it('matches cadences and scale routine', () => {
+    expect(matchLesson('cadence in c', lessons)).toMatch(/^cadence-/)
+    expect(matchLesson('scale routine', lessons)).toMatch(/^scale-/)
+  })
+
+  it('returns null when nothing overlaps', () => {
+    expect(matchLesson('quantum banjo', lessons)).toBeNull()
+  })
+})
+
+describe('buildGrammar', () => {
+  const grammar = buildGrammar(allLessons())
+
+  it('includes [unk], the wake word, and core vocabulary', () => {
+    expect(grammar).toContain('[unk]')
+    expect(grammar).toContain('piano')
+    expect(grammar).toContain('metronome')
+    expect(grammar).toContain('seventh')
+    expect(grammar).toContain('ninety')
+    expect(grammar).toContain('hundred')
+  })
+
+  it('has no duplicates', () => {
+    expect(new Set(grammar).size).toBe(grammar.length)
+  })
+
+  it('excludes out-of-vocab proper nouns and non-alphabetic lesson tokens', () => {
+    expect(grammar).not.toContain('hanon')
+    for (const w of grammar) {
+      if (w === '[unk]') continue
+      expect(w).toMatch(/^[a-z]+$/)
+    }
+  })
+})

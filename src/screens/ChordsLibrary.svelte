@@ -4,12 +4,15 @@
   import PianoKeyboard from '../components/PianoKeyboard.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
   import { mic } from '../lib/audio/mic.svelte'
-  import { onPolyEvent } from '../lib/audio/polyPitch.svelte'
+  import { startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
+  import { onPolyEvent, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
   import { playChord, playNote } from '../lib/audio/playback'
   import { chordFingering } from '../lib/data/chordFingerings'
   import { scoreFromChord } from '../lib/notation/vexScore'
   import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
   import type { ChordQualityId, Finger, Hand } from '../lib/theory/types'
+  import { matchRoot } from '../lib/voice/parser'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let root = $state('C')
   let quality: ChordQualityId = $state('major')
@@ -83,6 +86,59 @@
       playing = false
     }
   }
+
+  function applyChordPick(pick: { root?: string; quality?: ChordQualityId; inversion?: number; hand?: Hand }) {
+    const matched = pick.root ? matchRoot(pick.root, CHORD_ROOTS) : null
+    if (pick.root && !matched) return { say: "I don't know that chord root." }
+    if (pick.quality) selectQuality(pick.quality)
+    if (matched) root = matched
+    if (pick.inversion !== undefined) {
+      if (pick.inversion >= qualityDef.size) return { say: `${quality} chords have no ${INV_LABELS[pick.inversion]}.` }
+      inversion = pick.inversion
+    }
+    if (pick.hand) hand = pick.hand
+    return { say: `${chord.id}.` }
+  }
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Chords',
+      phrases: ['show me d minor seventh', 'first inversion', 'block / arpeggio', 'check my chord'],
+      handle(intent) {
+        if (intent.kind === 'show-chord') return applyChordPick(intent)
+        if (intent.kind === 'show-scale' && !intent.explicit) {
+          // Browsing chords, "show me d minor" means the chord.
+          if (intent.scaleType === 'harmonic minor') return null // genuinely a scale — let it route
+          return applyChordPick({
+            root: intent.root,
+            quality: intent.scaleType === 'natural minor' ? 'minor' : intent.scaleType ? 'major' : undefined,
+            hand: intent.hand,
+          })
+        }
+        if (intent.kind === 'set-inversion') return applyChordPick({ inversion: intent.inversion })
+        if (intent.kind === 'set-hand') {
+          hand = intent.hand
+          return { say: intent.hand === 'L' ? 'Left hand.' : 'Right hand.' }
+        }
+        if (intent.kind === 'play-demo') {
+          void play(intent.variant === 'arpeggio')
+          return { say: '' }
+        }
+        if (intent.kind === 'mic' && intent.action === 'start') {
+          void startMonoDetection().then(() => {
+            if (mic.status === 'running') return startPolyDetection()
+          })
+          return { say: 'Listening — play the chord and hold it.' }
+        }
+        if (intent.kind === 'mic' && intent.action === 'stop') {
+          stopPolyDetection()
+          stopMonoDetection()
+          return { say: 'Stopped.' }
+        }
+        return null
+      },
+    }),
+  )
 </script>
 
 <section>

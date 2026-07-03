@@ -5,11 +5,12 @@
   import SheetMusic from '../components/SheetMusic.svelte'
   import { mic } from '../lib/audio/mic.svelte'
   import { startMetronome, stopMetronome } from '../lib/audio/metronome'
-  import { monoPitch, onNoteEvent } from '../lib/audio/monoPitch.svelte'
-  import { onPolyEvent, polyPitch, startPolyDetection } from '../lib/audio/polyPitch.svelte'
+  import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
+  import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
   import { scoreFromSequence } from '../lib/notation/vexScore'
   import { clusterOnsets, type Onset } from '../lib/transcribe/cluster'
   import { quantizeToGrid, type QuantizedEvent } from '../lib/transcribe/quantize'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let mode = $state<'melody' | 'chords'>('melody')
   let onsets = $state<Onset[]>([])
@@ -86,6 +87,55 @@
   async function copyNotes() {
     await navigator.clipboard.writeText(noteNamesText)
   }
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Free Play',
+      phrases: ['melody mode / chord mode', 'start listening', 'record at one hundred', 'stop recording', 'clear', 'copy the notes'],
+      handle(intent) {
+        if (intent.kind === 'free-play') {
+          switch (intent.action) {
+            case 'set-mode':
+              if (intent.mode) mode = intent.mode
+              return { say: mode === 'chords' ? 'Chord mode.' : 'Melody mode.' }
+            case 'record':
+              if (recState !== 'idle') return { say: 'Already recording.' }
+              if (mic.status !== 'running') return { say: 'Say start listening first, then record.' }
+              if (intent.bpm !== undefined) recBpm = Math.max(40, Math.min(160, intent.bpm))
+              void startRecording()
+              return { say: `Recording at ${recBpm} — one bar of count-in.` }
+            case 'stop-recording':
+              if (recState === 'idle') return { say: 'Not recording.' }
+              stopRecording()
+              return { say: 'Done.' }
+            case 'clear':
+              onsets = []
+              return { say: 'Cleared.' }
+            case 'copy':
+              if (!clustered.length) return { say: 'Nothing to copy yet.' }
+              void copyNotes()
+              return { say: 'Copied.' }
+          }
+        }
+        if (intent.kind === 'set-bpm' && recState === 'idle' && intent.bpm !== undefined) {
+          recBpm = Math.max(40, Math.min(160, intent.bpm))
+          return { say: `${recBpm}.` }
+        }
+        if (intent.kind === 'mic' && intent.action === 'start') {
+          void startMonoDetection().then(() => {
+            if (mode === 'chords' && mic.status === 'running') return startPolyDetection()
+          })
+          return { say: 'Listening.' }
+        }
+        if (intent.kind === 'mic' && intent.action === 'stop') {
+          if (mode === 'chords') stopPolyDetection()
+          stopMonoDetection()
+          return { say: 'Stopped.' }
+        }
+        return null
+      },
+    }),
+  )
 </script>
 
 <section>

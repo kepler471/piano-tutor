@@ -1,5 +1,7 @@
 <script lang="ts">
   import { currentRoute, navigate } from './router.svelte'
+  import VoiceButton from './components/VoiceButton.svelte'
+  import VoiceHud from './components/VoiceHud.svelte'
   import Home from './screens/Home.svelte'
   import ScalesLibrary from './screens/ScalesLibrary.svelte'
   import ChordsLibrary from './screens/ChordsLibrary.svelte'
@@ -26,6 +28,7 @@
       {l.label}
     </button>
   {/each}
+  <VoiceButton />
 </nav>
 
 <main>
@@ -43,6 +46,8 @@
     <Home />
   {/if}
 </main>
+
+<VoiceHud />
 
 <style>
   nav {

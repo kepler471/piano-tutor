@@ -44,11 +44,38 @@ function midiToName(midi: number): string {
   return Note.fromMidi(midi)
 }
 
-async function withPlayingFlag(durationSec: number): Promise<void> {
+let gateHolds = 0
+
+/**
+ * Marks app audio (demo playback, spoken feedback) as sounding so the pitch
+ * detectors ignore the mic. Returns a release function; the flag drops 300 ms
+ * after the last hold releases so detection does not pick up the release tail.
+ * `isPlaying` is a read-only live binding for importers — this is the only
+ * way for other modules to raise it.
+ */
+export function acquireAudioGate(): () => void {
+  gateHolds++
   isPlaying = true
-  // extra 300ms tail so mic detection does not pick up the release
-  await new Promise((r) => setTimeout(r, durationSec * 1000 + 300))
-  isPlaying = false
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    gateHolds--
+    setTimeout(() => {
+      if (gateHolds === 0) isPlaying = false
+    }, 300)
+  }
+}
+
+/** Best-effort immediate silence: releases all sounding sampler notes. */
+export function stopAllPlayback(): void {
+  sampler?.releaseAll()
+}
+
+async function withPlayingFlag(durationSec: number): Promise<void> {
+  const release = acquireAudioGate()
+  await new Promise((r) => setTimeout(r, durationSec * 1000))
+  release()
 }
 
 export async function playNote(midi: number, duration = 0.6): Promise<void> {

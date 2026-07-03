@@ -3,7 +3,8 @@
 Browser-based piano learning app for a beginner with a non-MIDI electric piano. The app listens
 through the microphone: fast monophonic pitch detection (pitchy/MPM) for instant feedback, and
 polyphonic detection (Spotify Basic Pitch on TF.js WASM, in a Web Worker) for chords and
-transcription.
+transcription. Fully voice-controllable (hands-free) via on-device Vosk speech recognition with
+a "piano, …" wake word.
 
 ## Commands
 
@@ -16,7 +17,8 @@ transcription.
 
 Svelte 5 (runes) + TypeScript + Vite · `vexflow@5` (notation) · `tonal` (theory) · `pitchy`
 (mono pitch) · `@spotify/basic-pitch` + `@tensorflow/tfjs-backend-wasm` (poly pitch) · `tone`
-(playback: Salamander piano samples + metronome).
+(playback: Salamander piano samples + metronome) · `vosk-browser` (voice commands, Kaldi WASM
+in a worker — dynamically imported so the ~6 MB chunk loads only when voice is enabled).
 
 ⚠️ basic-pitch pins `@tensorflow/tfjs@3.x`. Do not install tfjs independently; keep
 `tfjs-backend-wasm` at the same major/minor as `npm ls @tensorflow/tfjs` reports (3.21.0).
@@ -45,6 +47,24 @@ Svelte 5 (runes) + TypeScript + Vite · `vexflow@5` (notation) · `tonal` (theor
   - `playback.ts` sets `isPlaying` during demos; both detectors ignore the mic then (+300 ms
     tail) to avoid hearing the speakers. The metronome (`metronome.ts`) intentionally does NOT
     set it.
+- `src/lib/voice/` — hands-free voice control.
+  - `voice.svelte.ts` — singleton: taps the shared mic through the same capture worklet
+    (resampled to 16 kHz), feeds a grammar-constrained Vosk `KaldiRecognizer`, and dispatches
+    parsed intents. Persists enable state (`piano-tutor.voice-enabled`); drops audio chunks
+    while `playback.isPlaying || tts.speaking` so it never hears the app itself.
+  - `parser.ts` / `intents.ts` / `dispatcher.ts` — **pure** (vitest-covered). Wake word
+    ("piano, …"), note/quality/number/lesson-name parsing, and a scope-stack dispatcher:
+    screens register commands while mounted via `registerVoiceCommands` in an `$effect`;
+    cross-screen commands ("show me D major" from Home) navigate and replay the intent when
+    the target screen's scope registers (pending-intent, 10 s TTL). `buildGrammar()` generates
+    the Kaldi word-list grammar (+`"[unk]"`) so piano notes/chatter decode as `[unk]` and are
+    dropped before the wake-word check.
+  - `tts.ts` — speechSynthesis confirmations; holds the playback audio gate while speaking so
+    pitch detectors ignore the speakers. Feedback strings must never contain "piano".
+  - `modelLoader.ts` — streams the model download with progress into the Cache API
+    (`piano-tutor.vosk-model`), then hands vosk-browser a blob URL.
+  - Mic lifecycle: voice holds the mic via `mic.acquire()`/`release()` (refcounted) so
+    `stopMonoDetection()`'s `mic.stop()` can't tear down the stream while voice listens.
 - `src/lib/practice/` — `matcher.ts` is a pure cursor matcher ("wait, don't fail": wrong notes
   flash but never advance); `history.svelte.ts` persists completions to localStorage.
 - `src/lib/data/lessons/` — practice content (five-finger, Hanon No. 1, scale routine, I–IV–V–I
@@ -57,6 +77,9 @@ Svelte 5 (runes) + TypeScript + Vite · `vexflow@5` (notation) · `tonal` (theor
 - `model/` — Basic Pitch model, copied from `node_modules/@spotify/basic-pitch/model/`
 - `tfjs-wasm/` — WASM binaries, copied from `node_modules/@tensorflow/tfjs-backend-wasm/dist/`
 - `worklets/capture-processor.js` — AudioWorklet source (plain JS, no imports)
+- `model-vosk/vosk-model-small-en-us-0.15.tar.gz` — Vosk speech model (~41 MB, from
+  https://ccoreilly.github.io/vosk-browser/models/; version kept in the filename so immutable
+  caching is safe)
 
 Re-copy these after upgrading the corresponding packages.
 
@@ -69,3 +92,5 @@ Re-copy these after upgrading the corresponding packages.
   browser.
 - Audio-detection changes should extend the synthesized-audio tests in
   `src/tests/detection.test.ts` rather than relying on manual mic testing.
+
+Never add claude to the commit messages.

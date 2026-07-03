@@ -1,6 +1,8 @@
 <script lang="ts">
   import LessonPlayer from '../components/LessonPlayer.svelte'
   import { allLessons, makeSightReadingLesson, type Lesson } from '../lib/data/lessons'
+  import { matchLesson } from '../lib/voice/parser'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   const POLY_AVAILABLE = true
 
@@ -22,6 +24,37 @@
     'Sight-reading':
       'Short random melodies you have never seen — trains reading the staff instead of memorizing.',
   }
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Practice',
+      phrases: ['practice five finger', 'finger exercise', 'sight reading', 'new melody', 'back to lessons'],
+      handle(intent) {
+        if (intent.kind === 'open-lesson') {
+          if (/sight ?reading/.test(intent.query)) {
+            sightReading = makeSightReadingLesson()
+            selected = sightReading
+            return { say: 'Sight reading — a fresh melody.' }
+          }
+          const id = matchLesson(intent.query, lessons)
+          const lesson = lessons.find((l) => l.id === id)
+          if (!lesson) return { say: "I couldn't find that lesson." }
+          selected = lesson
+          return { say: lesson.title }
+        }
+        if (intent.kind === 'lesson' && intent.action === 'new-melody') {
+          sightReading = makeSightReadingLesson()
+          selected = sightReading
+          return { say: 'New melody.' }
+        }
+        if (intent.kind === 'lesson' && intent.action === 'exit') {
+          selected = null
+          return { say: '' }
+        }
+        return null
+      },
+    }),
+  )
 </script>
 
 <section>

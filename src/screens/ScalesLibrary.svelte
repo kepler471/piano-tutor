@@ -7,6 +7,8 @@
   import { scoreFromScale } from '../lib/notation/vexScore'
   import { SCALE_TYPES, getScale } from '../lib/theory/scales'
   import type { Finger, Hand, ScaleTypeId } from '../lib/theory/types'
+  import { matchRoot } from '../lib/voice/parser'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let typeId: ScaleTypeId = $state('major')
   let root = $state('C')
@@ -44,6 +46,34 @@
       playing = false
     }
   }
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Scales',
+      phrases: ['show me d major', 'e flat harmonic minor', 'left hand', 'play it'],
+      handle(intent) {
+        if (intent.kind === 'show-scale') {
+          const nextType = intent.scaleType ?? typeId
+          const roots = SCALE_TYPES.find((t) => t.id === nextType)!.roots
+          const matched = intent.root ? matchRoot(intent.root, roots) : null
+          if (intent.root && !matched) return { say: `I don't have that key as a ${nextType} scale.` }
+          selectType(nextType)
+          if (matched) root = matched
+          if (intent.hand) hand = intent.hand
+          return { say: `${root} ${typeId}.` }
+        }
+        if (intent.kind === 'set-hand') {
+          hand = intent.hand
+          return { say: intent.hand === 'L' ? 'Left hand.' : 'Right hand.' }
+        }
+        if (intent.kind === 'play-demo') {
+          void play()
+          return { say: '' }
+        }
+        return null
+      },
+    }),
+  )
 </script>
 
 <section>

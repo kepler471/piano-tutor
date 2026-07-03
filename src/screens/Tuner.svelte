@@ -2,7 +2,24 @@
   import { Note } from 'tonal'
   import MicButton from '../components/MicButton.svelte'
   import PianoKeyboard from '../components/PianoKeyboard.svelte'
-  import { monoPitch } from '../lib/audio/monoPitch.svelte'
+  import { monoPitch, startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+
+  $effect(() =>
+    registerVoiceCommands({
+      name: 'Note Detector',
+      phrases: ['start listening', 'stop listening'],
+      handle(intent) {
+        if (intent.kind !== 'mic') return null
+        if (intent.action === 'start') {
+          void startMonoDetection()
+          return { say: 'Listening — play a note.' }
+        }
+        stopMonoDetection()
+        return { say: 'Stopped.' }
+      },
+    }),
+  )
 
   const noteName = $derived(monoPitch.midi !== null ? Note.fromMidi(monoPitch.midi) : '—')
   const cents = $derived(Math.round(monoPitch.cents))
