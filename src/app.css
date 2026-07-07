@@ -112,3 +112,77 @@ button.primary:disabled {
   font-size: 13px;
   color: #64748b;
 }
+
+/* Hover/focus tooltip for controls whose label is a musical term (scale
+   types, chord qualities, quiz modes…). Desktop-only preview by design:
+   on touch, tapping selects — the screens show the selected item's
+   definition inline instead. Visual twin of Term.svelte's tooltip. */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(260px, 78vw);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+}
+
+/* Quiet text-link button (e.g. "← All lessons"). */
+button.ghost {
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Segmented pick-one buttons (lesson segments, quiz modes, levels…). */
+.seg {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+}
+
+.seg.active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.seg.small {
+  padding: 4px 10px;
+}
+
+/* Green completion banner shown when a segment/round/passage is done. */
+.complete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #166534;
+}

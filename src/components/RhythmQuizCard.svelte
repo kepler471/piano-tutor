@@ -14,6 +14,7 @@
     playing = false,
     onselect,
     onreplay,
+    explanation,
   }: {
     options: RhythmPattern[]
     answerId: string
@@ -21,6 +22,8 @@
     playing?: boolean
     onselect: (patternId: string) => void
     onreplay: () => void
+    /** Shown after the reveal (right or wrong) — the "why" behind the answer. */
+    explanation?: string
   } = $props()
 
   const revealed = $derived(selected !== null)
@@ -59,6 +62,9 @@
     <p class="verdict" class:good={selected === answerId}>
       {selected === answerId ? 'Correct!' : 'Not that one — the green line is what you heard.'}
     </p>
+    {#if explanation}
+      <p class="why">{explanation}</p>
+    {/if}
   {/if}
 </div>
 
@@ -105,5 +111,12 @@
   }
   .verdict.good {
     color: #166534;
+  }
+  .why {
+    margin: -6px 0 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 560px;
   }
 </style>

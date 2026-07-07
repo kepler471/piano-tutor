@@ -120,6 +120,13 @@
   }
 
   const needsChords = $derived(steps.some((s) => s.midis.length > 1))
+
+  // Next-step suggestions for the completion card: the following section
+  // (when practising by section), then hands-together (when on one hand).
+  const nextSection = $derived.by(() => {
+    const idx = song.sections.findIndex((s) => s.fromMeasure === fromMeasure && s.toMeasure === toMeasure)
+    return idx !== -1 ? song.sections[idx + 1] : undefined
+  })
 </script>
 
 <div class="card">
@@ -207,6 +214,26 @@
       >
         Play it again
       </button>
+      {#if nextSection}
+        <button class="primary" onclick={() => selectSection(nextSection.fromMeasure, nextSection.toMeasure)}>
+          Next: {nextSection.label} →
+        </button>
+      {/if}
+      {#if hands !== 'both'}
+        <button
+          class="primary"
+          onclick={() => {
+            hands = 'both'
+            resetKey++
+            version++
+          }}
+        >
+          Try hands together
+        </button>
+      {/if}
+      {#if onexit}
+        <button class="ghost" onclick={onexit}>← All songs</button>
+      {/if}
     </div>
   {:else}
     <p class="hint">
@@ -240,42 +267,11 @@
   .spacer {
     flex: 1;
   }
-  .seg {
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-  }
-  .seg.active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    color: #fff;
-  }
-  .ghost {
-    border: none;
-    background: none;
-    color: #1d4ed8;
-    cursor: pointer;
-    font-size: 14px;
-  }
   .show-kb {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 13px;
     color: #475569;
-  }
-  .complete {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-weight: 600;
-    color: #166534;
   }
 </style>

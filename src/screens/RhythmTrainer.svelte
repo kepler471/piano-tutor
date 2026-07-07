@@ -1,4 +1,6 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
+  import GlossText from '../components/GlossText.svelte'
   import InputPicker from '../components/InputPicker.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
   import { getAnchorMs, onBeat, startMetronome, stopMetronome } from '../lib/audio/metronome'
@@ -148,6 +150,7 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Rhythm Trainer</h1>
   <p class="hint">
     Tap the rhythm on any key while the metronome clicks — the score lights up green where you were
@@ -169,7 +172,7 @@
 
   <div class="controls-row">
     {#each levelPatterns as p (p.id)}
-      <button class="seg" class:active={pattern.id === p.id} onclick={() => selectPattern(p.id)}>
+      <button class="seg" class:active={pattern.id === p.id} data-tip={p.hint} onclick={() => selectPattern(p.id)}>
         {p.label}{p.swing ? ' 𝄋' : ''}
       </button>
     {/each}
@@ -177,7 +180,7 @@
 
   <div class="card">
     {#if pattern.hint}
-      <p class="hint">{pattern.hint}{pattern.swing ? ' (swing feel)' : ''}</p>
+      <p class="hint"><GlossText text={pattern.hint + (pattern.swing ? ' (swing feel)' : '')} /></p>
     {/if}
 
     <InputPicker preferred="mono" />
@@ -223,18 +226,6 @@
   .spacer {
     flex: 1;
   }
-  .seg {
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-  }
-  .seg.active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    color: #fff;
-  }
   .bpm {
     display: flex;
     align-items: center;
@@ -265,18 +256,6 @@
   }
   .count.live {
     color: #16a34a;
-  }
-  .complete {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-weight: 600;
-    color: #166534;
   }
   .legend .lg.green {
     color: #16a34a;

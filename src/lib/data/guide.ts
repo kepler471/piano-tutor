@@ -52,26 +52,62 @@ export interface GuideStage {
   moveOnWhen: string[]
 }
 
-/** Hash href for a guide link, e.g. '#/practice?lesson=scale-C-major'. */
+/**
+ * Hash href for a guide link, e.g. '#/practice?lesson=scale-C-major&from=guide'.
+ * Every link carries from=guide so target screens can offer a way back.
+ */
 export function guideHref(link: GuideLink): string {
+  const from = { from: 'guide' }
   switch (link.kind) {
     case 'lesson':
-      return '#' + buildHash('/practice', { lesson: link.lessonId })
+      return '#' + buildHash('/practice', { lesson: link.lessonId, ...from })
     case 'song':
-      return '#' + buildHash('/songs', { song: link.songId })
+      return '#' + buildHash('/songs', { song: link.songId, ...from })
     case 'quiz':
-      return '#' + buildHash('/quizzes', { mode: link.mode, level: String(link.level) })
+      return '#' + buildHash('/quizzes', { mode: link.mode, level: String(link.level), ...from })
     case 'rhythm':
-      return '#' + buildHash('/rhythm', { level: String(link.level) })
+      return '#' + buildHash('/rhythm', { level: String(link.level), ...from })
     case 'sight':
-      return '#' + buildHash('/practice', { sight: String(link.level) })
+      return '#' + buildHash('/practice', { sight: String(link.level), ...from })
     case 'scale':
-      return '#' + buildHash('/scales', { root: link.root, type: link.type })
+      return '#' + buildHash('/scales', { root: link.root, type: link.type, ...from })
     case 'chord':
-      return '#' + buildHash('/chords', { root: link.root, quality: link.quality })
+      return '#' + buildHash('/chords', { root: link.root, quality: link.quality, ...from })
     case 'route':
-      return '#' + link.route
+      return '#' + buildHash(...splitRoute(link.route))
   }
+}
+
+/** '/quizzes?mode=echo' → ['/quizzes', {mode: 'echo', from: 'guide'}] */
+function splitRoute(route: string): [string, Record<string, string>] {
+  const qIndex = route.indexOf('?')
+  const path = qIndex === -1 ? route : route.slice(0, qIndex)
+  const params: Record<string, string> = { from: 'guide' }
+  if (qIndex !== -1) {
+    for (const pair of route.slice(qIndex + 1).split('&')) {
+      const [k, v = ''] = pair.split('=')
+      if (k) params[decodeURIComponent(k)] = decodeURIComponent(v)
+    }
+  }
+  return [path, params]
+}
+
+/**
+ * Where each practice method is introduced in the guide — the Practice screen
+ * renders these as "Guide →" chips. Stage ids are integrity-tested against
+ * GUIDE_STAGES (and method names against the lesson registry) in guide.test.ts.
+ */
+export const METHOD_GUIDE_STAGE: Record<string, string> = {
+  'Five-finger positions': 'stage-1',
+  Hanon: 'stage-1',
+  'Sight-reading': 'stage-1',
+  'Scale routine': 'stage-2',
+  Arpeggios: 'stage-2',
+  'Cadence drills': 'stage-2',
+  'Broken chords': 'stage-3',
+  'Chromatic scale': 'stage-4',
+  'Contrary motion': 'stage-4',
+  'Jazz & blues': 'stage-5',
 }
 
 const lesson = (lessonId: string, label: string): GuideLink => ({ kind: 'lesson', lessonId, label })

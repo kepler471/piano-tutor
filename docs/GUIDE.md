@@ -27,43 +27,43 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
-- Five-finger position in C — `#/practice?lesson=five-finger-C`
-- Five-finger position in G — `#/practice?lesson=five-finger-G`
-- Five-finger position in F — `#/practice?lesson=five-finger-F`
-- Hanon No. 1 — first finger exercise — `#/practice?lesson=hanon-1`
+- Five-finger position in C — `#/practice?lesson=five-finger-C&from=guide`
+- Five-finger position in G — `#/practice?lesson=five-finger-G&from=guide`
+- Five-finger position in F — `#/practice?lesson=five-finger-F&from=guide`
+- Hanon No. 1 — first finger exercise — `#/practice?lesson=hanon-1&from=guide`
 
 **Pieces**
 
-- Twinkle, Twinkle, Little Star — `#/songs?song=twinkle-twinkle`
-- Mary Had a Little Lamb — `#/songs?song=mary-had-a-little-lamb`
-- Ode to Joy (Beethoven) — `#/songs?song=ode-to-joy`
+- Twinkle, Twinkle, Little Star — `#/songs?song=twinkle-twinkle&from=guide`
+- Mary Had a Little Lamb — `#/songs?song=mary-had-a-little-lamb&from=guide`
+- Ode to Joy (Beethoven) — `#/songs?song=ode-to-joy&from=guide`
 
 **Ear**
 
-- Intervals — level 1 (up, down, or the same?) — `#/quizzes?mode=intervals&level=1`
+- Intervals — level 1 (up, down, or the same?) — `#/quizzes?mode=intervals&level=1&from=guide`
 
 **Rhythm**
 
-- Rhythm — level 1 (quarters, halves, whole notes) — `#/rhythm?level=1`
+- Rhythm — level 1 (quarters, halves, whole notes) — `#/rhythm?level=1&from=guide`
 
 **Sight-reading**
 
-- Sight-reading — level 1 (C position, one note at a time) — `#/practice?sight=1`
+- Sight-reading — level 1 (C position, one note at a time) — `#/practice?sight=1&from=guide`
 
 ### The staff, the clefs, and note names
 
 Music is written on a five-line staff. The treble clef (𝄞) marks the staff your right hand usually reads; the bass clef (𝄢) the left. Middle C sits between them on its own small ledger line. Notes climb line-space-line-space; every eighth note the letter names repeat. Learn a few anchor notes (middle C, treble G, bass F) and count neighbours from them rather than memorizing every line at once.
 
-- Quiz: name the note on the staff — `#/quizzes?mode=note-naming&level=1`
-- Note Detector — play a key, see its name and notation — `#/tuner`
-- Practice reading single notes in C position — `#/practice?sight=1`
+- Quiz: name the note on the staff — `#/quizzes?mode=note-naming&level=1&from=guide`
+- Note Detector — play a key, see its name and notation — `#/tuner?from=guide`
+- Practice reading single notes in C position — `#/practice?sight=1&from=guide`
 
 ### Counting time
 
 Rhythm is arithmetic you can feel: a whole note lasts four beats, a half note two, a quarter one. The time signature tells you how many beats fill a bar. Count out loud — "1, 2, 3, 4" — while you play; the notes that feel long are the ones you are counting through. The metronome is not a critic, it is a dance partner: put it on 60 and land your quarters exactly with the clicks.
 
-- Tap level-1 rhythms against the metronome — `#/rhythm?level=1`
-- Quiz: hear a rhythm, pick its notation — `#/quizzes?mode=rhythm-dictation&level=1`
+- Tap level-1 rhythms against the metronome — `#/rhythm?level=1&from=guide`
+- Quiz: hear a rhythm, pick its notation — `#/quizzes?mode=rhythm-dictation&level=1&from=guide`
 
 ### A week at this stage (~20 min/day)
 
@@ -108,50 +108,50 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
-- C major scale (1 & 2 octaves, hands together) — `#/practice?lesson=scale-C-major`
-- G major scale — `#/practice?lesson=scale-G-major`
-- D major scale — `#/practice?lesson=scale-D-major`
-- F major scale — `#/practice?lesson=scale-F-major`
-- C major arpeggio — `#/practice?lesson=arpeggio-C-major`
-- G major arpeggio — `#/practice?lesson=arpeggio-G-major`
-- F major arpeggio — `#/practice?lesson=arpeggio-F-major`
-- I–IV–V–I cadence in C — `#/practice?lesson=cadence-C`
+- C major scale (1 & 2 octaves, hands together) — `#/practice?lesson=scale-C-major&from=guide`
+- G major scale — `#/practice?lesson=scale-G-major&from=guide`
+- D major scale — `#/practice?lesson=scale-D-major&from=guide`
+- F major scale — `#/practice?lesson=scale-F-major&from=guide`
+- C major arpeggio — `#/practice?lesson=arpeggio-C-major&from=guide`
+- G major arpeggio — `#/practice?lesson=arpeggio-G-major&from=guide`
+- F major arpeggio — `#/practice?lesson=arpeggio-F-major&from=guide`
+- I–IV–V–I cadence in C — `#/practice?lesson=cadence-C&from=guide`
 
 **Pieces**
 
-- Jingle Bells — `#/songs?song=jingle-bells`
-- When the Saints Go Marching In — `#/songs?song=when-the-saints`
-- Minuet in G (Petzold) — stretch piece — `#/songs?song=minuet-in-g`
+- Jingle Bells — `#/songs?song=jingle-bells&from=guide`
+- When the Saints Go Marching In — `#/songs?song=when-the-saints&from=guide`
+- Minuet in G (Petzold) — stretch piece — `#/songs?song=minuet-in-g&from=guide`
 
 **Ear**
 
-- Intervals — level 2 — `#/quizzes?mode=intervals&level=2`
-- Chord qualities — level 1 (major vs minor) — `#/quizzes?mode=chords&level=1`
-- Play it back — level 1 — `#/quizzes?mode=echo&level=1`
+- Intervals — level 2 — `#/quizzes?mode=intervals&level=2&from=guide`
+- Chord qualities — level 1 (major vs minor) — `#/quizzes?mode=chords&level=1&from=guide`
+- Play it back — level 1 — `#/quizzes?mode=echo&level=1&from=guide`
 
 **Rhythm**
 
-- Rhythm — level 2 (eighth notes, rests, off-beats) — `#/rhythm?level=2`
+- Rhythm — level 2 (eighth notes, rests, off-beats) — `#/rhythm?level=2&from=guide`
 
 **Sight-reading**
 
-- Sight-reading — level 2 (G, D and F positions, skips) — `#/practice?sight=2`
+- Sight-reading — level 2 (G, D and F positions, skips) — `#/practice?sight=2&from=guide`
 
 ### Key signatures: your first sharps and flats
 
 A key signature at the start of each line tells you which notes are always sharp or flat. G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures physical: your fingers learn where the black keys live in each key.
 
-- Quiz: read the key signature — `#/quizzes?mode=key-signature&level=1`
-- G major in the scale library — `#/scales?root=G&type=major`
-- F major in the scale library — `#/scales?root=F&type=major`
+- Quiz: read the key signature — `#/quizzes?mode=key-signature&level=1&from=guide`
+- G major in the scale library — `#/scales?root=G&type=major&from=guide`
+- F major in the scale library — `#/scales?root=F&type=major&from=guide`
 
 ### Intervals: the distance between notes
 
 An interval is the distance between two notes, counted in letter names: C to E is a 3rd, C to G a 5th. Reading by interval ("up a 3rd") is faster than naming every note, and hearing intervals is how melodies become predictable. The interval quiz trains your ear; sight-reading trains your eye to see the same distances on the staff.
 
-- Interval ear quiz — `#/quizzes?mode=intervals&level=2`
-- Quiz: intervals on the staff — `#/quizzes?mode=interval-staff&level=1`
-- Read by interval in sight-reading — `#/practice?sight=2`
+- Interval ear quiz — `#/quizzes?mode=intervals&level=2&from=guide`
+- Quiz: intervals on the staff — `#/quizzes?mode=interval-staff&level=1&from=guide`
+- Read by interval in sight-reading — `#/practice?sight=2&from=guide`
 
 ### A week at this stage (~30 min/day)
 
@@ -197,55 +197,55 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
-- A harmonic minor scale — `#/practice?lesson=scale-A-harmonic-minor`
-- E harmonic minor scale — `#/practice?lesson=scale-E-harmonic-minor`
-- D harmonic minor scale — `#/practice?lesson=scale-D-harmonic-minor`
-- C major broken chords — `#/practice?lesson=broken-C-major`
-- A minor broken chords — `#/practice?lesson=broken-A-minor`
-- G major broken chords — `#/practice?lesson=broken-G-major`
-- I–IV–V–I cadence in G — `#/practice?lesson=cadence-G`
-- I–IV–V–I cadence in F — `#/practice?lesson=cadence-F`
+- A harmonic minor scale — `#/practice?lesson=scale-A-harmonic-minor&from=guide`
+- E harmonic minor scale — `#/practice?lesson=scale-E-harmonic-minor&from=guide`
+- D harmonic minor scale — `#/practice?lesson=scale-D-harmonic-minor&from=guide`
+- C major broken chords — `#/practice?lesson=broken-C-major&from=guide`
+- A minor broken chords — `#/practice?lesson=broken-A-minor&from=guide`
+- G major broken chords — `#/practice?lesson=broken-G-major&from=guide`
+- I–IV–V–I cadence in G — `#/practice?lesson=cadence-G&from=guide`
+- I–IV–V–I cadence in F — `#/practice?lesson=cadence-F&from=guide`
 
 **Pieces**
 
-- Melody, Op. 68 No. 1 (Schumann) — `#/songs?song=schumann-melodie`
-- La Candeur, Op. 100 No. 1 (Burgmüller) — `#/songs?song=burgmuller-la-candeur`
-- Old French Song (Tchaikovsky) — `#/songs?song=old-french-song`
-- St. James Infirmary — `#/songs?song=st-james-infirmary`
-- 12-Bar Blues in C — `#/songs?song=twelve-bar-blues-c`
-- Für Elise — theme (Beethoven) — `#/songs?song=fur-elise`
-- The Entertainer — easy arrangement (Joplin) — `#/songs?song=the-entertainer-easy`
+- Melody, Op. 68 No. 1 (Schumann) — `#/songs?song=schumann-melodie&from=guide`
+- La Candeur, Op. 100 No. 1 (Burgmüller) — `#/songs?song=burgmuller-la-candeur&from=guide`
+- Old French Song (Tchaikovsky) — `#/songs?song=old-french-song&from=guide`
+- St. James Infirmary — `#/songs?song=st-james-infirmary&from=guide`
+- 12-Bar Blues in C — `#/songs?song=twelve-bar-blues-c&from=guide`
+- Für Elise — theme (Beethoven) — `#/songs?song=fur-elise&from=guide`
+- The Entertainer — easy arrangement (Joplin) — `#/songs?song=the-entertainer-easy&from=guide`
 
 **Ear**
 
-- Chord qualities — level 2 (adds diminished & augmented) — `#/quizzes?mode=chords&level=2`
-- Intervals — level 3 — `#/quizzes?mode=intervals&level=3`
-- Play it back — level 2 — `#/quizzes?mode=echo&level=2`
+- Chord qualities — level 2 (adds diminished & augmented) — `#/quizzes?mode=chords&level=2&from=guide`
+- Intervals — level 3 — `#/quizzes?mode=intervals&level=3&from=guide`
+- Play it back — level 2 — `#/quizzes?mode=echo&level=2&from=guide`
 
 **Rhythm**
 
-- Rhythm — level 3 (dotted rhythms & syncopation) — `#/rhythm?level=3`
-- Rhythm dictation — hear it, pick the notation — `#/quizzes?mode=rhythm-dictation&level=2`
+- Rhythm — level 3 (dotted rhythms & syncopation) — `#/rhythm?level=3&from=guide`
+- Rhythm dictation — hear it, pick the notation — `#/quizzes?mode=rhythm-dictation&level=2&from=guide`
 
 **Sight-reading**
 
-- Sight-reading — level 3 (bass clef, accidentals) — `#/practice?sight=3`
+- Sight-reading — level 3 (bass clef, accidentals) — `#/practice?sight=3&from=guide`
 
 ### Relative minors: two keys, one signature
 
 Every key signature serves two keys: a major and its relative minor, three semitones below (C major / A minor share no sharps or flats). Minor pieces usually raise the 7th note as an accidental in the score — that raised note is why the harmonic minor scale sounds the way it does, and why you practice it.
 
-- A harmonic minor in the scale library — `#/scales?root=A&type=harmonic%20minor`
-- A natural minor for comparison — `#/scales?root=A&type=natural%20minor`
+- A harmonic minor in the scale library — `#/scales?root=A&type=harmonic%20minor&from=guide`
+- A natural minor for comparison — `#/scales?root=A&type=natural%20minor&from=guide`
 
 ### Primary chords: I, IV and V
 
 Almost every simple piece is built from three chords: the tonic (I), subdominant (IV) and dominant (V), built on the 1st, 4th and 5th notes of the key. The cadence drills teach your hands their shapes; the blues teaches you to hear them go by — a 12-bar blues is nothing but I, IV and V in a fixed order.
 
-- Cadences in G — `#/practice?lesson=cadence-G`
-- Quiz: which chord is V? — `#/quizzes?mode=chord-function&level=1`
-- Quiz: spell the chord — `#/quizzes?mode=chord-spelling&level=1`
-- Hear I–IV–V in the 12-bar blues — `#/songs?song=twelve-bar-blues-c`
+- Cadences in G — `#/practice?lesson=cadence-G&from=guide`
+- Quiz: which chord is V? — `#/quizzes?mode=chord-function&level=1&from=guide`
+- Quiz: spell the chord — `#/quizzes?mode=chord-spelling&level=1&from=guide`
+- Hear I–IV–V in the 12-bar blues — `#/songs?song=twelve-bar-blues-c&from=guide`
 
 ### A week at this stage (~40 min/day)
 
@@ -292,57 +292,57 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
-- B♭ major scale — `#/practice?lesson=scale-Bb-major`
-- E♭ major scale — `#/practice?lesson=scale-Eb-major`
-- A major scale — `#/practice?lesson=scale-A-major`
-- B harmonic minor scale — `#/practice?lesson=scale-B-harmonic-minor`
-- A melodic minor scale — `#/practice?lesson=scale-A-melodic-minor`
-- D melodic minor scale — `#/practice?lesson=scale-D-melodic-minor`
-- Chromatic scale from C — `#/practice?lesson=chromatic-C`
-- C major in contrary motion — `#/practice?lesson=contrary-C-major`
-- G major in contrary motion — `#/practice?lesson=contrary-G-major`
-- B♭ major arpeggio (black-key root) — `#/practice?lesson=arpeggio-Bb-major`
-- A minor arpeggio — `#/practice?lesson=arpeggio-A-minor`
-- D minor arpeggio — `#/practice?lesson=arpeggio-D-minor`
+- B♭ major scale — `#/practice?lesson=scale-Bb-major&from=guide`
+- E♭ major scale — `#/practice?lesson=scale-Eb-major&from=guide`
+- A major scale — `#/practice?lesson=scale-A-major&from=guide`
+- B harmonic minor scale — `#/practice?lesson=scale-B-harmonic-minor&from=guide`
+- A melodic minor scale — `#/practice?lesson=scale-A-melodic-minor&from=guide`
+- D melodic minor scale — `#/practice?lesson=scale-D-melodic-minor&from=guide`
+- Chromatic scale from C — `#/practice?lesson=chromatic-C&from=guide`
+- C major in contrary motion — `#/practice?lesson=contrary-C-major&from=guide`
+- G major in contrary motion — `#/practice?lesson=contrary-G-major&from=guide`
+- B♭ major arpeggio (black-key root) — `#/practice?lesson=arpeggio-Bb-major&from=guide`
+- A minor arpeggio — `#/practice?lesson=arpeggio-A-minor&from=guide`
+- D minor arpeggio — `#/practice?lesson=arpeggio-D-minor&from=guide`
 
 **Pieces**
 
-- Arabesque, Op. 100 No. 2 (Burgmüller) — `#/songs?song=burgmuller-arabesque`
-- The Wild Horseman, Op. 68 No. 8 (Schumann) — `#/songs?song=schumann-wild-rider`
-- Sonatina Op. 36 No. 1, 1st movement (Clementi) — `#/songs?song=clementi-sonatina-1`
-- Prelude in C (Bach, WTC I) — opening — `#/songs?song=bach-prelude-c`
-- Jazz Blues in G with walking bass — `#/songs?song=jazz-blues-walking-g`
+- Arabesque, Op. 100 No. 2 (Burgmüller) — `#/songs?song=burgmuller-arabesque&from=guide`
+- The Wild Horseman, Op. 68 No. 8 (Schumann) — `#/songs?song=schumann-wild-rider&from=guide`
+- Sonatina Op. 36 No. 1, 1st movement (Clementi) — `#/songs?song=clementi-sonatina-1&from=guide`
+- Prelude in C (Bach, WTC I) — opening — `#/songs?song=bach-prelude-c&from=guide`
+- Jazz Blues in G with walking bass — `#/songs?song=jazz-blues-walking-g&from=guide`
 
 **Ear**
 
-- Chord qualities — level 3 (adds 7th chords) — `#/quizzes?mode=chords&level=3`
-- Intervals — level 4 (all twelve) — `#/quizzes?mode=intervals&level=4`
-- Cadences — perfect or plagal? — `#/quizzes?mode=cadence&level=1`
-- Play it back — level 3 — `#/quizzes?mode=echo&level=3`
+- Chord qualities — level 3 (adds 7th chords) — `#/quizzes?mode=chords&level=3&from=guide`
+- Intervals — level 4 (all twelve) — `#/quizzes?mode=intervals&level=4&from=guide`
+- Cadences — perfect or plagal? — `#/quizzes?mode=cadence&level=1&from=guide`
+- Play it back — level 3 — `#/quizzes?mode=echo&level=3&from=guide`
 
 **Rhythm**
 
-- Rhythm — level 4 (swing, Charleston, comping) — `#/rhythm?level=4`
+- Rhythm — level 4 (swing, Charleston, comping) — `#/rhythm?level=4&from=guide`
 
 **Sight-reading**
 
-- Sight-reading — level 4 (eighths & dotted rhythms) — `#/practice?sight=4`
+- Sight-reading — level 4 (eighths & dotted rhythms) — `#/practice?sight=4&from=guide`
 
 ### Seventh chords and the circle of fifths
 
 Add one more third on top of a triad and you get a seventh chord — the sound of jazz and of every dominant that pulls home to its tonic. The circle of fifths orders all twelve keys by how many sharps or flats they carry; moving one step around it adds one accidental. Practice scales in circle order (C, G, D, A… / C, F, B♭, E♭…) and the pattern becomes second nature.
 
-- G7 in the chord library — `#/chords?root=G&quality=dominant%207th`
-- Hear 7th chords in the ear quiz — `#/quizzes?mode=chords&level=3`
-- Quiz: spell the 7th chords — `#/quizzes?mode=chord-spelling&level=3`
-- Quiz: key signatures around the circle — `#/quizzes?mode=key-signature&level=3`
+- G7 in the chord library — `#/chords?root=G&quality=dominant%207th&from=guide`
+- Hear 7th chords in the ear quiz — `#/quizzes?mode=chords&level=3&from=guide`
+- Quiz: spell the 7th chords — `#/quizzes?mode=chord-spelling&level=3&from=guide`
+- Quiz: key signatures around the circle — `#/quizzes?mode=key-signature&level=3&from=guide`
 
 ### Three flavours of minor
 
 Minor is not one scale but a family. Natural minor is what the key signature gives you; harmonic minor raises the 7th so the dominant chord can pull home; melodic minor also raises the 6th on the way up so the line climbs smoothly, then relaxes back to natural on the way down. Composers mix all three freely inside a single minor-key piece — that is why minor pieces are speckled with accidentals.
 
-- A melodic minor — hear both directions — `#/practice?lesson=scale-A-melodic-minor`
-- Compare in the scale library — `#/scales?root=A&type=harmonic%20minor`
+- A melodic minor — hear both directions — `#/practice?lesson=scale-A-melodic-minor&from=guide`
+- Compare in the scale library — `#/scales?root=A&type=harmonic%20minor&from=guide`
 
 ### A week at this stage (~45 min/day)
 
@@ -389,59 +389,59 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
-- B major scale — `#/practice?lesson=scale-B-major`
-- F♯ major scale — `#/practice?lesson=scale-F%23-major`
-- D♭ major scale — `#/practice?lesson=scale-Db-major`
-- C♯ harmonic minor scale — `#/practice?lesson=scale-C%23-harmonic-minor`
-- E melodic minor scale — `#/practice?lesson=scale-E-melodic-minor`
-- Chromatic scale from A — `#/practice?lesson=chromatic-A`
-- E major in contrary motion — `#/practice?lesson=contrary-E-major`
-- D♭ major arpeggio — `#/practice?lesson=arpeggio-Db-major`
-- F♯ minor arpeggio — `#/practice?lesson=arpeggio-F%23-minor`
-- ii–V–I in C with guide tones — `#/practice?lesson=jazz-251-C`
-- ii–V–I in F — `#/practice?lesson=jazz-251-F`
-- C blues scale — `#/practice?lesson=jazz-blues-scale-C`
-- 12-bar blues comping in C — `#/practice?lesson=jazz-blues-comp-C`
+- B major scale — `#/practice?lesson=scale-B-major&from=guide`
+- F♯ major scale — `#/practice?lesson=scale-F%23-major&from=guide`
+- D♭ major scale — `#/practice?lesson=scale-Db-major&from=guide`
+- C♯ harmonic minor scale — `#/practice?lesson=scale-C%23-harmonic-minor&from=guide`
+- E melodic minor scale — `#/practice?lesson=scale-E-melodic-minor&from=guide`
+- Chromatic scale from A — `#/practice?lesson=chromatic-A&from=guide`
+- E major in contrary motion — `#/practice?lesson=contrary-E-major&from=guide`
+- D♭ major arpeggio — `#/practice?lesson=arpeggio-Db-major&from=guide`
+- F♯ minor arpeggio — `#/practice?lesson=arpeggio-F%23-minor&from=guide`
+- ii–V–I in C with guide tones — `#/practice?lesson=jazz-251-C&from=guide`
+- ii–V–I in F — `#/practice?lesson=jazz-251-F&from=guide`
+- C blues scale — `#/practice?lesson=jazz-blues-scale-C&from=guide`
+- 12-bar blues comping in C — `#/practice?lesson=jazz-blues-comp-C&from=guide`
 
 **Pieces**
 
-- Gymnopédie No. 1 (Satie) — `#/songs?song=gymnopedie-1`
-- Ballade, Op. 100 No. 15 (Burgmüller) — `#/songs?song=burgmuller-ballade`
-- Canon in D (Pachelbel) — `#/songs?song=canon-in-d`
-- ii–V–I Étude (swing) — `#/songs?song=ii-v-i-etude`
-- Maple Leaf Rag — A strain (Joplin) — `#/songs?song=maple-leaf-rag`
-- Prelude in E minor, Op. 28 No. 4 (Chopin) — `#/songs?song=chopin-prelude-e-minor`
-- When the Saints — stride version — `#/songs?song=when-the-saints-stride`
+- Gymnopédie No. 1 (Satie) — `#/songs?song=gymnopedie-1&from=guide`
+- Ballade, Op. 100 No. 15 (Burgmüller) — `#/songs?song=burgmuller-ballade&from=guide`
+- Canon in D (Pachelbel) — `#/songs?song=canon-in-d&from=guide`
+- ii–V–I Étude (swing) — `#/songs?song=ii-v-i-etude&from=guide`
+- Maple Leaf Rag — A strain (Joplin) — `#/songs?song=maple-leaf-rag&from=guide`
+- Prelude in E minor, Op. 28 No. 4 (Chopin) — `#/songs?song=chopin-prelude-e-minor&from=guide`
+- When the Saints — stride version — `#/songs?song=when-the-saints-stride&from=guide`
 
 **Ear**
 
-- Chord qualities — level 4 (everything) — `#/quizzes?mode=chords&level=4`
-- Scale types — modes and blues by ear — `#/quizzes?mode=scale-type&level=4`
-- Cadences — including the deceptive V → vi — `#/quizzes?mode=cadence&level=3`
-- Rhythm dictation — swing patterns — `#/quizzes?mode=rhythm-dictation&level=4`
+- Chord qualities — level 4 (everything) — `#/quizzes?mode=chords&level=4&from=guide`
+- Scale types — modes and blues by ear — `#/quizzes?mode=scale-type&level=4&from=guide`
+- Cadences — including the deceptive V → vi — `#/quizzes?mode=cadence&level=3&from=guide`
+- Rhythm dictation — swing patterns — `#/quizzes?mode=rhythm-dictation&level=4&from=guide`
 
 **Rhythm**
 
-- Rhythm — level 4 (keep swing honest) — `#/rhythm?level=4`
+- Rhythm — level 4 (keep swing honest) — `#/rhythm?level=4&from=guide`
 
 **Sight-reading**
 
-- Sight-reading — level 5 (hands together) — `#/practice?sight=5`
+- Sight-reading — level 5 (hands together) — `#/practice?sight=5&from=guide`
 
 ### The ii–V–I: how jazz moves
 
 Jazz harmony strings dominant motion together: the ii chord leads to V, V resolves to I. The guide tones — each chord’s 3rd and 7th — are the two notes that carry the progression; voice-lead them smoothly and the harmony plays itself. Learn the drill in C and F first, then take it around the circle of fifths.
 
-- ii–V–I drill in C — `#/practice?lesson=jazz-251-C`
-- Hear it as music in the étude — `#/songs?song=ii-v-i-etude`
+- ii–V–I drill in C — `#/practice?lesson=jazz-251-C&from=guide`
+- Hear it as music in the étude — `#/songs?song=ii-v-i-etude&from=guide`
 
 ### Modes: old scales, new colours
 
 Play the white keys from D to D and you get Dorian — a minor scale with a bright 6th, the sound of Scarborough Fair and half of jazz. From G to G is Mixolydian: a major scale with a lowered 7th, the sound of the blues and rock. Modes are not new notes to learn, just familiar keys heard from a different home base — which is why training your ear to spot them matters more than memorizing them.
 
-- D Dorian in the scale library — `#/scales?root=D&type=dorian`
-- G Mixolydian in the scale library — `#/scales?root=G&type=mixolydian`
-- Quiz: name the scale type by ear — `#/quizzes?mode=scale-type&level=4`
+- D Dorian in the scale library — `#/scales?root=D&type=dorian&from=guide`
+- G Mixolydian in the scale library — `#/scales?root=G&type=mixolydian&from=guide`
+- Quiz: name the scale type by ear — `#/quizzes?mode=scale-type&level=4&from=guide`
 
 ### Where to go from here
 

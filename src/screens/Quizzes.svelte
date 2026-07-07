@@ -1,5 +1,7 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
   import EchoPlayer from '../components/EchoPlayer.svelte'
+  import GlossText from '../components/GlossText.svelte'
   import QuizCard from '../components/QuizCard.svelte'
   import RhythmQuizCard from '../components/RhythmQuizCard.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
@@ -33,7 +35,7 @@
   import { midiToVexKey, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
-  import { currentParams } from '../router.svelte'
+  import { currentParams, navigate } from '../router.svelte'
 
   type Question =
     | IntervalQuestion
@@ -85,16 +87,42 @@
   let mode = $state<QuizModeId>('intervals')
   let level = $state(1)
 
-  // Deep link from the learning guide, read once at mount.
-  {
-    const params = currentParams()
-    const linkedMode = ALL_MODES.some((m) => m.id === params.mode) ? (params.mode as QuizModeId) : 'intervals'
-    mode = linkedMode
+  // Mode and level are mirrored in the URL (?mode=&level=) with replace
+  // navigation: refresh and back-into-the-screen restore them, but toggling
+  // modes never stacks history entries. The $effect below also applies
+  // guide deep links and back/forward param changes.
+  const routeParams = $derived(currentParams())
+
+  function fromParams(params: Readonly<Record<string, string>>): { mode: QuizModeId; level: number } | null {
+    if (!ALL_MODES.some((m) => m.id === params.mode)) return null
+    const linkedMode = params.mode as QuizModeId
     const linkedLevel = Number(params.level)
-    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && linkedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]) {
-      level = linkedLevel
-    }
+    const validLevel =
+      Number.isInteger(linkedLevel) && linkedLevel >= 1 && linkedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]
+    return { mode: linkedMode, level: validLevel ? linkedLevel : 1 }
   }
+
+  // Initial deep link, applied before the first render.
+  const initial = fromParams(currentParams())
+  if (initial) {
+    mode = initial.mode
+    level = initial.level
+  }
+
+  function reflectRoute() {
+    const params: Record<string, string> = { mode, level: String(level) }
+    if (routeParams.from) params.from = routeParams.from
+    navigate('/quizzes', params, { replace: true })
+  }
+
+  $effect(() => {
+    const linked = fromParams(routeParams)
+    if (linked && (linked.mode !== mode || linked.level !== level)) {
+      mode = linked.mode
+      level = linked.level
+      resetRound()
+    }
+  })
 
   const modeDef = $derived(ALL_MODES.find((m) => m.id === mode)!)
   const maxLevel = $derived(QUIZ_LEVEL_COUNTS[mode])
@@ -139,11 +167,13 @@
     mode = m
     level = 1
     resetRound()
+    reflectRoute()
   }
 
   function setLevel(l: number) {
     level = l
     resetRound()
+    reflectRoute()
   }
 
   async function play() {
@@ -273,6 +303,7 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Quizzes</h1>
   <p class="hint">A few minutes of ear training and theory a day — it makes everything else easier.</p>
 
@@ -280,7 +311,9 @@
     <div class="mode-row">
       <span class="group-label">{group.label}</span>
       {#each group.modes as m (m.id)}
-        <button class="seg" class:active={mode === m.id} onclick={() => setMode(m.id)}>{m.label}</button>
+        <button class="seg" class:active={mode === m.id} data-tip={m.desc} onclick={() => setMode(m.id)}>
+          {m.label}
+        </button>
       {/each}
     </div>
   {/each}
@@ -295,7 +328,7 @@
   </div>
 
   <div class="card">
-    <p class="hint">{modeDef.desc}</p>
+    <p class="hint"><GlossText text={modeDef.desc} /></p>
     <p class="score">
       Question {Math.min(answered + 1, roundSize)} / {roundSize} · {correct} correct
     </p>
@@ -334,6 +367,7 @@
             {playing}
             onselect={choose}
             onreplay={play}
+            explanation={question.explanation}
           />
         {/if}
         {#if selected !== null}
@@ -350,6 +384,7 @@
             {playing}
             onselect={choose}
             onreplay={play}
+            explanation={question.explanation}
           />
         {/if}
         {#if selected !== null}
@@ -372,6 +407,7 @@
           answer={question.answer}
           {selected}
           onselect={choose}
+          explanation={question.explanation}
         />
         {#if selected !== null}
           <button class="primary next" onclick={next}>Next →</button>
@@ -394,21 +430,6 @@
     font-size: 13px;
     font-weight: 600;
     color: #64748b;
-  }
-  .seg {
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-  }
-  .seg.small {
-    padding: 4px 10px;
-  }
-  .seg.active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    color: #fff;
   }
   .level {
     display: flex;
@@ -442,18 +463,6 @@
   }
   .staff {
     max-width: 360px;
-  }
-  .complete {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-weight: 600;
-    color: #166534;
   }
   .next {
     align-self: flex-start;

@@ -1,13 +1,15 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
+  import GlossText from '../components/GlossText.svelte'
   import LessonPlayer from '../components/LessonPlayer.svelte'
+  import { METHOD_GUIDE_STAGE } from '../lib/data/guide'
   import { allLessons, type Lesson } from '../lib/data/lessons'
   import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'
   import { makeSightReading, SIGHT_LEVELS, type SightLevel } from '../lib/sightread/generator'
   import { matchLesson } from '../lib/voice/parser'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
-  import { currentParams } from '../router.svelte'
+  import { currentParams, navigate } from '../router.svelte'
 
-  const POLY_AVAILABLE = true
   const SIGHT_ACTIVITY = 'sight-reading'
   const MAX_SIGHT_LEVEL = 5
 
@@ -15,7 +17,6 @@
   const methods = [...new Set(lessons.map((l) => l.method))]
   const keys = ['All', ...new Set(lessons.map((l) => l.keySignature.replace(/m$/, '')))]
 
-  let selected = $state<Lesson | null>(null)
   let keyFilter = $state('All')
   let sightLevel = $state(Math.min(MAX_SIGHT_LEVEL, getProgress(SIGHT_ACTIVITY).level) as SightLevel)
   // Seeding from the persisted level once is intended; newMelody() regenerates.
@@ -23,17 +24,62 @@
   let sightReading = $state(makeSightReading(sightLevel))
   let sightMessage = $state('')
 
+  // Selection lives in the URL so the browser back button steps
+  // open lesson → lesson list → previous screen, and guide deep links
+  // just work. The generated sight-reading melody itself stays in state
+  // (it has no stable id); ?sight=<level> marks it open.
+  const params = $derived(currentParams())
+  const selected = $derived.by((): Lesson | null => {
+    if (params.lesson) return lessons.find((l) => l.id === params.lesson) ?? null
+    if (params.sight && /^[1-5]$/.test(params.sight)) return sightReading
+    return null
+  })
+
+  /** Preserve the guide breadcrumb (?from=guide) across in-screen navigation. */
+  const withFrom = (extra?: Record<string, string>) =>
+    params.from ? { ...extra, from: params.from } : extra
+
+  function openLesson(lesson: Lesson) {
+    navigate('/practice', withFrom({ lesson: lesson.id }))
+  }
+
+  function exitLesson() {
+    navigate('/practice', withFrom())
+  }
+
+  /** Open the sight-reading player with a fresh melody at `level`. */
+  function openSight(level = sightLevel) {
+    sightLevel = level
+    sightReading = makeSightReading(level)
+    navigate('/practice', withFrom({ sight: String(level) }))
+  }
+
+  /** Regenerate in place while the player is open — no history entry. */
   function newMelody(level = sightLevel) {
     sightLevel = level
     sightReading = makeSightReading(level)
-    selected = sightReading
+    if (params.sight !== String(level)) navigate('/practice', withFrom({ sight: String(level) }), { replace: true })
   }
 
   function chooseSightLevel(level: SightLevel) {
     setLevel(SIGHT_ACTIVITY, level)
     sightMessage = ''
-    newMelody(level)
+    openSight(level)
   }
+
+  // A guide link (?sight=N) must produce a melody at that level without
+  // touching the persisted sight-reading level; also covers back/forward
+  // between different ?sight= entries.
+  $effect(() => {
+    const s = params.sight
+    if (s && /^[1-5]$/.test(s)) {
+      const level = Number(s) as SightLevel
+      if (level !== sightLevel) {
+        sightLevel = level
+        sightReading = makeSightReading(level)
+      }
+    }
+  })
 
   function onSightComplete({ mistakes }: { mistakes: number }) {
     const { leveledUp, progress } = recordRun(SIGHT_ACTIVITY, mistakes === 0, MAX_SIGHT_LEVEL)
@@ -47,17 +93,14 @@
     }
   }
 
-  const makeSightReadingLesson = () => makeSightReading(sightLevel)
-
-  // Deep links from the learning guide, read once at mount. ?sight= goes
-  // through newMelody (not chooseSightLevel) on purpose: a guide link must
-  // never touch the persisted sight-reading level.
-  {
-    const params = currentParams()
-    const linked = params.lesson && lessons.find((l) => l.id === params.lesson)
-    if (linked) selected = linked
-    else if (params.sight && /^[1-5]$/.test(params.sight)) newMelody(Number(params.sight) as SightLevel)
-  }
+  // The natural follow-up offered on the completion card: the next lesson
+  // of the same method (sight-reading regenerates instead).
+  const nextLesson = $derived.by(() => {
+    if (!selected || selected.method === 'Sight-reading') return undefined
+    const sameMethod = lessons.filter((l) => l.method === selected.method)
+    const next = sameMethod[sameMethod.findIndex((l) => l.id === selected.id) + 1]
+    return next ? { title: next.title, onopen: () => openLesson(next) } : undefined
+  })
 
   const visibleLessons = $derived(
     keyFilter === 'All' ? lessons : lessons.filter((l) => l.keySignature.replace(/m$/, '') === keyFilter),
@@ -86,6 +129,7 @@
       'Short random melodies you have never seen — trains reading the staff instead of memorizing.',
   }
 
+
   $effect(() =>
     registerVoiceCommands({
       name: 'Practice',
@@ -93,23 +137,22 @@
       handle(intent) {
         if (intent.kind === 'open-lesson') {
           if (/sight ?reading/.test(intent.query)) {
-            sightReading = makeSightReadingLesson()
-            selected = sightReading
+            openSight()
             return { say: 'Sight reading — a fresh melody.' }
           }
           const id = matchLesson(intent.query, lessons)
           const lesson = lessons.find((l) => l.id === id)
           if (!lesson) return { say: "I couldn't find that lesson." }
-          selected = lesson
+          openLesson(lesson)
           return { say: lesson.title }
         }
         if (intent.kind === 'lesson' && intent.action === 'new-melody') {
-          sightReading = makeSightReadingLesson()
-          selected = sightReading
+          if (selected?.method === 'Sight-reading') newMelody()
+          else openSight()
           return { say: 'New melody.' }
         }
         if (intent.kind === 'lesson' && intent.action === 'exit') {
-          selected = null
+          exitLesson()
           return { say: '' }
         }
         return null
@@ -119,14 +162,16 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Practice</h1>
 
   {#if selected}
     {#key selected.id}
       <LessonPlayer
         lesson={selected}
-        onexit={() => (selected = null)}
+        onexit={exitLesson}
         oncomplete={selected.method === 'Sight-reading' ? onSightComplete : undefined}
+        {nextLesson}
       />
     {/key}
     {#if selected.method === 'Sight-reading'}
@@ -153,27 +198,28 @@
     </label>
 
     {#each methods.filter((m) => visibleLessons.some((l) => l.method === m)) as method (method)}
-      <h2 class="method">{method}</h2>
-      <p class="hint">{METHOD_BLURBS[method]}</p>
+      <h2 class="method">
+        {method}
+        {#if METHOD_GUIDE_STAGE[method]}
+          <a class="guide-chip" href={`#/guide?stage=${METHOD_GUIDE_STAGE[method]}`}>Guide →</a>
+        {/if}
+      </h2>
+      <p class="hint"><GlossText text={METHOD_BLURBS[method]} /></p>
       <div class="lesson-grid">
         {#each visibleLessons.filter((l) => l.method === method) as lesson (lesson.id)}
-          {@const locked = lesson.detectionMode === 'poly' && !POLY_AVAILABLE}
-          <button
-            class="lesson-tile"
-            disabled={locked}
-            onclick={() => (selected = lesson)}
-            title={locked ? 'Needs chord detection — coming soon' : ''}
-          >
+          <button class="lesson-tile" onclick={() => openLesson(lesson)}>
             <strong>{lesson.title}</strong>
             <span>{lesson.segments.length} part{lesson.segments.length > 1 ? 's' : ''} · ♩= {lesson.tempoBpm}</span>
-            {#if locked}<span class="lock">🔒 needs chord detection</span>{/if}
           </button>
         {/each}
       </div>
     {/each}
 
-    <h2 class="method">Sight-reading</h2>
-    <p class="hint">{METHOD_BLURBS['Sight-reading']}</p>
+    <h2 class="method">
+      Sight-reading
+      <a class="guide-chip" href={`#/guide?stage=${METHOD_GUIDE_STAGE['Sight-reading']}`}>Guide →</a>
+    </h2>
+    <p class="hint"><GlossText text={METHOD_BLURBS['Sight-reading']} /></p>
     <p class="hint">
       {STREAK_TO_LEVEL_UP} clean reads in a row level you up. Current streak:
       {getProgress(SIGHT_ACTIVITY).streak}/{STREAK_TO_LEVEL_UP}.
@@ -186,7 +232,7 @@
       {/each}
     </div>
     <div class="lesson-grid">
-      <button class="lesson-tile" onclick={() => newMelody()}>
+      <button class="lesson-tile" onclick={() => openSight()}>
         <strong>Sight-read at level {sightLevel}</strong>
         <span>a new melody every time</span>
       </button>
@@ -204,19 +250,6 @@
     gap: 8px;
     flex-wrap: wrap;
     margin: 10px 0;
-  }
-  .seg {
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .seg.active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    color: #fff;
   }
   .sight-message {
     margin: 10px 0 0;
@@ -260,18 +293,26 @@
     cursor: pointer;
     font-size: 14px;
   }
-  .lesson-tile:hover:not(:disabled) {
+  .lesson-tile:hover {
     border-color: #1d4ed8;
-  }
-  .lesson-tile:disabled {
-    opacity: 0.55;
-    cursor: default;
   }
   .lesson-tile span {
     color: #64748b;
     font-size: 12px;
   }
-  .lock {
-    color: #b45309 !important;
+  .guide-chip {
+    margin-left: 8px;
+    padding: 2px 10px;
+    border: 1px solid #dbeafe;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    vertical-align: middle;
+  }
+  .guide-chip:hover {
+    background: #dbeafe;
   }
 </style>

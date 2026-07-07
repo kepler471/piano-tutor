@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GUIDE_STAGES, guideHref, type GuideLink } from '../lib/data/guide'
+import { GUIDE_STAGES, METHOD_GUIDE_STAGE, guideHref, type GuideLink } from '../lib/data/guide'
 import { allLessons } from '../lib/data/lessons'
 import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
 import { SONG_CATALOG } from '../lib/data/songs/catalog'
@@ -111,6 +111,30 @@ describe('guide link integrity', () => {
       expect(href.startsWith('#/'), `${stageId}: ${href}`).toBe(true)
       const { path } = parseRoute(href)
       expect(KNOWN_ROUTES.has(path), `${stageId}: ${href} → ${path}`).toBe(true)
+    }
+  })
+
+  it('every href carries from=guide so target screens can offer a way back', () => {
+    for (const { stageId, link } of allLinks) {
+      const { params } = parseRoute(guideHref(link))
+      expect(params.from, `${stageId}: ${guideHref(link)}`).toBe('guide')
+    }
+  })
+})
+
+describe('method → guide-stage chips', () => {
+  const stageIds = new Set(GUIDE_STAGES.map((s) => s.id))
+
+  it('every mapped stage id exists', () => {
+    for (const [method, stageId] of Object.entries(METHOD_GUIDE_STAGE)) {
+      expect(stageIds.has(stageId), `${method} → ${stageId}`).toBe(true)
+    }
+  })
+
+  it('every lesson method (plus sight-reading) has a mapping', () => {
+    const methods = new Set([...allLessons().map((l) => l.method), 'Sight-reading'])
+    for (const method of methods) {
+      expect(METHOD_GUIDE_STAGE[method], `method '${method}' missing from METHOD_GUIDE_STAGE`).toBeDefined()
     }
   })
 })

@@ -1,8 +1,11 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
   import { Note } from 'tonal'
+  import GlossText from '../components/GlossText.svelte'
   import PianoKeyboard from '../components/PianoKeyboard.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
   import { playNote, playSequence } from '../lib/audio/playback'
+  import { lookupTerm } from '../lib/data/glossary'
   import { scaleFingerings } from '../lib/data/scaleFingerings'
   import { scoreFromScale } from '../lib/notation/vexScore'
   import { SCALE_TYPES, getScale } from '../lib/theory/scales'
@@ -87,13 +90,16 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Scales</h1>
 
   <div class="controls">
     <div class="control-group">
       <span class="control-label">Type</span>
       {#each SCALE_TYPES as t (t.id)}
-        <button class:active={typeId === t.id} onclick={() => selectType(t.id)}>{t.id}</button>
+        <button class:active={typeId === t.id} data-tip={lookupTerm(t.id)?.short} onclick={() => selectType(t.id)}>
+          {lookupTerm(t.id)?.term ?? t.id}
+        </button>
       {/each}
     </div>
     <div class="control-group">
@@ -116,6 +122,9 @@
         {playing ? 'Playing…' : '▶ Play'}
       </button>
     </div>
+    {#if lookupTerm(typeId)}
+      <p class="hint">{lookupTerm(typeId)!.short}</p>
+    {/if}
     <p class="hint">
       Notes: {scale.notes.join(' – ')} · Fingering shown {hand === 'R' ? 'above' : 'below'} the staff
       ({hand === 'R' ? 'right' : 'left'} hand, one octave up and down)
@@ -129,9 +138,9 @@
       onkeyclick={(m) => playNote(m)}
     />
     <p class="hint">
-      Green keys are the scale ({scale.notes.join(' ')}); numbers show
-      which finger plays each key on the way up. Thumb crossings happen after finger 3 (and after
-      finger 4 in some keys).
+      <GlossText
+        text={`Green keys are the scale (${scale.notes.join(' ')}); numbers show which finger plays each key on the way up. Thumb crossings happen after finger 3 (and after finger 4 in some keys).`}
+      />
     </p>
   </div>
 </section>

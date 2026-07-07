@@ -14,6 +14,8 @@ export interface IntervalQuestion {
   midis: [number, number]
   answer: string
   options: string[]
+  /** Why: shown after the reveal so a wrong answer still teaches. */
+  explanation: string
 }
 
 export interface ChordQuestion {
@@ -21,6 +23,7 @@ export interface ChordQuestion {
   midis: number[]
   answer: string
   options: string[]
+  explanation: string
 }
 
 export interface EchoQuestion {
@@ -44,6 +47,26 @@ export const INTERVAL_LABELS: Record<number, string> = {
   10: 'Minor 7th',
   11: 'Major 7th',
   12: 'Octave',
+}
+
+/**
+ * Post-answer teaching lines, keyed by semitones. Each names the semitone
+ * count plus a song hook — the standard way to learn intervals by ear.
+ */
+export const INTERVAL_EXPLANATIONS: Record<number, string> = {
+  0: 'A unison is the same note twice — 0 semitones apart. Nothing moves.',
+  1: 'A minor 2nd is 1 semitone — the smallest step, tense and creeping: the "Jaws" theme.',
+  2: 'A major 2nd is 2 semitones — a plain whole step: the start of "Happy Birthday" (hap-py).',
+  3: 'A minor 3rd is 3 semitones — soft and melancholy: the opening of "Greensleeves" (a-las).',
+  4: 'A major 3rd is 4 semitones — bright and open: "Oh, When the Saints" (oh, when).',
+  5: 'A perfect 4th is 5 semitones — sturdy and ceremonial: "Here Comes the Bride" (here comes).',
+  6: 'A tritone is 6 semitones — the famously unstable one: "The Simpsons" (the SIMP-sons).',
+  7: 'A perfect 5th is 7 semitones — hollow and strong: "Twinkle, Twinkle" (twin-kle twin-kle) or the "Star Wars" leap.',
+  8: 'A minor 6th is 8 semitones — bittersweet and yearning: the theme from "Love Story" (whe-re).',
+  9: 'A major 6th is 9 semitones — warm and lifting: "My Bonnie Lies Over the Ocean" (my bon-nie).',
+  10: 'A minor 7th is 10 semitones — wide and unresolved: "Somewhere" from West Side Story (there\'s a).',
+  11: 'A major 7th is 11 semitones — one shy of the octave, dissonant and reaching: the big leap in "Take On Me".',
+  12: 'An octave is 12 semitones — the same note, higher: "Somewhere Over the Rainbow" (some-where).',
 }
 
 /** Semitone sets per level — wider and more confusable as levels rise. */
@@ -83,6 +106,23 @@ const CHORD_LABELS: Record<ChordQualityId, string> = {
   'half-diminished': 'Half-diminished (m7♭5)',
   'diminished 7th': 'Diminished 7th',
   'major 6th': 'Major 6th',
+}
+
+/** Recipe + how it sounds — shared with the reading quizzes in theory/quiz.ts. */
+export const CHORD_QUALITY_EXPLANATIONS: Record<ChordQualityId, string> = {
+  major: 'Major stacks a major 3rd then a minor 3rd (4+3 semitones) — bright, stable, "happy".',
+  minor: 'Minor lowers the middle note: minor 3rd then major 3rd (3+4) — darker and sadder than major.',
+  diminished: 'Diminished is two minor 3rds (3+3) — cramped and tense; it wants to resolve somewhere.',
+  augmented: 'Augmented is two major 3rds (4+4) — dreamlike and unsettled, neither major nor minor.',
+  'dominant 7th':
+    'A dominant 7th is a major triad plus a flat 7th — bright but restless; listen for the pull back home, down a 5th.',
+  'major 7th': 'A major 7th is a major triad plus a major 7th — soft, warm and jazzy, no pull anywhere.',
+  'minor 7th': 'A minor 7th is a minor triad plus a flat 7th — mellow and smooth, the gentlest of the 7ths.',
+  'half-diminished':
+    'Half-diminished is a diminished triad plus a flat 7th (m7♭5) — suspenseful, darker than a minor 7th but softer than diminished.',
+  'diminished 7th':
+    'A diminished 7th stacks minor 3rds all the way up — maximum tension, the classic silent-movie "drama" chord.',
+  'major 6th': 'A major 6th is a major triad plus the 6th scale note — sweet and settled, a vintage-jazz ending colour.',
 }
 
 /** Five-finger positions for echo phrases: label → root midi. */
@@ -131,7 +171,13 @@ export function makeIntervalQuestion(level: number, rng: Rng = Math.random): Int
   const root = 55 + Math.floor(rng() * 13)
   const midis: [number, number] = [root, up ? root + semitones : root - semitones]
   const answer = INTERVAL_LABELS[semitones]
-  return { kind: 'interval', midis, answer, options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng) }
+  return {
+    kind: 'interval',
+    midis,
+    answer,
+    options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
+    explanation: INTERVAL_EXPLANATIONS[semitones],
+  }
 }
 
 const QUIZ_ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
@@ -146,6 +192,7 @@ export function makeChordQuestion(level: number, rng: Rng = Math.random): ChordQ
     midis: getChord(root, quality, 0).midi,
     answer,
     options: makeOptions(set.map((q) => CHORD_LABELS[q]), answer, 4, rng),
+    explanation: CHORD_QUALITY_EXPLANATIONS[quality],
   }
 }
 
@@ -160,6 +207,7 @@ export interface ScaleTypeQuestion {
   midis: number[]
   answer: string
   options: string[]
+  explanation: string
 }
 
 const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
@@ -170,6 +218,19 @@ const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
   'major pentatonic': 'Major pentatonic',
   dorian: 'Dorian',
   mixolydian: 'Mixolydian',
+}
+
+/** What to listen for, per scale type. */
+export const SCALE_TYPE_EXPLANATIONS: Record<ScaleTypeId, string> = {
+  major: 'Major is the plain do-re-mi ladder — bright and settled, no surprises on the way up.',
+  'natural minor': 'Natural minor lowers the 3rd, 6th and 7th — sad and folky, with a soft ending step.',
+  'harmonic minor':
+    'Harmonic minor raises the 7th, leaving an exotic extra-wide gap near the top — listen for that "snake-charmer" leap.',
+  blues: 'The blues scale has only six notes with crushed "blue" notes inside — it swaggers rather than climbs.',
+  'major pentatonic':
+    'Major pentatonic is five notes with no semitones at all — open and folky, nothing clashes.',
+  dorian: 'Dorian sounds minor but with a brighter, raised 6th — think "Scarborough Fair".',
+  mixolydian: 'Mixolydian sounds major until the lowered 7th near the top — bluesy, never quite finishing.',
 }
 
 /** Roots every scale type supports (kept to low-accidental keys the library covers). */
@@ -192,6 +253,7 @@ export function makeScaleTypeQuestion(level: number, rng: Rng = Math.random): Sc
     midis: getScale(root, type).midi,
     answer,
     options: makeOptions(set.map((t) => SCALE_TYPE_LABELS[t]), answer, 4, rng),
+    explanation: SCALE_TYPE_EXPLANATIONS[type],
   }
 }
 
@@ -203,15 +265,26 @@ export interface CadenceQuestion {
   chords: number[][]
   answer: string
   options: string[]
+  explanation: string
 }
 
-type CadenceId = 'authentic' | 'plagal' | 'half' | 'deceptive'
+export type CadenceId = 'authentic' | 'plagal' | 'half' | 'deceptive'
 
 const CADENCE_LABELS: Record<CadenceId, string> = {
   authentic: 'Perfect (V → I)',
   plagal: 'Plagal (IV → I)',
   half: 'Half (ends on V)',
   deceptive: 'Deceptive (V → vi)',
+}
+
+export const CADENCE_EXPLANATIONS: Record<CadenceId, string> = {
+  authentic:
+    'Perfect (V → I): the tension chord falls home to the tonic — music\'s full stop. The bass drops a 5th and everything settles.',
+  plagal:
+    'Plagal (IV → I): the gentle "Amen" ending of hymns — it relaxes home without the strong pull of a V chord.',
+  half: 'Half (ends on V): the phrase stops ON the tension chord — a question mark. It sounds unfinished because it is.',
+  deceptive:
+    'Deceptive (V → vi): sets up a full stop, then sidesteps to the minor vi chord — the "surprise" that keeps the music going.',
 }
 
 export const CADENCE_LEVELS: CadenceId[][] = [
@@ -252,6 +325,7 @@ export function makeCadenceQuestion(level: number, rng: Rng = Math.random): Cade
     chords: cadenceChords(tonic, cadence),
     answer,
     options: makeOptions(set.map((c) => CADENCE_LABELS[c]), answer, 4, rng),
+    explanation: CADENCE_EXPLANATIONS[cadence],
   }
 }
 

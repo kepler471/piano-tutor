@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GlossText from './GlossText.svelte'
   import InputPicker from './InputPicker.svelte'
   import PianoKeyboard from './PianoKeyboard.svelte'
   import SheetMusic from './SheetMusic.svelte'
@@ -17,10 +18,13 @@
     lesson,
     onexit,
     oncomplete,
+    nextLesson,
   }: {
     lesson: Lesson
     onexit?: () => void
     oncomplete?: (info: { mistakes: number }) => void
+    /** Offered after the final segment: the natural next lesson to open. */
+    nextLesson?: { title: string; onopen: () => void }
   } = $props()
 
   let segIndex = $state(0)
@@ -270,7 +274,7 @@
     {/if}
   </div>
 
-  <p class="hint">{lesson.description}</p>
+  <p class="hint"><GlossText text={lesson.description} /></p>
 
   <div class="controls-row">
     {#each lesson.segments as seg, i (seg.label)}
@@ -310,6 +314,12 @@
         </button>
       {:else}
         <button class="primary" onclick={() => restartSegment(0)}>Practice again</button>
+        {#if nextLesson}
+          <button class="primary" onclick={nextLesson.onopen}>Next: {nextLesson.title} →</button>
+        {/if}
+        {#if onexit}
+          <button class="ghost" onclick={onexit}>← All lessons</button>
+        {/if}
       {/if}
     </div>
   {:else}
@@ -338,11 +348,11 @@
   {/if}
 
   {#if lesson.tips.length}
-    <details>
+    <details open>
       <summary>Practice tips</summary>
       <ul>
         {#each lesson.tips as tip (tip)}
-          <li>{tip}</li>
+          <li><GlossText text={tip} /></li>
         {/each}
       </ul>
     </details>
@@ -359,25 +369,6 @@
   .spacer {
     flex: 1;
   }
-  .seg {
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-  }
-  .seg.active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    color: #fff;
-  }
-  .ghost {
-    border: none;
-    background: none;
-    color: #1d4ed8;
-    cursor: pointer;
-    font-size: 14px;
-  }
   .metro {
     display: flex;
     align-items: center;
@@ -390,18 +381,6 @@
     padding: 4px 6px;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
-  }
-  .complete {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-weight: 600;
-    color: #166534;
   }
   details {
     font-size: 14px;

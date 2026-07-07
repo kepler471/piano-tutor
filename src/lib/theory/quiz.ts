@@ -1,6 +1,12 @@
 import { Note } from 'tonal'
 import { getChord } from './chords'
-import { INTERVAL_LABELS, INTERVAL_LEVELS, type Rng } from '../ear/quiz'
+import {
+  CHORD_QUALITY_EXPLANATIONS,
+  INTERVAL_EXPLANATIONS,
+  INTERVAL_LABELS,
+  INTERVAL_LEVELS,
+  type Rng,
+} from '../ear/quiz'
 import type { ChordQualityId } from './types'
 
 /**
@@ -37,6 +43,14 @@ export interface NoteNamingQuestion {
   clef: 'treble' | 'bass'
   answer: string
   options: string[]
+  /** Why: shown after the reveal so a wrong answer still teaches. */
+  explanation: string
+}
+
+const CLEF_MNEMONICS: Record<'treble' | 'bass', string> = {
+  treble:
+    'Treble staff, bottom to top: the lines are E-G-B-D-F ("Every Good Boy Does Fine") and the spaces spell F-A-C-E.',
+  bass: 'Bass staff, bottom to top: the lines are G-B-D-F-A ("Good Boys Do Fine Always") and the spaces are A-C-E-G ("All Cows Eat Grass").',
 }
 
 /** [clef, low midi, high midi, accidentals allowed] per level. */
@@ -64,7 +78,14 @@ export function makeNoteNamingQuestion(level: number, rng: Rng = Math.random): N
   const pool = def.accidentals
     ? [answer, ...LETTERS.flatMap((l) => [l, `${l}♯`, `${l}♭`])]
     : LETTERS
-  return { kind: 'note-naming', midi, clef, answer, options: makeOptions(pool, answer, 4, rng) }
+  return {
+    kind: 'note-naming',
+    midi,
+    clef,
+    answer,
+    options: makeOptions(pool, answer, 4, rng),
+    explanation: `This is ${answer}. ${CLEF_MNEMONICS[clef]}`,
+  }
 }
 
 // --- key signature identification ---
@@ -76,6 +97,21 @@ export interface KeySignatureQuestion {
   prompt: string
   answer: string
   options: string[]
+  explanation: string
+}
+
+const SHARP_ORDER = ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯', 'B♯']
+const FLAT_ORDER = ['B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭', 'F♭']
+const SHARP_COUNTS: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6 }
+const FLAT_COUNTS: Record<string, number> = { F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5 }
+
+/** The accidentals a major key's signature carries, in signature order. */
+export function sigAccidentals(major: string): { kind: 'sharps' | 'flats' | 'none'; names: string[] } {
+  const sharps = SHARP_COUNTS[major]
+  if (sharps !== undefined) {
+    return sharps === 0 ? { kind: 'none', names: [] } : { kind: 'sharps', names: SHARP_ORDER.slice(0, sharps) }
+  }
+  return { kind: 'flats', names: FLAT_ORDER.slice(0, FLAT_COUNTS[major]) }
 }
 
 /** Majors ordered by accidental count; minors mirror them at level 4. */
@@ -99,12 +135,32 @@ export function makeKeySignatureQuestion(level: number, rng: Rng = Math.random):
   const label = (m: string) =>
     (asMinor ? `${RELATIVE_MINOR[m]} minor` : `${m} major`).replace('#', '♯').replace('b', '♭')
   const answer = label(major)
+  const majorLabel = `${major} major`.replace('#', '♯').replace('b', '♭')
+  const acc = sigAccidentals(major)
+  let explanation: string
+  if (acc.kind === 'none') {
+    explanation = `${majorLabel} has no sharps or flats — all white keys.`
+  } else if (acc.kind === 'sharps') {
+    explanation =
+      `${majorLabel} has ${acc.names.length} sharp${acc.names.length === 1 ? '' : 's'}: ${acc.names.join(', ')}. ` +
+      'Tip: the last sharp sits one semitone below the key name.'
+  } else {
+    explanation =
+      `${majorLabel} has ${acc.names.length} flat${acc.names.length === 1 ? '' : 's'}: ${acc.names.join(', ')}. ` +
+      (acc.names.length === 1
+        ? 'F major\'s single flat is the one to memorize.'
+        : 'Tip: the second-to-last flat names the key.')
+  }
+  if (asMinor) {
+    explanation += ` ${answer} shares this signature — the relative minor, three semitones below ${majorLabel}.`
+  }
   return {
     kind: 'key-signature',
     keySignature: major,
     prompt: asMinor ? 'Which minor key has this key signature?' : 'Which major key has this key signature?',
     answer,
     options: makeOptions(set.map(label), answer, 4, rng),
+    explanation,
   }
 }
 
@@ -116,6 +172,7 @@ export interface IntervalStaffQuestion {
   midis: [number, number]
   answer: string
   options: string[]
+  explanation: string
 }
 
 export function makeIntervalStaffQuestion(level: number, rng: Rng = Math.random): IntervalStaffQuestion {
@@ -131,6 +188,7 @@ export function makeIntervalStaffQuestion(level: number, rng: Rng = Math.random)
     midis: [root, root + semitones],
     answer,
     options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
+    explanation: `On the staff, count letter names from the bottom note up, inclusive — line-space-line — to get the number. ${INTERVAL_EXPLANATIONS[semitones]}`,
   }
 }
 
@@ -142,6 +200,7 @@ export interface ChordSpellingQuestion {
   prompt: string
   answer: string
   options: string[]
+  explanation: string
 }
 
 export const CHORD_SPELLING_LEVELS: ChordQualityId[][] = [
@@ -171,6 +230,7 @@ export function makeChordSpellingQuestion(level: number, rng: Rng = Math.random)
     prompt: `Which notes spell ${chord.symbol}?`,
     answer,
     options: makeOptions(pool, answer, 4, rng),
+    explanation: `${chord.symbol} = ${answer}. ${CHORD_QUALITY_EXPLANATIONS[quality]}`,
   }
 }
 
@@ -181,6 +241,7 @@ export interface ChordFunctionQuestion {
   prompt: string
   answer: string
   options: string[]
+  explanation: string
 }
 
 const FUNCTION_KEYS_BY_LEVEL: string[][] = [
@@ -211,11 +272,16 @@ export function makeChordFunctionQuestion(level: number, rng: Rng = Math.random)
     `${Note.pitchClass(Note.transpose(key, intervalName(s)))} ${q}`
   const answer = chordName(semis, quality)
   const pool = degrees.map(([, s, q]) => chordName(s, q))
+  const degreeNumber = { 0: 1, 2: 2, 5: 4, 7: 5, 9: 6 }[semis]
+  const rootName = Note.pitchClass(Note.transpose(key, intervalName(semis)))
   return {
     kind: 'chord-function',
     prompt: `In the key of ${key} major, which chord is ${numeral}?`,
     answer,
     options: makeOptions(pool, answer, 4, rng),
+    explanation:
+      `${numeral} means "the triad built on scale degree ${degreeNumber}" — in ${key} major that root is ${rootName}. ` +
+      'Upper-case numerals are major chords, lower-case are minor.',
   }
 }
 

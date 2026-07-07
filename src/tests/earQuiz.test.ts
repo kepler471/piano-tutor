@@ -3,6 +3,8 @@ import {
   CADENCE_LEVELS,
   ECHO_LEVELS,
   ECHO_POSITIONS,
+  INTERVAL_EXPLANATIONS,
+  INTERVAL_LABELS,
   INTERVAL_LEVELS,
   SCALE_TYPE_LEVELS,
   makeCadenceQuestion,
@@ -57,6 +59,37 @@ describe('makeIntervalQuestion', () => {
 
   it('is deterministic under a fixed seed', () => {
     expect(makeIntervalQuestion(3, seededRng(7))).toEqual(makeIntervalQuestion(3, seededRng(7)))
+  })
+
+  it('explanation matches the played interval and names its semitone count', () => {
+    expect(Object.keys(INTERVAL_EXPLANATIONS).sort()).toEqual(Object.keys(INTERVAL_LABELS).sort())
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of seeds) {
+        const q = makeIntervalQuestion(level, seededRng(seed))
+        const semitones = Math.abs(q.midis[1] - q.midis[0])
+        expect(q.explanation).toBe(INTERVAL_EXPLANATIONS[semitones])
+        expect(q.explanation).toContain(`${semitones} semitone`)
+      }
+    }
+  })
+})
+
+describe('question explanations', () => {
+  it('every option-based ear question carries a non-empty explanation', () => {
+    for (const seed of seeds) {
+      expect(makeIntervalQuestion(4, seededRng(seed)).explanation.length).toBeGreaterThan(20)
+      expect(makeChordQuestion(4, seededRng(seed)).explanation.length).toBeGreaterThan(20)
+      expect(makeScaleTypeQuestion(4, seededRng(seed)).explanation.length).toBeGreaterThan(20)
+      expect(makeCadenceQuestion(3, seededRng(seed)).explanation.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('cadence explanation restates the answer label', () => {
+    for (const seed of seeds) {
+      const q = makeCadenceQuestion(3, seededRng(seed))
+      // Both the answer and its explanation lead with the same cadence name.
+      expect(q.explanation.startsWith(q.answer.split(' ')[0])).toBe(true)
+    }
   })
 })
 

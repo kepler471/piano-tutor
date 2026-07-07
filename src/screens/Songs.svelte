@@ -1,18 +1,30 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
   import SongPlayer from '../components/SongPlayer.svelte'
+  import Term from '../components/Term.svelte'
   import { SONG_CATALOG } from '../lib/data/songs/catalog'
   import type { Song } from '../lib/data/songs/types'
   import { parseMidiFile } from '../lib/songs/midiImport'
   import { parseMusicXml } from '../lib/songs/musicxml'
   import { addUserSong, removeUserSong, userSongs } from '../lib/songs/userSongs.svelte'
-  import { currentParams } from '../router.svelte'
+  import { currentParams, navigate } from '../router.svelte'
 
-  let selected = $state<Song | null>(null)
-  // Deep link from the learning guide, read once at mount.
-  {
-    const linked = SONG_CATALOG.find((s) => s.id === currentParams().song)
-    if (linked) selected = linked
-  }
+  // Selection lives in the URL (?song=id) so the browser back button steps
+  // open song → song list → previous screen. User imports persist with
+  // stable ids, so they are addressable too.
+  const params = $derived(currentParams())
+  const selected = $derived.by((): Song | null => {
+    if (!params.song) return null
+    return SONG_CATALOG.find((s) => s.id === params.song) ?? userSongs.all.find((s) => s.id === params.song) ?? null
+  })
+
+  /** Preserve the guide breadcrumb (?from=guide) across in-screen navigation. */
+  const withFrom = (extra?: Record<string, string>) =>
+    params.from ? { ...extra, from: params.from } : extra
+
+  const openSong = (song: Song) => navigate('/songs', withFrom({ song: song.id }))
+  const exitSong = () => navigate('/songs', withFrom())
+
   let importError = $state('')
   let fileInput: HTMLInputElement | undefined = $state()
 
@@ -43,7 +55,7 @@
         throw new Error('Unsupported file type — use .mid, .midi, .xml or .musicxml.')
       }
       addUserSong(song)
-      selected = song
+      openSong(song)
     } catch (err) {
       importError = err instanceof Error ? err.message : String(err)
     } finally {
@@ -53,11 +65,12 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Songs</h1>
 
   {#if selected}
     {#key selected.id}
-      <SongPlayer song={selected} onexit={() => (selected = null)} />
+      <SongPlayer song={selected} onexit={exitSong} />
     {/key}
   {:else}
     <p class="hint">
@@ -68,10 +81,10 @@
     {#each grades as grade (grade)}
       {@const songs = byGrade(grade)}
       {#if songs.length}
-        <h2 class="grade-h">Grade {grade}</h2>
+        <h2 class="grade-h"><Term term="abrsm" label={`Grade ${grade}`} /></h2>
         <div class="song-grid">
           {#each songs as song (song.id)}
-            <button class="song-tile" onclick={() => (selected = song)}>
+            <button class="song-tile" onclick={() => openSong(song)}>
               <strong>{STYLE_ICONS[song.style]} {song.title}</strong>
               <span>{song.composer} · {song.measures.length} bars{song.swing ? ' · swing' : ''}</span>
             </button>
@@ -102,7 +115,7 @@
       <div class="song-grid">
         {#each userSongs.all as song (song.id)}
           <div class="song-tile imported">
-            <button class="tile-main" onclick={() => (selected = song)}>
+            <button class="tile-main" onclick={() => openSong(song)}>
               <strong>{song.title}</strong>
               <span>{song.composer} · {song.measures.length} bars</span>
             </button>

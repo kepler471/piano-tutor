@@ -1,10 +1,17 @@
-<script lang="ts">
-  import { GUIDE_STAGES, guideHref, type GuideLink, type GuideStage } from '../lib/data/guide'
-  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+<script lang="ts" module>
+  import { GUIDE_STAGES } from '../lib/data/guide'
 
-  // Which stages are expanded. Transient by design — the guide never
-  // persists anything (no progress tracking).
+  // Which stages are expanded. Module-level so following a guide link and
+  // coming back keeps your place for the rest of the visit — but nothing is
+  // ever persisted (the guide tracks no progress by design; a reload resets).
   let open = $state<Record<string, boolean>>({ [GUIDE_STAGES[0].id]: true })
+</script>
+
+<script lang="ts">
+  import GlossText from '../components/GlossText.svelte'
+  import { guideHref, type GuideLink, type GuideStage } from '../lib/data/guide'
+  import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+  import { currentParams } from '../router.svelte'
 
   function toggle(id: string) {
     open[id] = !open[id]
@@ -16,6 +23,12 @@
     open[stage.id] = true
     document.getElementById(stage.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     return true
+  }
+
+  // Deep link (#/guide?stage=stage-3): open and scroll to that stage.
+  {
+    const linked = GUIDE_STAGES.findIndex((s) => s.id === currentParams().stage)
+    if (linked !== -1) setTimeout(() => showStage(linked + 1), 0)
   }
 
   const LINK_GROUPS: { key: 'technique' | 'repertoire' | 'ear' | 'rhythm' | 'sight'; label: string }[] = [
@@ -68,7 +81,7 @@
 
       {#if open[stage.id]}
         <div class="stage-body">
-          <p class="overview">{stage.overview}</p>
+          <p class="overview"><GlossText text={stage.overview} /></p>
 
           <h3>You're working towards</h3>
           <ul>
@@ -92,7 +105,7 @@
           {#each stage.theory as section (section.title)}
             <div class="theory">
               <h3>{section.title}</h3>
-              <p>{section.body}</p>
+              <p><GlossText text={section.body} /></p>
               {#if section.links.length}
                 <div class="chips">
                   {#each section.links as link (link.label)}
@@ -138,7 +151,6 @@
     border-radius: 12px;
     background: #fff;
     margin-top: 16px;
-    overflow: hidden;
   }
   .stage-head {
     display: flex;

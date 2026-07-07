@@ -11,6 +11,7 @@ import {
   makeIntervalStaffQuestion,
   makeKeySignatureQuestion,
   makeNoteNamingQuestion,
+  sigAccidentals,
 } from '../lib/theory/quiz'
 import { makeRhythmDictationQuestion } from '../lib/quiz/rhythmQuiz'
 import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
@@ -199,6 +200,69 @@ describe('makeRhythmDictationQuestion', () => {
   it('every level has enough patterns for 3 options', () => {
     for (const level of [1, 2, 3, 4]) {
       expect(RHYTHM_PATTERNS.filter((p) => p.level === level).length).toBeGreaterThanOrEqual(3)
+    }
+  })
+})
+
+describe('sigAccidentals', () => {
+  it('lists the exact accidentals per major key', () => {
+    expect(sigAccidentals('C')).toEqual({ kind: 'none', names: [] })
+    expect(sigAccidentals('G')).toEqual({ kind: 'sharps', names: ['F♯'] })
+    expect(sigAccidentals('D')).toEqual({ kind: 'sharps', names: ['F♯', 'C♯'] })
+    expect(sigAccidentals('F#')).toEqual({ kind: 'sharps', names: ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯'] })
+    expect(sigAccidentals('F')).toEqual({ kind: 'flats', names: ['B♭'] })
+    expect(sigAccidentals('Db')).toEqual({ kind: 'flats', names: ['B♭', 'E♭', 'A♭', 'D♭', 'G♭'] })
+  })
+})
+
+describe('question explanations', () => {
+  it('every option-based question carries a non-empty explanation', () => {
+    for (const seed of seeds) {
+      const rng = () => seededRng(seed)
+      expect(makeNoteNamingQuestion(4, rng()).explanation.length).toBeGreaterThan(20)
+      expect(makeKeySignatureQuestion(3, rng()).explanation.length).toBeGreaterThan(20)
+      expect(makeIntervalStaffQuestion(4, rng()).explanation.length).toBeGreaterThan(20)
+      expect(makeChordSpellingQuestion(3, rng()).explanation.length).toBeGreaterThan(20)
+      expect(makeChordFunctionQuestion(3, rng()).explanation.length).toBeGreaterThan(20)
+      expect(makeRhythmDictationQuestion(2, rng()).explanation.length).toBeGreaterThan(5)
+    }
+  })
+
+  it('key-signature explanation lists the exact accidentals of the rendered signature', () => {
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of seeds) {
+        const q = makeKeySignatureQuestion(level, seededRng(seed))
+        const acc = sigAccidentals(q.keySignature)
+        if (acc.kind === 'none') {
+          expect(q.explanation).toContain('no sharps or flats')
+        } else {
+          expect(q.explanation).toContain(`${acc.names.length} ${acc.kind.slice(0, -1)}${acc.names.length === 1 ? '' : 's'}`)
+          expect(q.explanation).toContain(acc.names.join(', '))
+        }
+      }
+    }
+  })
+
+  it('note-naming explanation names the answer and the right clef mnemonic', () => {
+    for (const seed of seeds) {
+      const q = makeNoteNamingQuestion(2, seededRng(seed))
+      expect(q.explanation).toContain(q.answer)
+      expect(q.explanation).toContain(q.clef === 'treble' ? 'Every Good Boy' : 'All Cows Eat Grass')
+    }
+  })
+
+  it('chord-function explanation names the answer chord root', () => {
+    for (const seed of seeds) {
+      const q = makeChordFunctionQuestion(3, seededRng(seed))
+      const root = q.answer.split(' ')[0]
+      expect(q.explanation).toContain(`that root is ${root}`)
+    }
+  })
+
+  it('rhythm-dictation explanation quotes the answer pattern label', () => {
+    for (const seed of seeds) {
+      const q = makeRhythmDictationQuestion(3, seededRng(seed))
+      expect(q.explanation).toContain(q.answer.label)
     }
   })
 })

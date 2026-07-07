@@ -1,5 +1,7 @@
 <script lang="ts">
+  import BackToGuide from '../components/BackToGuide.svelte'
   import { Chord, Note } from 'tonal'
+  import GlossText from '../components/GlossText.svelte'
   import MicButton from '../components/MicButton.svelte'
   import PianoKeyboard from '../components/PianoKeyboard.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
@@ -8,6 +10,7 @@
   import { onPolyEvent, startPolyDetection, stopPolyDetection } from '../lib/audio/polyPitch.svelte'
   import { playChord, playNote } from '../lib/audio/playback'
   import { chordFingering } from '../lib/data/chordFingerings'
+  import { lookupTerm } from '../lib/data/glossary'
   import { scoreFromChord, scoreFromSteps, type ScoreModel } from '../lib/notation/vexScore'
   import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
   import { SHELL_QUALITIES, shellVoicing } from '../lib/theory/voicings'
@@ -165,6 +168,7 @@
 </script>
 
 <section>
+  <BackToGuide />
   <h1>Chords</h1>
 
   <div class="controls">
@@ -177,13 +181,23 @@
     <div class="control-group">
       <span class="control-label">Quality</span>
       {#each CHORD_QUALITIES as q (q.id)}
-        <button class:active={quality === q.id} onclick={() => selectQuality(q.id)}>{q.id}</button>
+        <button
+          class:active={quality === q.id}
+          data-tip={lookupTerm(q.id)?.short}
+          onclick={() => selectQuality(q.id)}
+        >
+          {lookupTerm(q.id)?.term ?? q.id}
+        </button>
       {/each}
     </div>
     <div class="control-group">
       <span class="control-label">Inversion</span>
       {#each inversionsFor(quality) as inv (inv)}
-        <button class:active={inversion === inv} onclick={() => (inversion = inv)}>
+        <button
+          class:active={inversion === inv}
+          data-tip={lookupTerm(inv === 0 ? 'root position' : 'inversion')?.short}
+          onclick={() => (inversion = inv)}
+        >
           {INV_LABELS[inv]}
         </button>
       {/each}
@@ -197,8 +211,20 @@
       <div class="control-group">
         <span class="control-label">Voicing</span>
         <button class:active={activeVoicing === 'full'} onclick={() => (voicing = 'full')}>Full chord</button>
-        <button class:active={activeVoicing === 'A'} onclick={() => (voicing = 'A')}>Shell A (1+7)</button>
-        <button class:active={activeVoicing === 'B'} onclick={() => (voicing = 'B')}>Shell B (1+3)</button>
+        <button
+          class:active={activeVoicing === 'A'}
+          data-tip={lookupTerm('shell voicing')?.short}
+          onclick={() => (voicing = 'A')}
+        >
+          Shell A (1+7)
+        </button>
+        <button
+          class:active={activeVoicing === 'B'}
+          data-tip={lookupTerm('shell voicing')?.short}
+          onclick={() => (voicing = 'B')}
+        >
+          Shell B (1+3)
+        </button>
       </div>
     {/if}
   </div>
@@ -213,11 +239,14 @@
     </div>
     {#if shell}
       <p class="hint">
-        Notes: {shell.midis.map((m) => Note.pitchClass(Note.fromMidi(m))).join(' – ')} · Left hand,
-        fingers 5 and 1. Jazz players sketch the harmony with just these two notes — the other hand
-        is free for melody.
+        <GlossText
+          text={`Notes: ${shell.midis.map((m) => Note.pitchClass(Note.fromMidi(m))).join(' – ')} · Left hand, fingers 5 and 1. Jazz players sketch the harmony with just these two notes in a shell voicing — the other hand is free for melody.`}
+        />
       </p>
     {:else}
+      {#if lookupTerm(quality)}
+        <p class="hint">{lookupTerm(quality)!.short}</p>
+      {/if}
       <p class="hint">
         Notes: {chord.noteNames.map((n) => Note.pitchClass(n)).join(' – ')} · Fingers
         ({hand === 'R' ? 'right' : 'left'} hand, bottom to top):

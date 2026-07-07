@@ -4,6 +4,16 @@
 
   const recent = $derived(practiceHistory.records.slice(0, 6))
 
+  // One-time welcome for first-run users (a UI flag, not progress tracking).
+  const WELCOMED_KEY = 'piano-tutor.welcomed'
+  let welcomed = $state(localStorage.getItem(WELCOMED_KEY) === '1')
+
+  function dismissWelcome(openGuide: boolean) {
+    localStorage.setItem(WELCOMED_KEY, '1')
+    welcomed = true
+    if (openGuide) navigate('/guide')
+  }
+
   const sections: { route: string; title: string; desc: string; highlight?: boolean }[] = [
     {
       route: '/guide',
@@ -60,6 +70,28 @@
     A practice companion for your piano. Plug in a MIDI keyboard for instant, accurate feedback —
     or use no gear at all and let it listen through your microphone.
   </p>
+
+  {#if !welcomed}
+    <div class="welcome">
+      <h2>Welcome — here's how this works</h2>
+      <ol>
+        <li><strong>Sit at your piano.</strong> Any acoustic or electric piano works — no cables needed.</li>
+        <li>
+          <strong>The app listens through your microphone.</strong> When you press "Start listening" in a
+          lesson, allow microphone access — everything runs on your device. Wrong notes flash red, and the
+          score always waits for you. A MIDI keyboard also works and is even more accurate.
+        </li>
+        <li>
+          <strong>Not sure where to start?</strong> The Learning Guide is a staged path from your first
+          notes to intermediate playing.
+        </li>
+      </ol>
+      <div class="welcome-actions">
+        <button class="primary" onclick={() => dismissWelcome(true)}>Open the Learning Guide</button>
+        <button class="ghost" onclick={() => dismissWelcome(false)}>Got it</button>
+      </div>
+    </div>
+  {/if}
   <div class="grid">
     {#each sections as s (s.route)}
       <button class="tile" class:highlight={s.highlight} onclick={() => navigate(s.route)}>
@@ -93,6 +125,33 @@
 </section>
 
 <style>
+  .welcome {
+    margin-top: 16px;
+    padding: 18px 20px;
+    border: 1px solid #93c5fd;
+    border-radius: 12px;
+    background: #eff6ff;
+  }
+  .welcome h2 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    color: #1d4ed8;
+  }
+  .welcome ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #334155;
+  }
+  .welcome li + li {
+    margin-top: 6px;
+  }
+  .welcome-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

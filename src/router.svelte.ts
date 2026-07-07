@@ -21,6 +21,16 @@ export function currentParams(): Readonly<Record<string, string>> {
   return current.params
 }
 
-export function navigate(to: string, params?: Record<string, string>): void {
-  window.location.hash = buildHash(to, params)
+export function navigate(to: string, params?: Record<string, string>, opts?: { replace?: boolean }): void {
+  const hash = buildHash(to, params)
+  if (opts?.replace) {
+    // Same-document fragment replace: no reload, fires hashchange, and —
+    // unlike assigning location.hash — adds no history entry, so control
+    // tweaks (quiz mode, level) don't pollute the back button.
+    const url = new URL(window.location.href)
+    url.hash = hash
+    window.location.replace(url.href)
+  } else {
+    window.location.hash = hash
+  }
 }
