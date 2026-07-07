@@ -38,6 +38,11 @@ export const INTENT_BANK: readonly IntentTemplate[] = [
     'lets go back to the main menu',
     'back to the start screen please',
   ], { kind: 'navigate', route: '/' }),
+  fixed('nav-guide', [
+    'where do i start',
+    'where should i begin',
+    'show me the learning path',
+  ], { kind: 'navigate', route: '/guide' }),
   fixed('nav-scales', [
     'can you open up the scales for me',
     'i would like to look at some scales',

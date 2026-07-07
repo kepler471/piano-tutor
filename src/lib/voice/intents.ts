@@ -8,7 +8,11 @@ import type { ChordQualityId, Hand, ScaleTypeId } from '../theory/types'
 export type Intent =
   // global
   | { kind: 'wake' } // wake word alone — "Yes?" + armed window
-  | { kind: 'navigate'; route: '/' | '/scales' | '/chords' | '/practice' | '/play' | '/tuner' }
+  | {
+      kind: 'navigate'
+      route: '/' | '/guide' | '/scales' | '/chords' | '/practice' | '/ear' | '/rhythm' | '/songs' | '/play' | '/tuner'
+    }
+  | { kind: 'show-stage'; stage: number } // "show stage two" — guide (cross-screen capable)
   | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number }
   | { kind: 'set-bpm'; bpm?: number; delta?: number } // scope decides which bpm; delta for "slower"/"faster"
   | { kind: 'stop-all' } // "piano, stop"
@@ -38,6 +42,7 @@ export type Intent =
 
 /** Where an intent can be fulfilled if no active scope handles it. */
 export const ROUTE_FOR_KIND: Partial<Record<Intent['kind'], string>> = {
+  'show-stage': '/guide',
   'show-scale': '/scales',
   'show-chord': '/chords',
   'set-inversion': '/chords',

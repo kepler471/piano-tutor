@@ -7,6 +7,7 @@ import { buildGrammar } from '../lib/voice/parser'
 /** What each template must resolve to (kind only; slots vary by transcript). */
 const EXPECTED_KIND: Record<string, Intent['kind']> = {
   'nav-home': 'navigate',
+  'nav-guide': 'navigate',
   'nav-scales': 'navigate',
   'nav-chords': 'navigate',
   'nav-practice': 'navigate',

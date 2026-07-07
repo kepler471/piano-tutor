@@ -54,12 +54,33 @@ describe('navigation', () => {
     ['piano open free play', '/play'],
     ['piano tuner', '/tuner'],
     ['piano note detector', '/tuner'],
+    ['piano open the guide', '/guide'],
+    ['piano show me the learning guide', '/guide'],
+    ['piano ear training', '/ear'],
+    ['piano open songs', '/songs'],
+    ['piano rhythm trainer', '/rhythm'],
+    ['piano go to rhythm', '/rhythm'],
   ]
   for (const [phrase, route] of cases) {
     it(phrase, () => {
       expect(parseTranscript(phrase)).toEqual({ kind: 'navigate', route })
     })
   }
+})
+
+describe('guide stages', () => {
+  it('show stage two', () => {
+    expect(parseTranscript('piano show stage two')).toEqual({ kind: 'show-stage', stage: 2 })
+  })
+  it('open stage five', () => {
+    expect(parseTranscript('piano open stage five')).toEqual({ kind: 'show-stage', stage: 5 })
+  })
+  it('bare "stage three" while armed', () => {
+    expect(parseTranscript('stage three', { armed: true })).toEqual({ kind: 'show-stage', stage: 3 })
+  })
+  it('stage without a number falls through to unknown', () => {
+    expect(parseTranscript('piano show the stage')).toEqual({ kind: 'unknown', text: 'show the stage' })
+  })
 })
 
 describe('scales', () => {

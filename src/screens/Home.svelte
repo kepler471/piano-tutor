@@ -4,7 +4,13 @@
 
   const recent = $derived(practiceHistory.records.slice(0, 6))
 
-  const sections = [
+  const sections: { route: string; title: string; desc: string; highlight?: boolean }[] = [
+    {
+      route: '/guide',
+      title: 'Learning Guide — start here',
+      desc: 'New to the piano, or unsure what to practice next? A staged path from first notes to intermediate playing, using everything below.',
+      highlight: true,
+    },
     {
       route: '/scales',
       title: 'Scales',
@@ -56,7 +62,7 @@
   </p>
   <div class="grid">
     {#each sections as s (s.route)}
-      <button class="tile" onclick={() => navigate(s.route)}>
+      <button class="tile" class:highlight={s.highlight} onclick={() => navigate(s.route)}>
         <h2>{s.title}</h2>
         <p>{s.desc}</p>
       </button>
@@ -104,6 +110,13 @@
   }
   .tile:hover {
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  }
+  .tile.highlight {
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+  .tile.highlight h2 {
+    color: #1d4ed8;
   }
   .tile h2 {
     margin: 0 0 8px;

@@ -32,6 +32,8 @@ const MODEL_DIR = fileURLToPath(new URL('../../public/model-minilm', import.meta
 const POSITIVE_ROWS: [string, object][] = [
   ['take us back home', { kind: 'navigate', route: '/' }],
   ['back to the main menu please', { kind: 'navigate', route: '/' }],
+  ['where should i start', { kind: 'navigate', route: '/guide' }],
+  ['i do not know where to begin', { kind: 'navigate', route: '/guide' }],
   ['could you open up the scales', { kind: 'navigate', route: '/scales' }],
   ['i would like to see some scales', { kind: 'navigate', route: '/scales' }],
   ['can i look at the chords', { kind: 'navigate', route: '/chords' }],

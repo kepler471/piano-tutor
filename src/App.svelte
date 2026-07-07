@@ -3,6 +3,7 @@
   import VoiceButton from './components/VoiceButton.svelte'
   import VoiceHud from './components/VoiceHud.svelte'
   import Home from './screens/Home.svelte'
+  import GuideScreen from './screens/GuideScreen.svelte'
   import ScalesLibrary from './screens/ScalesLibrary.svelte'
   import ChordsLibrary from './screens/ChordsLibrary.svelte'
   import Practice from './screens/Practice.svelte'
@@ -14,6 +15,7 @@
 
   const links = [
     { route: '/', label: 'Home' },
+    { route: '/guide', label: 'Guide' },
     { route: '/scales', label: 'Scales' },
     { route: '/chords', label: 'Chords' },
     { route: '/practice', label: 'Practice' },
@@ -38,7 +40,9 @@
 </nav>
 
 <main>
-  {#if route === '/scales'}
+  {#if route === '/guide'}
+    <GuideScreen />
+  {:else if route === '/scales'}
     <ScalesLibrary />
   {:else if route === '/chords'}
     <ChordsLibrary />

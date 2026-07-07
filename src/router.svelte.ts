@@ -1,22 +1,26 @@
+import { buildHash, parseRoute } from './lib/routing'
+
 /**
- * Minimal hash router. Routes are plain strings like '/', '/scales', '/practice'.
+ * Minimal hash router. Routes are plain strings like '/', '/scales', '/practice',
+ * optionally followed by a query string: '#/practice?lesson=scale-C-major'.
+ * currentRoute() always returns the bare path so exact-match checks keep working.
+ * Pure parsing/building lives in src/lib/routing.ts.
  */
 
-function parseHash(): string {
-  const h = window.location.hash.slice(1)
-  return h === '' ? '/' : h
-}
-
-let current = $state(parseHash())
+let current = $state(parseRoute(window.location.hash))
 
 window.addEventListener('hashchange', () => {
-  current = parseHash()
+  current = parseRoute(window.location.hash)
 })
 
 export function currentRoute(): string {
-  return current
+  return current.path
 }
 
-export function navigate(to: string): void {
-  window.location.hash = to
+export function currentParams(): Readonly<Record<string, string>> {
+  return current.params
+}
+
+export function navigate(to: string, params?: Record<string, string>): void {
+  window.location.hash = buildHash(to, params)
 }

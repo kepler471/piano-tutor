@@ -186,9 +186,16 @@ export function extractSlots(raw: string): Slots {
 
 const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] = [
   ['home', { kind: 'navigate', route: '/' }],
+  ['guide', { kind: 'navigate', route: '/guide' }],
+  ['learning guide', { kind: 'navigate', route: '/guide' }],
   ['scales', { kind: 'navigate', route: '/scales' }],
   ['chords', { kind: 'navigate', route: '/chords' }],
   ['practice', { kind: 'navigate', route: '/practice' }],
+  ['ear training', { kind: 'navigate', route: '/ear' }],
+  ['quizzes', { kind: 'navigate', route: '/ear' }],
+  ['rhythm', { kind: 'navigate', route: '/rhythm' }],
+  ['rhythm trainer', { kind: 'navigate', route: '/rhythm' }],
+  ['songs', { kind: 'navigate', route: '/songs' }],
   ['free play', { kind: 'navigate', route: '/play' }],
   ['tuner', { kind: 'navigate', route: '/tuner' }],
   ['note detector', { kind: 'navigate', route: '/tuner' }],
@@ -231,6 +238,14 @@ export function parseTranscript(raw: string, opts: { armed?: boolean } = {}): In
   const navText = tokens.filter((t) => !NAV_FILLERS.has(t)).join(' ')
   for (const [key, intent] of NAV_TARGETS) {
     if (navText === key) return intent
+  }
+
+  // Guide stages: "show stage two", "stage three" (navigates to the guide if needed).
+  const stageIdx = tokens.indexOf('stage')
+  if (stageIdx !== -1) {
+    const next = tokens[stageIdx + 1]
+    const stage = next && /^\d+$/.test(next) ? parseInt(next, 10) : next ? UNITS[next] : undefined
+    if (stage !== undefined) return { kind: 'show-stage', stage }
   }
 
   // Metronome / tempo.
@@ -363,6 +378,7 @@ export function buildGrammar(lessons: { title: string; method: string }[]): stri
     hey okay ok
     go to open show me the a an of screen page
     home scales chords practice free play tuner note detector
+    guide learning stage stages ear training rhythm songs quizzes
     start stop turn off on cancel quiet be help what can i say you do commands
     metronome tempo speed at set slower faster slow down up
     record recording clear copy notes score
