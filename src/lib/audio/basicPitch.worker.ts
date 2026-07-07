@@ -36,6 +36,26 @@ let newSinceRun = 0
 let busy = false
 const emitted: { midi: number; onset: number }[] = []
 
+/**
+ * tfjs 3.21's wasm Fill kernel crashes with "Unknown dtype undefined" when the
+ * dtype attr is omitted — and tf.signal.frame's end-padding omits it, which
+ * Basic Pitch hits on every window. Re-register the kernel with a default.
+ */
+function patchWasmFillKernel() {
+  const fill = tf.getKernel('Fill', 'wasm')
+  if (!fill) return
+  tf.unregisterKernel('Fill', 'wasm')
+  tf.registerKernel({
+    kernelName: 'Fill',
+    backendName: 'wasm',
+    kernelFunc: (args) => {
+      const attrs = args.attrs as { value?: unknown; dtype?: string }
+      const dtype = attrs.dtype ?? (typeof attrs.value === 'string' ? 'string' : 'float32')
+      return fill.kernelFunc({ ...args, attrs: { ...args.attrs, dtype } as typeof args.attrs })
+    },
+  })
+}
+
 async function init() {
   try {
     setWasmPaths('/tfjs-wasm/')
@@ -45,6 +65,7 @@ async function init() {
       await tf.setBackend('cpu')
     }
     await tf.ready()
+    patchWasmFillKernel()
     model = new BasicPitch('/model/model.json')
     // Warm-up: the first inference compiles kernels; do it on silence now
     // instead of on the user's first chord.
