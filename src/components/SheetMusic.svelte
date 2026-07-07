@@ -23,7 +23,7 @@
   $effect(() => {
     if (container && score) {
       try {
-        if (isGrandScore(score)) renderGrandScore(container, score, highlights, minWidth)
+        if (isGrandScore(score)) renderGrandScore(container, score, highlights, { minWidth })
         else renderScore(container, score, highlights, minWidth)
       } catch (err) {
         console.error('Sheet music render failed', err)

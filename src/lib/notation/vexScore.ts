@@ -182,6 +182,19 @@ export function renderScore(
   voice.draw(ctx, stave)
 }
 
+export interface GrandRenderOptions {
+  minWidth?: number
+  /** Render at exactly this width (justified system lines for songs) */
+  width?: number
+  /** Songs: independent bass-stave highlights (indices differ from treble) */
+  bassHighlights?: Map<number, HighlightState>
+}
+
+/** Natural (unjustified) width of a grand system with this many events. */
+export function grandScoreNaturalWidth(eventCount: number): number {
+  return 110 + eventCount * 46
+}
+
 /**
  * Renders a grand staff (treble over bass, brace-connected). Events at equal
  * indices are formatted to align vertically; highlight indices color the
@@ -191,13 +204,12 @@ export function renderGrandScore(
   container: HTMLElement,
   model: GrandScoreModel,
   highlights?: Map<number, HighlightState>,
-  minWidth = 320,
-  /** Songs: independent bass-stave highlights (indices differ from treble) */
-  bassHighlights?: Map<number, HighlightState>,
+  opts: GrandRenderOptions = {},
 ): void {
   container.innerHTML = ''
+  const { minWidth = 320, bassHighlights } = opts
   const count = Math.max(model.treble.length, model.bass.length)
-  const width = Math.max(minWidth, 110 + count * 46)
+  const width = opts.width ?? Math.max(minWidth, grandScoreNaturalWidth(count))
   const height = 320
 
   const renderer = new Renderer(container as HTMLDivElement, Renderer.Backends.SVG)
@@ -235,7 +247,7 @@ export function renderGrandScore(
 
   Accidental.applyAccidentals([trebleVoice], model.keySignature)
   Accidental.applyAccidentals([bassVoice], model.keySignature)
-  new Formatter().joinVoices([trebleVoice]).joinVoices([bassVoice]).format([trebleVoice, bassVoice], width - 130)
+  new Formatter().joinVoices([trebleVoice]).joinVoices([bassVoice]).formatToStave([trebleVoice, bassVoice], treble)
   trebleVoice.draw(ctx, treble)
   bassVoice.draw(ctx, bass)
 }

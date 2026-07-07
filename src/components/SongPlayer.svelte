@@ -5,7 +5,6 @@
   import { playSong } from '../lib/audio/playback'
   import { beatsPerMeasure, type Song } from '../lib/data/songs/types'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
-  import { songSystems } from '../lib/notation/songScore'
   import type { HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
@@ -34,7 +33,6 @@
 
   const range = $derived({ hands, fromMeasure, toMeasure })
   const steps = $derived(stepsFromSong(song, range))
-  const systems = $derived(songSystems(song, range))
 
   const matcher = $derived.by(() => {
     void resetKey
@@ -232,7 +230,7 @@
     </p>
   {/if}
 
-  <GrandSheetMusic {systems} stepHighlights={highlights} />
+  <GrandSheetMusic {song} {range} stepHighlights={highlights} />
   <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.activeNotes} {expected} wrong={wrongFlash} fingers={fingerMap} />
 </div>
 
