@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest'
+import {
+  cosineSimilarity,
+  DEFAULT_MARGIN,
+  DEFAULT_THRESHOLD,
+  matchIntent,
+} from '../lib/voice/intentMatcher'
+
+const v = (...xs: number[]) => new Float32Array(xs)
+
+describe('cosineSimilarity', () => {
+  it('identical / orthogonal / opposite unit vectors', () => {
+    expect(cosineSimilarity(v(1, 0, 0), v(1, 0, 0))).toBeCloseTo(1, 6)
+    expect(cosineSimilarity(v(1, 0, 0), v(0, 1, 0))).toBeCloseTo(0, 6)
+    expect(cosineSimilarity(v(1, 0, 0), v(-1, 0, 0))).toBeCloseTo(-1, 6)
+  })
+
+  it('handles unnormalized vectors', () => {
+    // dot = 24, |a| = |b| = 5 → 24/25
+    expect(cosineSimilarity(v(3, 4), v(4, 3))).toBeCloseTo(24 / 25, 6)
+  })
+
+  it('throws on dimension mismatch', () => {
+    expect(() => cosineSimilarity(v(1, 0), v(1, 0, 0))).toThrow(RangeError)
+  })
+
+  it('zero vector scores 0, not NaN', () => {
+    expect(cosineSimilarity(v(0, 0), v(1, 1))).toBe(0)
+    expect(cosineSimilarity(v(0, 0), v(0, 0))).toBe(0)
+  })
+})
+
+describe('matchIntent', () => {
+  // Two templates: group 0 has two examples, group 1 has one.
+  const bank = [v(1, 0, 0), v(0, 1, 0), v(0, 0, 1)]
+  const groups = [0, 0, 1]
+
+  it('exact hit on an example wins its group', () => {
+    const m = matchIntent(v(1, 0, 0), bank, groups)
+    expect(m).toMatchObject({ index: 0, group: 0 })
+    expect(m!.score).toBeCloseTo(1, 6)
+  })
+
+  it('empty bank → null', () => {
+    expect(matchIntent(v(1, 0, 0), [], [])).toBeNull()
+  })
+
+  it('best score below threshold → null', () => {
+    // cos = 1/√3 ≈ 0.577 against every bank vector
+    const q = v(1, 1, 1)
+    expect(cosineSimilarity(q, bank[0])).toBeCloseTo(1 / Math.sqrt(3), 6)
+    expect(matchIntent(q, bank, groups, { threshold: 0.6, margin: 0 })).toBeNull()
+  })
+
+  it('runner-up within margin but in the SAME group still matches', () => {
+    // Equidistant from both group-0 examples; far from group 1.
+    const q = v(1, 1, 0)
+    const m = matchIntent(q, bank, groups, { threshold: 0.6, margin: 0.1 })
+    expect(m).not.toBeNull()
+    expect(m!.group).toBe(0)
+    expect(m!.margin).toBeCloseTo(Math.SQRT1_2, 6) // gap to group 1 (score 0)
+  })
+
+  it('best other-group vector within margin → null (ambiguous)', () => {
+    // Nearly equidistant between group 0 and group 1.
+    const q = v(1, 0, 0.98)
+    expect(matchIntent(q, bank, groups, { threshold: 0.5, margin: 0.06 })).toBeNull()
+  })
+
+  it('single-group bank has infinite margin', () => {
+    const m = matchIntent(v(1, 0, 0), [v(1, 0, 0)], [0], { threshold: 0.6, margin: 0.5 })
+    expect(m).not.toBeNull()
+    expect(m!.margin).toBe(Infinity)
+  })
+
+  it('zero query vector → null', () => {
+    expect(matchIntent(v(0, 0, 0), bank, groups)).toBeNull()
+  })
+
+  it('throws when groups do not line up with the bank', () => {
+    expect(() => matchIntent(v(1, 0, 0), bank, [0, 0])).toThrow(RangeError)
+  })
+
+  it('default gates are biased toward rejection', () => {
+    expect(DEFAULT_THRESHOLD).toBeGreaterThanOrEqual(0.5)
+    expect(DEFAULT_MARGIN).toBeGreaterThan(0)
+  })
+})

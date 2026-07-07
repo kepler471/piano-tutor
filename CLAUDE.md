@@ -18,7 +18,9 @@ a "piano, …" wake word.
 Svelte 5 (runes) + TypeScript + Vite · `vexflow@5` (notation) · `tonal` (theory) · `pitchy`
 (mono pitch) · `@spotify/basic-pitch` + `@tensorflow/tfjs-backend-wasm` (poly pitch) · `tone`
 (playback: Salamander piano samples + metronome) · `vosk-browser` (voice commands, Kaldi WASM
-in a worker — dynamically imported so the ~6 MB chunk loads only when voice is enabled).
+in a worker — dynamically imported so the ~6 MB chunk loads only when voice is enabled) ·
+`@huggingface/transformers` (MiniLM sentence embeddings for the voice-intent fallback, ONNX on
+WASM — dynamically imported, fully offline against vendored model files).
 
 ⚠️ basic-pitch pins `@tensorflow/tfjs@3.x`. Do not install tfjs independently; keep
 `tfjs-backend-wasm` at the same major/minor as `npm ls @tensorflow/tfjs` reports (3.21.0).
@@ -59,6 +61,19 @@ in a worker — dynamically imported so the ~6 MB chunk loads only when voice is
     the target screen's scope registers (pending-intent, 10 s TTL). `buildGrammar()` generates
     the Kaldi word-list grammar (+`"[unk]"`) so piano notes/chatter decode as `[unk]` and are
     dropped before the wake-word check.
+  - Embedding fallback (Tier 1): when the regex parser yields `{kind:'unknown'}`,
+    `voice.svelte.ts` embeds the transcript (MiniLM via `embedder.ts`, lazily preloaded on
+    voice enable) and nearest-neighbor matches it against `intentBank.ts` — example phrasings
+    per intent whose `resolve()` re-extracts slots from the actual transcript
+    (`extractSlots` in parser.ts). `intentMatcher.ts` gates acceptance by similarity
+    threshold + cross-template margin (calibrated by
+    `src/tests/voiceEmbedding.integration.test.ts`, which runs the REAL model offline in node
+    env — tune constants there, never by hand). All matching logic is pure
+    (`intentBank`/`intentMatcher`/`fallback` — vitest-covered); a miss falls back to the old
+    "didn't catch that". Bank example words are auto-added to the Vosk grammar
+    (invariant-tested), so keep examples to real English words the small model knows.
+    Antonym-ish intents (faster/slower, arpeggio/block) share ONE template with the direction
+    read from the transcript — separate templates sit too close in embedding space.
   - `tts.ts` — speechSynthesis confirmations; holds the playback audio gate while speaking so
     pitch detectors ignore the speakers. Feedback strings must never contain "piano".
   - `modelLoader.ts` — streams the model download with progress into the Cache API
@@ -80,6 +95,12 @@ in a worker — dynamically imported so the ~6 MB chunk loads only when voice is
 - `model-vosk/vosk-model-small-en-us-0.15.tar.gz` — Vosk speech model (~41 MB, from
   https://ccoreilly.github.io/vosk-browser/models/; version kept in the filename so immutable
   caching is safe)
+- `model-minilm/Xenova/all-MiniLM-L6-v2/` — quantized MiniLM embedding model (~23 MB:
+  config.json, tokenizer.json, tokenizer_config.json, onnx/model_quantized.onnx) from
+  https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/…
+- `ort-wasm/` — onnxruntime WASM runtime (plain + .asyncify pairs), copied from
+  `node_modules/onnxruntime-web/dist/`. Prod loads these; dev serves them from node_modules
+  instead because Vite refuses to `import()` modules out of public/ (see `embedder.ts`).
 
 Re-copy these after upgrading the corresponding packages.
 

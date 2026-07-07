@@ -8,6 +8,7 @@ import { setMetronomeBpm, startMetronome, stopMetronome } from '../audio/metrono
 import * as playback from '../audio/playback'
 import { Resampler } from '../audio/resample'
 import { createDispatcher, type Dispatcher } from './dispatcher'
+import { createFallbackResolver, createSequenceGate, type FallbackResolver } from './fallback'
 import type { Intent, VoiceScopeSpec } from './intents'
 import { loadModelArchive } from './modelLoader'
 import { buildGrammar, parseTranscript } from './parser'
@@ -131,6 +132,46 @@ const globalScope: VoiceScopeSpec = {
 dispatcher.register(globalScope)
 
 // ---------------------------------------------------------------------------
+// Embedding-based intent fallback (Tier 1)
+// ---------------------------------------------------------------------------
+
+let fallback: FallbackResolver | null = null
+let fallbackLoad: Promise<void> | null = null
+const fallbackGate = createSequenceGate()
+
+/**
+ * Preloads the embedding fallback in the background (~23 MB model + WASM,
+ * browser-cached). Until it's ready, unknown intents keep the plain
+ * "didn't catch that" behavior; failure just leaves the fallback off.
+ */
+function ensureFallback(): void {
+  fallbackLoad ??= import('./embedder')
+    .then(({ getEmbedder }) => getEmbedder())
+    .then(async (embedder) => {
+      const resolver = createFallbackResolver((texts) => embedder.embed(texts))
+      await resolver.ready
+      fallback = resolver
+    })
+    .catch((err) => {
+      console.warn('[voice] intent fallback unavailable:', err)
+    })
+}
+
+async function handleUnknown(intent: Extract<Intent, { kind: 'unknown' }>, seq: number): Promise<void> {
+  let resolved: Intent | null = null
+  if (fallback) {
+    try {
+      resolved = await fallback.resolve(intent.text)
+    } catch (err) {
+      console.warn('[voice] intent fallback failed:', err)
+    }
+  }
+  if (!fallbackGate.isCurrent(seq)) return // superseded by a newer utterance
+  const { feedback } = dispatcher.dispatch(resolved ?? intent)
+  lastFeedback = feedback
+}
+
+// ---------------------------------------------------------------------------
 // Recognition pipeline
 // ---------------------------------------------------------------------------
 
@@ -140,10 +181,16 @@ function handleFinal(text: string): void {
   if (!intent) return // no wake word — silently ignore
   armedUntil = 0
   lastHeard = text.replace(/\[unk\]/g, '').replace(/\s+/g, ' ').trim()
+  // Every new utterance supersedes any in-flight fallback resolution.
+  const seq = fallbackGate.next()
   if (intent.kind === 'wake') {
     armedUntil = Date.now() + ARMED_WINDOW_MS
     lastFeedback = 'Yes?'
     tts.speak('Yes?')
+    return
+  }
+  if (intent.kind === 'unknown') {
+    void handleUnknown(intent, seq)
     return
   }
   const { feedback } = dispatcher.dispatch(intent)
@@ -253,6 +300,7 @@ async function enable(): Promise<void> {
     needsGesture = ctx.state === 'suspended'
     status = 'listening'
     persist(true)
+    ensureFallback()
   } catch (err) {
     console.error('[voice] enable failed:', err)
     status = 'error'

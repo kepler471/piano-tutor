@@ -7,4 +7,8 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  optimizeDeps: {
+    // Pre-bundling breaks transformers.js's import.meta.url-based WASM loading.
+    exclude: ['@huggingface/transformers'],
+  },
 })

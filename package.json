@@ -23,6 +23,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@spotify/basic-pitch": "^1.0.1",
     "@tensorflow/tfjs-backend-wasm": "^3.21.0",
     "pitchy": "^4.1.0",

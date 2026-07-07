@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { allLessons } from '../lib/data/lessons'
 import { MAJOR_ROOTS, MINOR_ROOTS } from '../lib/theory/scales'
-import { buildGrammar, matchLesson, matchRoot, parseTranscript, wordsToNumber } from '../lib/voice/parser'
+import {
+  buildGrammar,
+  extractSlots,
+  matchLesson,
+  matchRoot,
+  parseTranscript,
+  wordsToNumber,
+} from '../lib/voice/parser'
 
 describe('wake word', () => {
   it('ignores utterances without the wake word', () => {
@@ -105,6 +112,18 @@ describe('scales', () => {
       root: 'A',
       scaleType: 'major',
     })
+  })
+
+  it('homophones are only roots when sharp/flat/quality follows', () => {
+    // "see" as an ordinary verb must not become the note C…
+    expect(parseTranscript('piano can i see the chords')).toMatchObject({ kind: 'unknown' })
+    expect(parseTranscript('piano let me see it')).not.toMatchObject({ kind: 'show-scale' })
+    // …but still works as a spoken note letter.
+    expect(parseTranscript('piano show me see sharp')).toMatchObject({
+      kind: 'show-scale',
+      root: 'C#',
+    })
+    expect(parseTranscript('piano see major')).toMatchObject({ kind: 'show-scale', root: 'C' })
   })
 
   it('left hand / right hand', () => {
@@ -327,6 +346,72 @@ describe('matchLesson', () => {
   })
 })
 
+describe('extractSlots', () => {
+  it('pulls every slot type in one pass', () => {
+    expect(extractSlots('c sharp diminished second inversion right hand at ninety')).toEqual({
+      root: 'C#',
+      scaleType: undefined,
+      chordQuality: 'diminished',
+      inversion: 2,
+      hand: 'R',
+      bpm: 90,
+    })
+  })
+
+  it('agrees with parseTranscript on homophones and articles', () => {
+    expect(extractSlots('show me be flat major').root).toBe('Bb')
+    expect(extractSlots('can i see the chords').root).toBeUndefined()
+    expect(extractSlots('show me a d major').root).toBe('D')
+  })
+
+  it('returns all-undefined for slotless text', () => {
+    expect(extractSlots('keep going')).toEqual({
+      root: undefined,
+      scaleType: undefined,
+      chordQuality: undefined,
+      inversion: undefined,
+      hand: undefined,
+      bpm: undefined,
+    })
+  })
+})
+
+describe('fast path regression (canonical phrasings never fall to the fallback)', () => {
+  // The embedding fallback only sees {kind:'unknown'}; every canonical
+  // phrasing must keep parsing on the regex fast path.
+  const cases: [string, string][] = [
+    ['piano stop', 'stop-all'],
+    ['piano help', 'help'],
+    ['piano go home', 'navigate'],
+    ['piano open scales', 'navigate'],
+    ['piano free play', 'navigate'],
+    ['piano show me d major', 'show-scale'],
+    ['piano be flat major', 'show-scale'],
+    ['piano d minor seventh first inversion', 'show-chord'],
+    ['piano start the metronome at ninety', 'metronome'],
+    ['piano metronome off', 'metronome'],
+    ['piano set tempo to ninety', 'set-bpm'],
+    ['piano faster', 'set-bpm'],
+    ['piano play it', 'play-demo'],
+    ['piano next', 'lesson'],
+    ['piano restart', 'lesson'],
+    ['piano practice five finger', 'open-lesson'],
+    ['piano record at one hundred', 'free-play'],
+    ['piano stop recording', 'free-play'],
+    ['piano clear', 'free-play'],
+    ['piano start listening', 'mic'],
+    ['piano stop the mic', 'mic'],
+    ['piano voice off', 'voice-off'],
+    ['piano left hand', 'set-hand'],
+    ['piano first inversion', 'set-inversion'],
+  ]
+  for (const [phrase, kind] of cases) {
+    it(`${phrase} → ${kind}`, () => {
+      expect(parseTranscript(phrase)).toMatchObject({ kind })
+    })
+  }
+})
+
 describe('buildGrammar', () => {
   const grammar = buildGrammar(allLessons())
 
@@ -337,6 +422,13 @@ describe('buildGrammar', () => {
     expect(grammar).toContain('seventh')
     expect(grammar).toContain('ninety')
     expect(grammar).toContain('hundred')
+  })
+
+  it('includes conversational filler and intent-bank vocabulary', () => {
+    expect(grammar).toContain('please')
+    expect(grammar).toContain('could')
+    expect(grammar).toContain('beat')
+    expect(grammar).toContain('together')
   })
 
   it('has no duplicates', () => {

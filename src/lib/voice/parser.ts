@@ -1,5 +1,6 @@
 import { Note } from 'tonal'
 import type { ChordQualityId, Hand, ScaleTypeId } from '../theory/types'
+import { bankGrammarWords } from './intentBank'
 import type { Intent } from './intents'
 
 /**
@@ -48,6 +49,9 @@ function normalize(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+/** Public alias so the intent-fallback modules normalize exactly like the parser. */
+export const normalizeTranscript = normalize
 
 /**
  * Parses spoken number words or digits, e.g. "ninety", "one hundred and
@@ -105,14 +109,17 @@ const AFTER_ROOT_KEYWORDS = new Set([
 /** Finds a note root in the token stream; returns canonical form like "C#", "Bb". */
 function findRoot(tokens: string[]): { root: string } | null {
   for (let i = 0; i < tokens.length; i++) {
+    const homophone = tokens[i] in NOTE_HOMOPHONES
     const letter = NOTE_HOMOPHONES[tokens[i]] ?? tokens[i]
     if (!NOTE_LETTERS.has(letter)) continue
     const next = tokens[i + 1]
     if (next === 'sharp') return { root: letter.toUpperCase() + '#' }
     if (next === 'flat') return { root: letter.toUpperCase() + 'b' }
-    // "a" and "e" double as articles/filler ("show me a d major"); only treat
-    // them as roots when a quality/scale keyword follows immediately.
-    if ((letter === 'a' || letter === 'e') && !(next && AFTER_ROOT_KEYWORDS.has(next))) continue
+    // "a"/"e" double as articles ("show me a d major") and homophones double
+    // as ordinary words ("can i SEE the chords" must not become C); only
+    // treat them as roots when a quality/scale keyword follows immediately.
+    if ((homophone || letter === 'a' || letter === 'e') && !(next && AFTER_ROOT_KEYWORDS.has(next)))
+      continue
     return { root: letter.toUpperCase() }
   }
   return null
@@ -148,6 +155,33 @@ function findHand(text: string): Hand | undefined {
   if (text.includes('left hand')) return 'L'
   if (text.includes('right hand')) return 'R'
   return undefined
+}
+
+/** Everything slot-like that can be pulled out of a transcript, in one pass. */
+export interface Slots {
+  root?: string
+  scaleType?: ScaleTypeId
+  chordQuality?: ChordQualityId
+  inversion?: 0 | 1 | 2 | 3
+  hand?: Hand
+  bpm?: number
+}
+
+/**
+ * Slot extraction for the embedding-based intent fallback: reuses the exact
+ * same finders as parseTranscript so both tiers agree on what "b flat" means.
+ */
+export function extractSlots(raw: string): Slots {
+  const tokens = normalize(raw).split(' ').filter(Boolean)
+  const text = tokens.join(' ')
+  return {
+    root: findRoot(tokens)?.root,
+    scaleType: findScaleType(text),
+    chordQuality: findChordQuality(text),
+    inversion: findInversion(text),
+    hand: findHand(text),
+    bpm: trailingNumber(tokens),
+  }
 }
 
 const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] = [
@@ -308,6 +342,16 @@ export function matchLesson(
 const GRAMMAR_DENYLIST = new Set(['hanon'])
 
 /**
+ * Conversational filler so paraphrases ("can you show me the chords page
+ * please") survive grammar-constrained decoding instead of collapsing to
+ * [unk]. The regex parser ignores these; the embedding fallback needs them.
+ */
+const FILLER_WORDS = `
+  please could would like want lets us need see try
+  little bit more much this another how about going for
+`
+
+/**
  * Builds the Kaldi grammar word list. Vosk compiles this into a loop FST, so
  * listing vocabulary words permits any sequence of them; the parser handles
  * ordering. "[unk]" makes everything else (piano notes, chatter) decode as
@@ -332,6 +376,12 @@ export function buildGrammar(lessons: { title: string; method: string }[]): stri
     and hundred
   `
   for (const w of staticWords.split(/\s+/).filter(Boolean)) words.add(w)
+  for (const w of FILLER_WORDS.split(/\s+/).filter(Boolean)) words.add(w)
+  // Every word used by the embedding fallback's example bank must be
+  // decodable, or paraphrases can never reach it (invariant covered by tests).
+  for (const w of bankGrammarWords()) {
+    if (!GRAMMAR_DENYLIST.has(w)) words.add(w)
+  }
   for (const w of Object.keys(UNITS)) words.add(w)
   for (const w of Object.keys(TENS)) words.add(w)
   for (const alias of Object.keys(SPOKEN_LESSON_ALIASES)) {
