@@ -10,6 +10,11 @@ what you missed.
 
 ![Scales screen: C major with sheet music, fingering, and keyboard](docs/screenshots/scales.png)
 
+**New to the piano, or unsure what to practice next?** Start with the
+[Learning Guide](docs/GUIDE.md) — a staged path from first notes to early intermediate
+(~ABRSM Grade 4) that organizes everything below into a curriculum, with weekly practice
+plans and curated external resources. The same guide lives in the app under **Guide**.
+
 ## Features
 
 ### 📚 Reference library

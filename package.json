@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "guide:md": "vite-node scripts/generateGuideMd.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -20,6 +21,7 @@
     "svelte-check": "^4.7.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
+    "vite-node": "^6.0.0",
     "vitest": "^3.2.6"
   },
   "dependencies": {
