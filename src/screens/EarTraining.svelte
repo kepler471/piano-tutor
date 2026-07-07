@@ -15,6 +15,7 @@
   } from '../lib/ear/quiz'
   import { addRecord } from '../lib/practice/history.svelte'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+  import { currentParams } from '../router.svelte'
 
   type Mode = 'intervals' | 'chords' | 'echo'
   type Question = IntervalQuestion | ChordQuestion | EchoQuestion
@@ -27,6 +28,15 @@
 
   let mode = $state<Mode>('intervals')
   let level = $state(1)
+
+  // Deep link from the learning guide, read once at mount.
+  {
+    const params = currentParams()
+    if (params.mode === 'intervals' || params.mode === 'chords' || params.mode === 'echo') mode = params.mode
+    const max = params.mode === 'chords' ? CHORD_LEVELS.length : params.mode === 'echo' ? ECHO_LEVELS.length : INTERVAL_LEVELS.length
+    const linkedLevel = Number(params.level)
+    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && linkedLevel <= max) level = linkedLevel
+  }
 
   const maxLevel = $derived(
     mode === 'intervals' ? INTERVAL_LEVELS.length : mode === 'chords' ? CHORD_LEVELS.length : ECHO_LEVELS.length,

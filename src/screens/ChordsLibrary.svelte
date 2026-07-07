@@ -14,12 +14,20 @@
   import type { ChordQualityId, Finger, Hand } from '../lib/theory/types'
   import { matchRoot } from '../lib/voice/parser'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+  import { currentParams } from '../router.svelte'
 
   let root = $state('C')
   let quality: ChordQualityId = $state('major')
   let inversion = $state(0)
   let hand: Hand = $state('R')
   let playing = $state(false)
+
+  // Deep link from the learning guide, read once at mount.
+  {
+    const params = currentParams()
+    if (CHORD_QUALITIES.some((q) => q.id === params.quality)) quality = params.quality as ChordQualityId
+    if (params.root && CHORD_ROOTS.includes(params.root)) root = params.root
+  }
 
   const qualityDef = $derived(CHORD_QUALITIES.find((q) => q.id === quality)!)
 

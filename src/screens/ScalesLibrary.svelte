@@ -9,11 +9,21 @@
   import type { Finger, Hand, ScaleTypeId } from '../lib/theory/types'
   import { matchRoot } from '../lib/voice/parser'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+  import { currentParams } from '../router.svelte'
 
   let typeId: ScaleTypeId = $state('major')
   let root = $state('C')
   let hand: Hand = $state('R')
   let playing = $state(false)
+
+  // Deep link from the learning guide, read once at mount.
+  {
+    const params = currentParams()
+    const typeDef = SCALE_TYPES.find((t) => t.id === params.type)
+    if (typeDef) typeId = typeDef.id
+    const roots = (typeDef ?? SCALE_TYPES.find((t) => t.id === 'major')!).roots
+    if (params.root && roots.includes(params.root)) root = params.root
+  }
 
   const typeDef = $derived(SCALE_TYPES.find((t) => t.id === typeId)!)
 

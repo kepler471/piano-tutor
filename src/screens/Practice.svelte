@@ -5,6 +5,7 @@
   import { makeSightReading, SIGHT_LEVELS, type SightLevel } from '../lib/sightread/generator'
   import { matchLesson } from '../lib/voice/parser'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
+  import { currentParams } from '../router.svelte'
 
   const POLY_AVAILABLE = true
   const SIGHT_ACTIVITY = 'sight-reading'
@@ -47,6 +48,16 @@
   }
 
   const makeSightReadingLesson = () => makeSightReading(sightLevel)
+
+  // Deep links from the learning guide, read once at mount. ?sight= goes
+  // through newMelody (not chooseSightLevel) on purpose: a guide link must
+  // never touch the persisted sight-reading level.
+  {
+    const params = currentParams()
+    const linked = params.lesson && lessons.find((l) => l.id === params.lesson)
+    if (linked) selected = linked
+    else if (params.sight && /^[1-5]$/.test(params.sight)) newMelody(Number(params.sight) as SightLevel)
+  }
 
   const visibleLessons = $derived(
     keyFilter === 'All' ? lessons : lessons.filter((l) => l.keySignature.replace(/m$/, '') === keyFilter),

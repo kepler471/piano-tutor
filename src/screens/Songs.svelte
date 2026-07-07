@@ -5,8 +5,14 @@
   import { parseMidiFile } from '../lib/songs/midiImport'
   import { parseMusicXml } from '../lib/songs/musicxml'
   import { addUserSong, removeUserSong, userSongs } from '../lib/songs/userSongs.svelte'
+  import { currentParams } from '../router.svelte'
 
   let selected = $state<Song | null>(null)
+  // Deep link from the learning guide, read once at mount.
+  {
+    const linked = SONG_CATALOG.find((s) => s.id === currentParams().song)
+    if (linked) selected = linked
+  }
   let importError = $state('')
   let fileInput: HTMLInputElement | undefined = $state()
 

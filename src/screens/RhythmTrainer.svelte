@@ -7,6 +7,7 @@
   import { durationFromBeats, type HighlightState, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { gradeTiming, type TimingResult } from '../lib/practice/timingGrader'
+  import { currentParams } from '../router.svelte'
 
   const SWING_RATIO = 2 / 3
   const COUNT_IN = 4
@@ -14,6 +15,15 @@
   let level = $state<1 | 2 | 3 | 4>(1)
   let patternId = $state(RHYTHM_PATTERNS[0].id)
   let bpm = $state(80)
+
+  // Deep link from the learning guide, read once at mount.
+  {
+    const linked = Number(currentParams().level)
+    if (linked === 1 || linked === 2 || linked === 3 || linked === 4) {
+      level = linked
+      patternId = RHYTHM_PATTERNS.find((p) => p.level === linked)!.id
+    }
+  }
 
   const levelPatterns = $derived(RHYTHM_PATTERNS.filter((p) => p.level === level))
   const pattern = $derived(RHYTHM_PATTERNS.find((p) => p.id === patternId) ?? levelPatterns[0])
