@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
-   * Presentational multiple-choice card for by-ear quizzes: a replay button,
-   * answer options, and reveal styling once the user has picked.
+   * Presentational multiple-choice card: answer options with reveal styling
+   * once the user has picked, plus a replay button for by-ear questions
+   * (omit onreplay for visual/text questions).
    */
   let {
     options,
@@ -16,16 +17,18 @@
     selected: string | null
     playing?: boolean
     onselect: (option: string) => void
-    onreplay: () => void
+    onreplay?: () => void
   } = $props()
 
   const revealed = $derived(selected !== null)
 </script>
 
 <div class="quiz">
-  <button class="primary replay" onclick={onreplay} disabled={playing}>
-    {playing ? 'Playing…' : '🔊 Hear it again'}
-  </button>
+  {#if onreplay}
+    <button class="primary replay" onclick={onreplay} disabled={playing}>
+      {playing ? 'Playing…' : '🔊 Hear it again'}
+    </button>
+  {/if}
   <div class="options">
     {#each options as opt (opt)}
       <button

@@ -22,6 +22,7 @@ const PENDING_TTL_MS = 10_000
 
 const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
   '/guide': 'the Guide',
+  '/quizzes': 'Quizzes',
   '/scales': 'Scales',
   '/chords': 'Chords',
   '/practice': 'Practice',

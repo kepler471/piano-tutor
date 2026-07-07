@@ -27,9 +27,9 @@
       desc: 'Guided beginner routines — five-finger positions, Hanon, scales, cadences and sight-reading — with live feedback from your piano.',
     },
     {
-      route: '/ear',
-      title: 'Ear Training',
-      desc: 'Name intervals and chord qualities by ear, and play back short phrases from memory.',
+      route: '/quizzes',
+      title: 'Quizzes',
+      desc: 'Train your ear and your reading: intervals, chords, cadences and scales by ear; notes, key signatures and harmony on the page.',
     },
     {
       route: '/rhythm',

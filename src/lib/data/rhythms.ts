@@ -53,6 +53,24 @@ export const RHYTHM_PATTERNS: RhythmPattern[] = [
     events: [...bar(0, [[0, 4]]), ...bar(1, [[0, 2], [2, 2]])],
     hint: 'One tap per bar, then two — count 1-2-3-4 out loud.',
   },
+  {
+    id: 'l1-quarters-rest',
+    label: 'Quarters with a breath',
+    level: 1,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[0, 1], [1, 1], [2, 2]]), ...bar(1, [[0, 1], [1, 1], [2, 1], [3, 1]])],
+    hint: 'Hold beat 3 through beat 4, then walk the second bar.',
+  },
+  {
+    id: 'l1-halves-quarters',
+    label: 'Quarters then halves',
+    level: 1,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[0, 1], [1, 1], [2, 1], [3, 1]]), ...bar(1, [[0, 2], [2, 2]])],
+    hint: 'Four taps, then two long ones — keep the pulse identical.',
+  },
   // Level 2 — eighths and rests
   {
     id: 'l2-eighths',
@@ -84,6 +102,24 @@ export const RHYTHM_PATTERNS: RhythmPattern[] = [
     events: [...bar(0, [[0, 1], [1, 0.5], [1.5, 0.5], [2, 1], [3, 0.5], [3.5, 0.5]]), ...bar(1, [[0, 1], [1, 0.5], [1.5, 0.5], [2, 2]])],
     hint: 'Say "1, 2-and, 3, 4-and" while you tap.',
   },
+  {
+    id: 'l2-eighth-pairs',
+    label: 'Pairs of eighths',
+    level: 2,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[0, 0.5], [0.5, 0.5], [1, 1], [2, 0.5], [2.5, 0.5], [3, 1]]), ...bar(1, [[0, 0.5], [0.5, 0.5], [1, 1], [2, 2]])],
+    hint: 'Two quick, one steady — "1-and, 2, 3-and, 4".',
+  },
+  {
+    id: 'l2-rest-on-one',
+    label: 'Rest on beat 1',
+    level: 2,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[1, 1], [2, 1], [3, 1]]), ...bar(1, [[1, 1], [2, 1], [3, 1]])],
+    hint: 'Nothing on the downbeat — count "1" silently and come in on 2.',
+  },
   // Level 3 — dotted rhythms and syncopation
   {
     id: 'l3-dotted-quarter',
@@ -111,6 +147,24 @@ export const RHYTHM_PATTERNS: RhythmPattern[] = [
     bars: 2,
     events: [...bar(0, [[0, 1], [1.5, 1.5], [3, 1]]), ...bar(1, [[0, 1], [1.5, 1.5], [3, 1]])],
     hint: 'The middle tap comes on the "and" of 2 and hangs across beat 3.',
+  },
+  {
+    id: 'l3-dotted-eighth',
+    label: 'Dotted eighth + sixteenth',
+    level: 3,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[0, 0.75], [0.75, 0.25], [1, 0.75], [1.75, 0.25], [2, 1], [3, 1]]), ...bar(1, [[0, 0.75], [0.75, 0.25], [1, 1], [2, 2]])],
+    hint: 'A long-short limp — the short note snaps right before the next beat.',
+  },
+  {
+    id: 'l3-anticipation',
+    label: 'Anticipated downbeat',
+    level: 3,
+    timeSignature: [4, 4],
+    bars: 2,
+    events: [...bar(0, [[0, 1], [1, 1], [2, 1], [3.5, 0.5]]), ...bar(1, [[0, 1], [1, 1], [2, 2]])],
+    hint: 'The last tap of bar 1 arrives half a beat early — lean into it.',
   },
   // Level 4 — swing and jazz comping
   {
@@ -145,6 +199,26 @@ export const RHYTHM_PATTERNS: RhythmPattern[] = [
     swing: true,
     events: [...bar(0, [[1, 1], [3, 1]]), ...bar(1, [[1, 1], [3, 0.5], [3.5, 0.5]])],
     hint: 'Where the drummer’s hi-hat lives — nothing on 1 and 3.',
+  },
+  {
+    id: 'l4-charleston-variation',
+    label: 'Charleston, displaced',
+    level: 4,
+    timeSignature: [4, 4],
+    bars: 2,
+    swing: true,
+    events: [...bar(0, [[0, 1.5], [1.5, 1], [3, 1]]), ...bar(1, [[0.5, 1], [1.5, 1.5], [3, 1]])],
+    hint: 'Bar 1 is the Charleston plus beat 4; bar 2 starts off the beat.',
+  },
+  {
+    id: 'l4-red-garland',
+    label: 'Comp on the and of 2',
+    level: 4,
+    timeSignature: [4, 4],
+    bars: 2,
+    swing: true,
+    events: [...bar(0, [[1.5, 1], [3.5, 0.5]]), ...bar(1, [[1.5, 1], [3.5, 0.5]])],
+    hint: 'The classic trio comp — always between the beats, never on them.',
   },
 ]
 

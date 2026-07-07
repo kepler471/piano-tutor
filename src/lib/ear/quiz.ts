@@ -1,5 +1,6 @@
 import { getChord } from '../theory/chords'
-import type { ChordQualityId } from '../theory/types'
+import { getScale } from '../theory/scales'
+import type { ChordQualityId, ScaleTypeId } from '../theory/types'
 
 /**
  * Ear-training question generators. Pure logic — an injectable RNG keeps
@@ -29,7 +30,7 @@ export interface EchoQuestion {
   positionLabel: string
 }
 
-const INTERVAL_LABELS: Record<number, string> = {
+export const INTERVAL_LABELS: Record<number, string> = {
   0: 'Unison',
   1: 'Minor 2nd',
   2: 'Major 2nd',
@@ -150,6 +151,109 @@ export function makeChordQuestion(level: number, rng: Rng = Math.random): ChordQ
 
 /** Five-finger scale degrees above the root (major pentascale). */
 const POSITION_OFFSETS = [0, 2, 4, 5, 7]
+
+// --- scale-type identification ---
+
+export interface ScaleTypeQuestion {
+  kind: 'scale-type'
+  /** Scale played ascending. */
+  midis: number[]
+  answer: string
+  options: string[]
+}
+
+const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
+  major: 'Major',
+  'natural minor': 'Natural minor',
+  'harmonic minor': 'Harmonic minor',
+  blues: 'Blues',
+  'major pentatonic': 'Major pentatonic',
+  dorian: 'Dorian',
+  mixolydian: 'Mixolydian',
+}
+
+/** Roots every scale type supports (kept to low-accidental keys the library covers). */
+const SCALE_QUIZ_ROOTS = ['C', 'G', 'F']
+
+export const SCALE_TYPE_LEVELS: ScaleTypeId[][] = [
+  ['major', 'natural minor'],
+  ['major', 'natural minor', 'harmonic minor'],
+  ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic'],
+  ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic', 'dorian', 'mixolydian'],
+]
+
+export function makeScaleTypeQuestion(level: number, rng: Rng = Math.random): ScaleTypeQuestion {
+  const set = SCALE_TYPE_LEVELS[clampLevel(level, SCALE_TYPE_LEVELS.length) - 1]
+  const type = pick(set, rng)
+  const root = pick(SCALE_QUIZ_ROOTS, rng)
+  const answer = SCALE_TYPE_LABELS[type]
+  return {
+    kind: 'scale-type',
+    midis: getScale(root, type).midi,
+    answer,
+    options: makeOptions(set.map((t) => SCALE_TYPE_LABELS[t]), answer, 4, rng),
+  }
+}
+
+// --- cadence identification ---
+
+export interface CadenceQuestion {
+  kind: 'cadence'
+  /** Block chords played in order; the last move is the cadence. */
+  chords: number[][]
+  answer: string
+  options: string[]
+}
+
+type CadenceId = 'authentic' | 'plagal' | 'half' | 'deceptive'
+
+const CADENCE_LABELS: Record<CadenceId, string> = {
+  authentic: 'Perfect (V → I)',
+  plagal: 'Plagal (IV → I)',
+  half: 'Half (ends on V)',
+  deceptive: 'Deceptive (V → vi)',
+}
+
+export const CADENCE_LEVELS: CadenceId[][] = [
+  ['authentic', 'plagal'],
+  ['authentic', 'plagal', 'half'],
+  ['authentic', 'plagal', 'half', 'deceptive'],
+]
+
+/**
+ * Close voicings around the tonic (same shapes as the cadence drills):
+ * I root position, IV in 2nd inversion, V in 1st inversion, vi in 1st
+ * inversion — smooth voice leading so only the harmony changes.
+ */
+function cadenceChords(tonicMidi: number, cadence: CadenceId): number[][] {
+  const I = [tonicMidi, tonicMidi + 4, tonicMidi + 7]
+  const IV = [tonicMidi, tonicMidi + 5, tonicMidi + 9]
+  const V = [tonicMidi - 1, tonicMidi + 2, tonicMidi + 7]
+  const vi = [tonicMidi, tonicMidi + 4, tonicMidi + 9]
+  switch (cadence) {
+    case 'authentic':
+      return [I, IV, V, I]
+    case 'plagal':
+      return [I, IV, I] // the "Amen" cadence
+    case 'half':
+      return [I, IV, V]
+    case 'deceptive':
+      return [I, IV, V, vi]
+  }
+}
+
+export function makeCadenceQuestion(level: number, rng: Rng = Math.random): CadenceQuestion {
+  const set = CADENCE_LEVELS[clampLevel(level, CADENCE_LEVELS.length) - 1]
+  const cadence = pick(set, rng)
+  const tonic = 57 + Math.floor(rng() * 8) // A3–E4: chords sit around middle C
+  const answer = CADENCE_LABELS[cadence]
+  return {
+    kind: 'cadence',
+    chords: cadenceChords(tonic, cadence),
+    answer,
+    options: makeOptions(set.map((c) => CADENCE_LABELS[c]), answer, 4, rng),
+  }
+}
 
 export function makeEchoQuestion(level: number, rng: Rng = Math.random): EchoQuestion {
   const def = ECHO_LEVELS[clampLevel(level, ECHO_LEVELS.length) - 1]

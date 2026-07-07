@@ -21,6 +21,7 @@ const KNOWN_ROUTES = new Set([
   '/chords',
   '/practice',
   '/ear',
+  '/quizzes',
   '/rhythm',
   '/songs',
   '/play',

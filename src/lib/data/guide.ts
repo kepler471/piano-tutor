@@ -60,7 +60,7 @@ export function guideHref(link: GuideLink): string {
     case 'song':
       return '#' + buildHash('/songs', { song: link.songId })
     case 'quiz':
-      return '#' + buildHash('/ear', { mode: link.mode, level: String(link.level) })
+      return '#' + buildHash('/quizzes', { mode: link.mode, level: String(link.level) })
     case 'rhythm':
       return '#' + buildHash('/rhythm', { level: String(link.level) })
     case 'sight':
@@ -182,6 +182,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           'few anchor notes (middle C, treble G, bass F) and count neighbours from them rather than ' +
           'memorizing every line at once.',
         links: [
+          quiz('note-naming', 1, 'Quiz: name the note on the staff'),
           { kind: 'route', route: '/tuner', label: 'Note Detector — play a key, see its name and notation' },
           sight(1, 'Practice reading single notes in C position'),
         ],
@@ -259,6 +260,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           'reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures ' +
           'physical: your fingers learn where the black keys live in each key.',
         links: [
+          quiz('key-signature', 1, 'Quiz: read the key signature'),
           { kind: 'scale', root: 'G', type: 'major', label: 'G major in the scale library' },
           { kind: 'scale', root: 'F', type: 'major', label: 'F major in the scale library' },
         ],
@@ -272,6 +274,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           'trains your eye to see the same distances on the staff.',
         links: [
           quiz('intervals', 2, 'Interval ear quiz'),
+          quiz('interval-staff', 1, 'Quiz: intervals on the staff'),
           sight(2, 'Read by interval in sight-reading'),
         ],
       },
@@ -339,7 +342,10 @@ export const GUIDE_STAGES: GuideStage[] = [
       quiz('intervals', 3, 'Intervals — level 3'),
       quiz('echo', 2, 'Play it back — level 2'),
     ],
-    rhythm: [rhythm(3, 'Rhythm — level 3 (dotted rhythms & syncopation)')],
+    rhythm: [
+      rhythm(3, 'Rhythm — level 3 (dotted rhythms & syncopation)'),
+      quiz('rhythm-dictation', 2, 'Rhythm dictation — hear it, pick the notation'),
+    ],
     sight: [sight(3, 'Sight-reading — level 3 (bass clef, accidentals)')],
     theory: [
       {
@@ -363,6 +369,8 @@ export const GUIDE_STAGES: GuideStage[] = [
           'I, IV and V in a fixed order.',
         links: [
           lesson('cadence-G', 'Cadences in G'),
+          quiz('chord-function', 1, 'Quiz: which chord is V?'),
+          quiz('chord-spelling', 1, 'Quiz: spell the chord'),
           song('twelve-bar-blues-c', 'Hear I–IV–V in the 12-bar blues'),
         ],
       },
@@ -427,6 +435,7 @@ export const GUIDE_STAGES: GuideStage[] = [
     ear: [
       quiz('chords', 3, 'Chord qualities — level 3 (adds 7th chords)'),
       quiz('intervals', 4, 'Intervals — level 4 (all twelve)'),
+      quiz('cadence', 1, 'Cadences — perfect or plagal?'),
       quiz('echo', 3, 'Play it back — level 3'),
     ],
     rhythm: [rhythm(4, 'Rhythm — level 4 (swing, Charleston, comping)')],
@@ -442,6 +451,8 @@ export const GUIDE_STAGES: GuideStage[] = [
         links: [
           { kind: 'chord', root: 'G', quality: 'dominant 7th', label: 'G7 in the chord library' },
           quiz('chords', 3, 'Hear 7th chords in the ear quiz'),
+          quiz('chord-spelling', 3, 'Quiz: spell the 7th chords'),
+          quiz('key-signature', 3, 'Quiz: key signatures around the circle'),
         ],
       },
     ],
@@ -508,7 +519,9 @@ export const GUIDE_STAGES: GuideStage[] = [
     ],
     ear: [
       quiz('chords', 4, 'Chord qualities — level 4 (everything)'),
-      quiz('intervals', 4, 'Intervals — level 4'),
+      quiz('scale-type', 4, 'Scale types — modes and blues by ear'),
+      quiz('cadence', 3, 'Cadences — including the deceptive V → vi'),
+      quiz('rhythm-dictation', 4, 'Rhythm dictation — swing patterns'),
     ],
     rhythm: [rhythm(4, 'Rhythm — level 4 (keep swing honest)')],
     sight: [sight(5, 'Sight-reading — level 5 (hands together)')],

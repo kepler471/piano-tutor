@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CADENCE_LEVELS,
   ECHO_LEVELS,
   ECHO_POSITIONS,
   INTERVAL_LEVELS,
+  SCALE_TYPE_LEVELS,
+  makeCadenceQuestion,
   makeChordQuestion,
   makeEchoQuestion,
   makeIntervalQuestion,
+  makeScaleTypeQuestion,
   type Rng,
 } from '../lib/ear/quiz'
 
@@ -111,6 +115,75 @@ describe('makeEchoQuestion', () => {
     for (const seed of seeds) {
       const q = makeEchoQuestion(3, seededRng(seed))
       for (let i = 1; i < q.midis.length; i++) expect(q.midis[i]).not.toBe(q.midis[i - 1])
+    }
+  })
+})
+
+describe('makeScaleTypeQuestion', () => {
+  it('answer is in unique options drawn from the level set', () => {
+    for (const level of [1, 2, 3, 4]) {
+      const labels = new Set(
+        ['Major', 'Natural minor', 'Harmonic minor', 'Blues', 'Major pentatonic', 'Dorian', 'Mixolydian'].slice(
+          0,
+          SCALE_TYPE_LEVELS[level - 1].length,
+        ),
+      )
+      for (const seed of seeds) {
+        const q = makeScaleTypeQuestion(level, seededRng(seed))
+        expect(q.options.filter((o) => o === q.answer)).toHaveLength(1)
+        expect(new Set(q.options).size).toBe(q.options.length)
+        expect(labels.has(q.answer), q.answer).toBe(true)
+      }
+    }
+  })
+
+  it('plays an ascending scale', () => {
+    for (const seed of seeds) {
+      const q = makeScaleTypeQuestion(4, seededRng(seed))
+      expect(q.midis.length).toBeGreaterThanOrEqual(6)
+      for (let i = 1; i < q.midis.length; i++) expect(q.midis[i]).toBeGreaterThan(q.midis[i - 1])
+      expect(q.midis[q.midis.length - 1] - q.midis[0]).toBe(12)
+    }
+  })
+})
+
+describe('makeCadenceQuestion', () => {
+  it('answer is in unique options from the level set', () => {
+    for (const level of [1, 2, 3]) {
+      for (const seed of seeds) {
+        const q = makeCadenceQuestion(level, seededRng(seed))
+        expect(q.options.filter((o) => o === q.answer)).toHaveLength(1)
+        expect(new Set(q.options).size).toBe(q.options.length)
+        expect(q.options.length).toBe(CADENCE_LEVELS[level - 1].length)
+      }
+    }
+  })
+
+  it('every progression starts on the tonic and matches its label', () => {
+    for (const seed of seeds) {
+      const q = makeCadenceQuestion(3, seededRng(seed))
+      const tonicChord = q.chords[0]
+      // Root-position major triad establishes the key.
+      expect(tonicChord[1] - tonicChord[0]).toBe(4)
+      expect(tonicChord[2] - tonicChord[0]).toBe(7)
+      const last = q.chords[q.chords.length - 1]
+      if (q.answer.startsWith('Perfect') || q.answer.startsWith('Plagal')) {
+        expect(last).toEqual(tonicChord) // ends home
+      } else {
+        expect(last).not.toEqual(tonicChord) // half/deceptive end away
+      }
+    }
+  })
+
+  it('chords stay in a comfortable register', () => {
+    for (const seed of seeds) {
+      const q = makeCadenceQuestion(3, seededRng(seed))
+      for (const chord of q.chords) {
+        for (const m of chord) {
+          expect(m).toBeGreaterThanOrEqual(48)
+          expect(m).toBeLessThanOrEqual(84)
+        }
+      }
     }
   })
 })

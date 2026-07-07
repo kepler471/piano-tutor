@@ -192,7 +192,7 @@ const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] = [
   ['chords', { kind: 'navigate', route: '/chords' }],
   ['practice', { kind: 'navigate', route: '/practice' }],
   ['ear training', { kind: 'navigate', route: '/ear' }],
-  ['quizzes', { kind: 'navigate', route: '/ear' }],
+  ['quizzes', { kind: 'navigate', route: '/quizzes' }],
   ['rhythm', { kind: 'navigate', route: '/rhythm' }],
   ['rhythm trainer', { kind: 'navigate', route: '/rhythm' }],
   ['songs', { kind: 'navigate', route: '/songs' }],
