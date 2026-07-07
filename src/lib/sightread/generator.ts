@@ -118,6 +118,8 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
   let clef: 'treble' | 'bass' | 'grand'
   let hand: 'R' | 'L' | 'both'
 
+  // Like printed sight-reading tests: only the first note carries a finger
+  // number (a hand-position cue). Everything after must be read off the staff.
   if (level === 3) {
     clef = 'bass'
     hand = 'L'
@@ -125,7 +127,7 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
     const walk = melodyWalk(slots.length, lhOctave.length - 1, rng)
     steps = slots.map((slot, i) => ({
       midis: [lhOctave[walk[i]]],
-      fingers: [null],
+      fingers: [i === 0 ? 5 : null], // LH starts with 5 on the tonic
       ...slot,
     }))
   } else if (level === 5) {
@@ -137,7 +139,7 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
     steps = slots.map((slot, i) => ({
       // Chorale texture: LH root/fifth moves with the melody.
       midis: [slot.startBeat % 4 < 2 ? root : fifth, fiveFinger[walk[i]]],
-      fingers: [null, (walk[i] + 1) as Finger],
+      fingers: [null, i === 0 ? ((walk[i] + 1) as Finger) : null],
       hands: ['L', 'R'],
       ...slot,
     }))
@@ -148,7 +150,7 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
     const walk = melodyWalk(slots.length, material.length - 1, rng)
     steps = slots.map((slot, i) => ({
       midis: [material[walk[i]]],
-      fingers: [level <= 2 ? ((walk[i] + 1) as Finger) : null],
+      fingers: [i === 0 && walk[i] < 5 ? ((walk[i] + 1) as Finger) : null],
       ...slot,
     }))
   }
@@ -157,6 +159,7 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
     id: `sight-reading-L${level}-${actualSeed}`,
     title: `Sight-reading level ${level}: ${key} — ${SIGHT_LEVELS[level]}`,
     method: 'Sight-reading',
+    hints: 'reading',
     description:
       level === 5
         ? 'Read both staves at once: the left hand anchors on the root and fifth while the right hand carries the melody.'

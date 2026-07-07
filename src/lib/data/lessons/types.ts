@@ -29,6 +29,13 @@ export interface Lesson {
   title: string
   /** Practice method this comes from, e.g. 'Hanon', 'Five-finger' */
   method: string
+  /**
+   * How much the player may give away. 'technique' (default): keyboard shows the
+   * expected keys + finger badges — right for drills where fingering IS the lesson.
+   * 'reading': the keyboard is hidden (toggleable, and never shows the answer) so
+   * the score must be read, not matched against lit keys.
+   */
+  hints?: 'technique' | 'reading'
   description: string
   /** Practical tips shown in the player */
   tips: string[]

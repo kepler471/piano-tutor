@@ -25,6 +25,10 @@
 
   let segIndex = $state(0)
   const segment = $derived(lesson.segments[segIndex])
+  // Reading-focused lessons hide the keyboard (and its expected-key/finger
+  // hints) so the score can't be shortcut by watching for the lit key.
+  const reading = $derived(lesson.hints === 'reading')
+  let showKeyboard = $state(false)
   // Hands-together segments override to chord detection when on the mic.
   const effectiveMode = $derived(segment.detectionMode ?? lesson.detectionMode)
 
@@ -310,15 +314,28 @@
     </div>
   {:else}
     <p class="hint">
-      Progress: {progress} / {segment.steps.length} · The orange note is next — green keys show
-      where it is and which finger to use.
+      Progress: {progress} / {segment.steps.length} ·
+      {#if reading}
+        The orange note is next — read it off the staff; eyes on the score, not your hands.
+      {:else}
+        The orange note is next — green keys show where it is and which finger to use.
+      {/if}
       {#if mistakes > 0}
         Wrong notes so far: {mistakes}.{/if}
     </p>
   {/if}
 
   <SheetMusic {score} {highlights} />
-  <PianoKeyboard from={kbFrom} to={kbTo} {pressed} {expected} wrong={wrongFlash} fingers={fingerMap} />
+  {#if reading}
+    <label class="metro">
+      <input type="checkbox" bind:checked={showKeyboard} /> Show keyboard (played notes only — no hints)
+    </label>
+    {#if showKeyboard}
+      <PianoKeyboard from={kbFrom} to={kbTo} {pressed} wrong={wrongFlash} />
+    {/if}
+  {:else}
+    <PianoKeyboard from={kbFrom} to={kbTo} {pressed} {expected} wrong={wrongFlash} fingers={fingerMap} />
+  {/if}
 
   {#if lesson.tips.length}
     <details>

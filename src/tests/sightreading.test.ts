@@ -46,7 +46,7 @@ describe('makeSightReading', () => {
     }
   })
 
-  it('level 1 stays in the C five-finger position with fingering', () => {
+  it('level 1 stays in the C five-finger position', () => {
     for (const seed of seeds) {
       const lesson = makeSightReading(1, seed)
       expect(lesson.keySignature).toBe('C')
@@ -54,7 +54,20 @@ describe('makeSightReading', () => {
         expect(step.midis[0]).toBeGreaterThanOrEqual(60)
         expect(step.midis[0]).toBeLessThanOrEqual(67)
         expect(step.durationBeats).toBe(1)
-        expect(step.fingers[0]).not.toBeNull()
+      }
+    }
+  })
+
+  it('is a reading lesson: fingering appears only as a first-note position cue', () => {
+    for (const level of LEVELS) {
+      for (const seed of seeds) {
+        const lesson = makeSightReading(level, seed)
+        expect(lesson.hints).toBe('reading')
+        const steps = lesson.segments[0].steps
+        // First step may carry a starting finger; every later step must not.
+        for (const step of steps.slice(1)) {
+          expect(step.fingers.every((f) => f === null), `${lesson.id}`).toBe(true)
+        }
       }
     }
   })

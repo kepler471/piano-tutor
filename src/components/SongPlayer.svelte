@@ -9,7 +9,6 @@
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import { stepsFromSong } from '../lib/practice/songSteps'
-  import type { Finger } from '../lib/theory/types'
 
   let { song, onexit }: { song: Song; onexit?: () => void } = $props()
 
@@ -23,6 +22,9 @@
   let resetKey = $state(0)
   let wrongFlash = $state(new Set<number>())
   let demoPlaying = $state(false)
+  // Songs are reading material: no keyboard by default, and when shown it only
+  // mirrors what was played — never the expected keys or fingers.
+  let showKeyboard = $state(false)
 
   function selectSection(from: number, to: number) {
     fromMeasure = from
@@ -62,22 +64,6 @@
       else if (r === 'corrected') map.set(i, 'played')
     })
     if (!matcher.done) map.set(matcher.cursor, 'next')
-    return map
-  })
-
-  const expected = $derived.by(() => {
-    void version
-    return matcher.done ? new Set<number>() : matcher.remaining
-  })
-
-  const fingerMap = $derived.by(() => {
-    void version
-    const map = new Map<number, Finger>()
-    const cur = matcher.current
-    cur?.midis.forEach((m, i) => {
-      const f = cur.fingers[i]
-      if (f) map.set(m, f)
-    })
     return map
   })
 
@@ -231,7 +217,12 @@
   {/if}
 
   <GrandSheetMusic {song} {range} stepHighlights={highlights} />
-  <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.activeNotes} {expected} wrong={wrongFlash} fingers={fingerMap} />
+  <label class="show-kb">
+    <input type="checkbox" bind:checked={showKeyboard} /> Show keyboard (played notes only — no hints)
+  </label>
+  {#if showKeyboard}
+    <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.activeNotes} wrong={wrongFlash} />
+  {/if}
 </div>
 
 <style>
@@ -267,6 +258,13 @@
     color: #1d4ed8;
     cursor: pointer;
     font-size: 14px;
+  }
+  .show-kb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #475569;
   }
   .complete {
     display: flex;
