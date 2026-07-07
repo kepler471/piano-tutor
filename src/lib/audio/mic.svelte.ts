@@ -7,6 +7,7 @@ let audioContext: AudioContext | null = null
 let stream: MediaStream | null = null
 let analyser: AnalyserNode | null = null
 let source: MediaStreamAudioSourceNode | null = null
+let highpass: BiquadFilterNode | null = null
 
 /**
  * Long-lived consumers (e.g. voice control) hold the mic open via
@@ -30,7 +31,8 @@ async function start(): Promise<void> {
   status = 'requesting'
   errorMessage = ''
   try {
-    // Voice processing destroys piano transients and low notes — turn it all off.
+    // Voice processing destroys piano transients and low notes — turn it all
+    // off and do our own minimal cleanup (the high-pass below) instead.
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,
@@ -41,9 +43,18 @@ async function start(): Promise<void> {
     audioContext = new AudioContext()
     await audioContext.resume()
     source = audioContext.createMediaStreamSource(stream)
+    // 20 Hz high-pass kills DC offset and infrasonic rumble (HVAC, footsteps,
+    // desk bumps) that inflates RMS and destabilizes the pitch gates. Only
+    // ~-1 dB at A0 (27.5 Hz), so the lowest piano note is safe. All consumers
+    // (analyser, poly worklet, voice worklet) tap the filtered output.
+    highpass = audioContext.createBiquadFilter()
+    highpass.type = 'highpass'
+    highpass.frequency.value = 20
+    highpass.Q.value = 0.7071
+    source.connect(highpass)
     analyser = audioContext.createAnalyser()
     analyser.fftSize = 2048
-    source.connect(analyser)
+    highpass.connect(analyser)
     status = 'running'
   } catch (err) {
     teardown()
@@ -69,6 +80,7 @@ function teardown(): void {
   audioContext = null
   analyser = null
   source = null
+  highpass = null
   if (status === 'running' || status === 'requesting') status = 'idle'
 }
 
@@ -82,8 +94,9 @@ export const mic = {
   get analyser() {
     return analyser
   },
-  get source() {
-    return source
+  /** Cleaned-up mic signal (post high-pass) — tap this, never the raw source. */
+  get output(): AudioNode | null {
+    return highpass
   },
   get audioContext() {
     return audioContext

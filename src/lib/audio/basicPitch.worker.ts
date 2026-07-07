@@ -27,6 +27,12 @@ const DEDUP_SEC = 0.3
 const ONSET_THRESH = 0.5
 const FRAME_THRESH = 0.3
 const MIN_NOTE_FRAMES = 5
+/**
+ * Skip inference on near-silent windows — below the post-filter ambient of
+ * any usable room. This only saves CPU; the amplitude floor in polyFilter.ts
+ * stays the detection gate.
+ */
+const SKIP_RMS = 0.002
 
 let model: BasicPitch | null = null
 let ring = new Float32Array(WINDOW_SAMPLES)
@@ -109,6 +115,12 @@ async function maybeInfer() {
   busy = true
   newSinceRun = 0
   const window = ring.slice(0, ringFilled)
+  let sum = 0
+  for (let i = 0; i < window.length; i++) sum += window[i] * window[i]
+  if (Math.sqrt(sum / window.length) < SKIP_RMS) {
+    busy = false
+    return
+  }
   const windowStart = (totalSamples - ringFilled) / SAMPLE_RATE
   try {
     const t0 = performance.now()

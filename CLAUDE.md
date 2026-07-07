@@ -36,10 +36,14 @@ WASM — dynamically imported, fully offline against vendored model files).
   per-note highlight colors. `SheetMusic.svelte` re-renders fully on any change (scores are small).
 - `src/lib/audio/`
   - `mic.svelte.ts` — getUserMedia with echoCancellation/noiseSuppression/autoGainControl **off**
-    (voice processing destroys piano transients).
+    (voice processing destroys piano transients). Instead a 20 Hz high-pass BiquadFilterNode on
+    the shared source kills DC offset and low rumble; all consumers tap `mic.output` (never the
+    raw source).
   - `monoTracker.ts` — pure detection logic (pitchy + clarity threshold + 3-frame hysteresis to
-    kill octave flicker). Same code path runs live (`monoPitch.svelte.ts`, rAF + AnalyserNode)
-    and in tests against synthesized audio (`src/tests/detection.test.ts`).
+    kill octave flicker + adaptive RMS gate: `noiseFloor.ts` tracks ambient level via a
+    sliding-block minimum so steady hum/fans can't register as notes). Same code path runs live
+    (`monoPitch.svelte.ts`, rAF + AnalyserNode) and in tests against synthesized audio
+    (`src/tests/detection.test.ts`).
   - `basicPitch.worker.ts` — sliding-window inference (2 s window / 0.5 s hop) over a ring
     buffer; dedup by (midi, onset ±0.3 s); `polyFilter.ts` drops harmonic ghosts (amplitude
     floor 0.4 + octave/12th suppression — thresholds verified against synthetic chords).

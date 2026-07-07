@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MonoTracker } from '../lib/audio/monoTracker'
-import { midiToFrequency } from '../lib/audio/noteEvents'
+import { midiToFrequency, type NoteEvent } from '../lib/audio/noteEvents'
 import { clusterOnsets } from '../lib/transcribe/cluster'
 
 const SAMPLE_RATE = 44100
@@ -38,17 +38,50 @@ function concat(parts: Float32Array<ArrayBuffer>[]): Float32Array<ArrayBuffer> {
   return out
 }
 
+/** Deterministic PRNG so noise tests never flake. */
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function whiteNoise(seconds: number, amp: number, seed = 1): Float32Array<ArrayBuffer> {
+  const rand = mulberry32(seed)
+  const out = new Float32Array(Math.floor(seconds * SAMPLE_RATE))
+  for (let i = 0; i < out.length; i++) out[i] = (rand() * 2 - 1) * amp
+  return out
+}
+
+function hum(seconds: number, amp: number, freq = 60): Float32Array<ArrayBuffer> {
+  const out = new Float32Array(Math.floor(seconds * SAMPLE_RATE))
+  for (let i = 0; i < out.length; i++) out[i] = amp * Math.sin((2 * Math.PI * freq * i) / SAMPLE_RATE)
+  return out
+}
+
+function mix(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>): Float32Array<ArrayBuffer> {
+  const out = new Float32Array(Math.max(a.length, b.length))
+  for (let i = 0; i < out.length; i++) out[i] = (a[i] ?? 0) + (b[i] ?? 0)
+  return out
+}
+
 /** Run audio through the tracker exactly as the live loop does. */
-function detect(audio: Float32Array<ArrayBuffer>): number[] {
+function detectEvents(audio: Float32Array<ArrayBuffer>): NoteEvent[] {
   const tracker = new MonoTracker({ frameSize: FRAME })
-  const onsets: number[] = []
+  const events: NoteEvent[] = []
   for (let off = 0; off + FRAME <= audio.length; off += FRAME / 2) {
     const frame = audio.slice(off, off + FRAME)
-    for (const ev of tracker.process(frame, SAMPLE_RATE, off / SAMPLE_RATE)) {
-      if (ev.kind === 'on') onsets.push(ev.midi)
-    }
+    events.push(...tracker.process(frame, SAMPLE_RATE, off / SAMPLE_RATE))
   }
-  return onsets
+  return events
+}
+
+function detect(audio: Float32Array<ArrayBuffer>): number[] {
+  return detectEvents(audio)
+    .filter((ev) => ev.kind === 'on')
+    .map((ev) => ev.midi)
 }
 
 describe('mono detection on synthesized audio', () => {
@@ -77,6 +110,37 @@ describe('mono detection on synthesized audio', () => {
 
   it('emits nothing for silence', () => {
     expect(detect(silence(1.0))).toEqual([])
+  })
+})
+
+describe('mono detection in noise (adaptive noise floor)', () => {
+  it('detects a scale through moderate white noise', () => {
+    const scaleMidis = [60, 62, 64, 65, 67, 69, 71, 72]
+    const clean = concat(scaleMidis.flatMap((m) => [synthNote(m, 0.4), silence(0.15)]))
+    const noisy = mix(clean, whiteNoise(clean.length / SAMPLE_RATE, 0.01))
+    expect(detect(noisy)).toEqual(scaleMidis)
+  })
+
+  it('emits nothing for white noise alone', () => {
+    expect(detect(whiteNoise(3, 0.05))).toEqual([])
+  })
+
+  it('silences steady mains hum once the floor adapts', () => {
+    // 60 Hz hum at RMS ~0.021 — loud enough to read as a clear B1 forever
+    // under a fixed 0.004 gate. The adaptive floor must gate it; at most one
+    // short-lived false note may slip through before the first blocks close.
+    const events = detectEvents(hum(5, 0.03))
+    const ons = events.filter((ev) => ev.kind === 'on')
+    const offs = events.filter((ev) => ev.kind === 'off')
+    expect(ons.length).toBeLessThanOrEqual(1)
+    expect(ons.filter((ev) => ev.t > 2.5)).toEqual([])
+    expect(offs.length).toBe(ons.length)
+  })
+
+  it('still detects a note after the floor has adapted to room noise', () => {
+    const noise = whiteNoise(3.5, 0.01)
+    const note = concat([silence(1.5), synthNote(60, 0.8)])
+    expect(detect(mix(noise, note))).toEqual([60])
   })
 })
 

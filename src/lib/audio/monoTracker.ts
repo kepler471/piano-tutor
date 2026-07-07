@@ -1,4 +1,5 @@
 import { PitchDetector } from 'pitchy'
+import { NoiseFloor } from './noiseFloor'
 import { frequencyToMidi, type NoteEvent } from './noteEvents'
 
 export interface MonoTrackerOptions {
@@ -7,6 +8,7 @@ export interface MonoTrackerOptions {
   minRms?: number
   confirmFrames?: number
   releaseFrames?: number
+  noiseFloorK?: number
 }
 
 export interface MonoState {
@@ -15,6 +17,7 @@ export interface MonoState {
   cents: number
   clarity: number
   rms: number
+  noiseFloor: number
 }
 
 const MIDI_MIN = 21
@@ -33,12 +36,14 @@ export class MonoTracker {
   private minRms: number
   private confirmFrames: number
   private releaseFrames: number
+  private noiseFloorK: number
+  private noiseFloor = new NoiseFloor()
 
   private candidateMidi: number | null = null
   private candidateCount = 0
   private missCount = 0
 
-  readonly state: MonoState = { midi: null, freq: null, cents: 0, clarity: 0, rms: 0 }
+  readonly state: MonoState = { midi: null, freq: null, cents: 0, clarity: 0, rms: 0, noiseFloor: 0 }
 
   constructor(opts: MonoTrackerOptions = {}) {
     this.detector = PitchDetector.forFloat32Array(opts.frameSize ?? 2048)
@@ -46,9 +51,14 @@ export class MonoTracker {
     this.minRms = opts.minRms ?? 0.004
     this.confirmFrames = opts.confirmFrames ?? 3
     this.releaseFrames = opts.releaseFrames ?? 6
+    this.noiseFloorK = opts.noiseFloorK ?? 2.5
   }
 
-  /** Drop any pending note (e.g. while demo playback is sounding). */
+  /**
+   * Drop any pending note (e.g. while demo playback is sounding). Does NOT
+   * reset the noise floor — the ambient estimate stays valid across playback
+   * pauses (the floor just closes its stale block on the next frame).
+   */
   reset(t: number): NoteEvent[] {
     this.candidateMidi = null
     this.candidateCount = 0
@@ -76,11 +86,21 @@ export class MonoTracker {
     const rms = Math.sqrt(sum / frame.length)
     this.state.rms = rms
 
+    // Adaptive gate: steady room noise (hum, fans) raises the RMS floor so it
+    // can't register as notes. Limitation: strongly periodic noise can still
+    // slip through as one false note during the first ~1.5 s, before the
+    // floor's first blocks complete — a strict improvement over a fixed gate
+    // (which lets it through forever), and safer than starting the floor high,
+    // which would swallow the user's first note.
+    this.noiseFloor.update(rms, t)
+    this.state.noiseFloor = this.noiseFloor.floor
+    const effMinRms = Math.max(this.minRms, this.noiseFloorK * this.noiseFloor.floor)
+
     const [freq, clarity] = this.detector.findPitch(frame, sampleRate)
     this.state.clarity = clarity
 
     const { midi, cents } = frequencyToMidi(freq)
-    const valid = clarity >= this.minClarity && rms >= this.minRms && midi >= MIDI_MIN && midi <= MIDI_MAX
+    const valid = clarity >= this.minClarity && rms >= effMinRms && midi >= MIDI_MIN && midi <= MIDI_MAX
 
     if (!valid) {
       this.candidateMidi = null

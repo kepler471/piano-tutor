@@ -271,7 +271,7 @@ async function enable(): Promise<void> {
       return
     }
     const ctx = mic.audioContext!
-    const source = mic.source!
+    const source = mic.output!
 
     spawnRecognizer(true)
 

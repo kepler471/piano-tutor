@@ -65,7 +65,7 @@ export async function startPolyDetection(): Promise<void> {
   if (status === 'loading' || status === 'listening') return
   await mic.start()
   const ctx = mic.audioContext
-  const source = mic.source
+  const source = mic.output
   if (!ctx || !source || mic.status !== 'running') return
 
   status = 'loading'
