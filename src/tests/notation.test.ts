@@ -20,6 +20,7 @@ import { scaleFingerings } from '../lib/data/scaleFingerings'
 import { chordFingering } from '../lib/data/chordFingerings'
 import { SONG_CATALOG } from '../lib/data/songs/catalog'
 import { songSystems } from '../lib/notation/songScore'
+import { allLessons } from '../lib/data/lessons'
 
 describe('vex keys', () => {
   it('converts note names', () => {
@@ -148,6 +149,18 @@ describe('rendering (jsdom smoke test)', () => {
     const score = scoreFromSteps(steps, 'C', 'grand') as GrandScoreModel
     renderGrandScore(container, score, new Map([[0, 'next']]))
     expect(container.querySelector('svg')).toBeTruthy()
+  })
+
+  it('renders every lesson segment without throwing', { timeout: 60_000 }, () => {
+    const container = document.createElement('div')
+    for (const lesson of allLessons()) {
+      for (const seg of lesson.segments) {
+        const score = scoreFromSteps(seg.steps, lesson.keySignature, seg.clef)
+        if (isGrandScore(score)) renderGrandScore(container, score)
+        else renderScore(container, score as ScoreModel)
+        expect(container.querySelector('svg'), `${lesson.id} · ${seg.label}`).toBeTruthy()
+      }
+    }
   })
 
   it('renders every catalog song (all key/time signatures) without throwing', () => {

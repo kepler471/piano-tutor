@@ -70,6 +70,10 @@
       'Charles-Louis Hanon’s finger independence exercises (1873) — still the most widely used technique drills in piano teaching.',
     'Scale routine':
       'Daily scales in every key with standard fingering — one and two octaves, hands separate and together.',
+    'Chromatic scale':
+      'Every key in order — 3 on the blacks, thumb on the whites. The same fingering works from any starting note.',
+    'Contrary motion':
+      'Both thumbs on the same note, hands moving apart and back — the mirror image trains real hand independence.',
     Arpeggios:
       'Triad arpeggios up and down — the wrist-lateral motion behind accompaniment patterns and virtuosic passages alike.',
     'Broken chords':

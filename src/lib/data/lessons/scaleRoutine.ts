@@ -25,14 +25,14 @@ export function twoOctaveLh(oneOctave: Finger[]): Finger[] {
   return [...oneOctave, ...oneOctave.slice(1)]
 }
 
-const upDown = (midis: number[], fingers: (Finger | null)[]): LessonStep[] => {
+export const upDown = (midis: number[], fingers: (Finger | null)[]): LessonStep[] => {
   const m = [...midis, ...midis.slice(0, -1).reverse()]
   const f = [...fingers, ...fingers.slice(0, -1).reverse()]
   return m.map((midi, i) => ({ midis: [midi], fingers: [f[i]] }))
 }
 
 /** Parallel-motion steps: LH an octave below RH, both hands on every step. */
-const handsTogether = (rhMidis: number[], rh: (Finger | null)[], lh: (Finger | null)[]): LessonStep[] => {
+export const handsTogether = (rhMidis: number[], rh: (Finger | null)[], lh: (Finger | null)[]): LessonStep[] => {
   const rhUpDown = [...rhMidis, ...rhMidis.slice(0, -1).reverse()]
   const rhF = [...rh, ...rh.slice(0, -1).reverse()]
   const lhF = [...lh, ...lh.slice(0, -1).reverse()]
