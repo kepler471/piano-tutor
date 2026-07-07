@@ -1,9 +1,12 @@
+import type { Hand } from '../theory/types'
 import type { Song, SongMeasure, SongNote } from '../data/songs/types'
 
 /**
  * Standard MIDI File (format 0/1) → Song. Onsets and durations quantize to
- * a 16th-note grid; notes below middle C go to the left hand. Assumes 4/4
- * unless the file carries a time-signature meta event.
+ * a 16th-note grid. Hands: when exactly two tracks carry notes (the common
+ * piano-staff export), the higher-pitched track is the right hand; otherwise
+ * notes below middle C go left. Assumes 4/4 unless the file carries a
+ * time-signature meta event.
  */
 export class MidiImportError extends Error {}
 
@@ -53,6 +56,7 @@ interface RawNote {
   midi: number
   startTick: number
   durationTicks: number
+  track: number
 }
 
 export function parseMidiFile(buffer: ArrayBuffer, id: string): Song {
@@ -113,7 +117,8 @@ export function parseMidiFile(buffer: ArrayBuffer, id: string): Song {
           const start = open.get(midi)
           if (start !== undefined) {
             open.delete(midi)
-            if (midi >= 21 && midi <= 108) notes.push({ midi, startTick: start, durationTicks: tick - start })
+            if (midi >= 21 && midi <= 108)
+              notes.push({ midi, startTick: start, durationTicks: tick - start, track: t })
           }
         }
       } else if (type === 0xc0 || type === 0xd0) {
@@ -126,6 +131,23 @@ export function parseMidiFile(buffer: ArrayBuffer, id: string): Song {
   }
 
   if (notes.length === 0) fail('No notes found in this MIDI file.')
+
+  // Two note-bearing tracks = a piano staff: the higher-pitched track is
+  // the right hand. Anything else falls back to the middle-C split.
+  const byTrack = new Map<number, { sum: number; count: number }>()
+  for (const n of notes) {
+    const acc = byTrack.get(n.track) ?? { sum: 0, count: 0 }
+    acc.sum += n.midi
+    acc.count++
+    byTrack.set(n.track, acc)
+  }
+  let rightTrack: number | null = null
+  if (byTrack.size === 2) {
+    const [a, b] = [...byTrack.entries()]
+    rightTrack = a[1].sum / a[1].count >= b[1].sum / b[1].count ? a[0] : b[0]
+  }
+  const handOf = (n: RawNote): Hand =>
+    rightTrack !== null ? (n.track === rightTrack ? 'R' : 'L') : n.midi < 60 ? 'L' : 'R'
 
   // Quantize to the 16th grid and bucket into measures.
   const q = (ticks: number) => Math.round((ticks / division) * 4) / 4
@@ -140,7 +162,7 @@ export function parseMidiFile(buffer: ArrayBuffer, id: string): Song {
       midi: n.midi,
       startBeat: start - measureIndex * beatsPerMeasure,
       durationBeats: duration,
-      hand: n.midi < 60 ? 'L' : 'R',
+      hand: handOf(n),
     }
     measures[measureIndex].notes.push(songNote)
   }

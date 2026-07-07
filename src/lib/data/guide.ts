@@ -332,6 +332,9 @@ export const GUIDE_STAGES: GuideStage[] = [
       lesson('cadence-F', 'I–IV–V–I cadence in F'),
     ],
     repertoire: [
+      song('schumann-melodie', 'Melody, Op. 68 No. 1 (Schumann)'),
+      song('burgmuller-la-candeur', 'La Candeur, Op. 100 No. 1 (Burgmüller)'),
+      song('old-french-song', 'Old French Song (Tchaikovsky)'),
       song('st-james-infirmary', 'St. James Infirmary'),
       song('twelve-bar-blues-c', '12-Bar Blues in C'),
       song('fur-elise', 'Für Elise — theme (Beethoven)'),
@@ -429,6 +432,9 @@ export const GUIDE_STAGES: GuideStage[] = [
       lesson('arpeggio-D-minor', 'D minor arpeggio'),
     ],
     repertoire: [
+      song('burgmuller-arabesque', 'Arabesque, Op. 100 No. 2 (Burgmüller)'),
+      song('schumann-wild-rider', 'The Wild Horseman, Op. 68 No. 8 (Schumann)'),
+      song('clementi-sonatina-1', 'Sonatina Op. 36 No. 1, 1st movement (Clementi)'),
       song('bach-prelude-c', 'Prelude in C (Bach, WTC I) — opening'),
       song('jazz-blues-walking-g', 'Jazz Blues in G with walking bass'),
     ],
@@ -512,8 +518,11 @@ export const GUIDE_STAGES: GuideStage[] = [
       lesson('jazz-blues-comp-C', '12-bar blues comping in C'),
     ],
     repertoire: [
+      song('gymnopedie-1', 'Gymnopédie No. 1 (Satie)'),
+      song('burgmuller-ballade', 'Ballade, Op. 100 No. 15 (Burgmüller)'),
       song('canon-in-d', 'Canon in D (Pachelbel)'),
       song('ii-v-i-etude', 'ii–V–I Étude (swing)'),
+      song('maple-leaf-rag', 'Maple Leaf Rag — A strain (Joplin)'),
       song('chopin-prelude-e-minor', 'Prelude in E minor, Op. 28 No. 4 (Chopin)'),
       song('when-the-saints-stride', 'When the Saints — stride version'),
     ],

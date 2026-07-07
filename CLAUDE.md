@@ -82,8 +82,19 @@ WASM — dynamically imported, fully offline against vendored model files).
     `stopMonoDetection()`'s `mic.stop()` can't tear down the stream while voice listens.
 - `src/lib/practice/` — `matcher.ts` is a pure cursor matcher ("wait, don't fail": wrong notes
   flash but never advance); `history.svelte.ts` persists completions to localStorage.
-- `src/lib/data/lessons/` — practice content (five-finger, Hanon No. 1, scale routine, I–IV–V–I
-  cadences (poly), generated sight-reading melodies).
+- `src/lib/data/lessons/` — practice content (five-finger, Hanon No. 1, scale routine incl.
+  melodic minors, chromatic, contrary motion, arpeggios in all 24 keys, I–IV–V–I cadences
+  (poly), jazz, generated sight-reading melodies).
+- `src/lib/data/songs/` — graded repertoire: `catalog.ts` (hand-written arrangements, named
+  midi constants) + `catalogImported.ts` (generated from public-domain Mutopia MIDI via
+  `scripts/midiToCatalog.ts`, then curated: grades/sections/tempi are editorial). To add
+  imported pieces: download the Mutopia .mid, run
+  `npx vite-node scripts/midiToCatalog.ts file.mid`, paste + clamp/curate.
+- `src/lib/data/guide.ts` — the learning guide: five curriculum stages whose deep links are
+  integrity-tested against the lesson/song/quiz registries (`src/tests/guide.test.ts`).
+  Deliberately static — the guide never tracks progress.
+- `src/lib/quiz/` + `src/lib/theory/quiz.ts` + `src/lib/ear/quiz.ts` — pure quiz generators
+  (11 modes) behind `/quizzes` (`/ear` is an alias route).
 - `src/lib/transcribe/` — `cluster.ts` (Tier A: onsets → chords, no rhythm) and `quantize.ts`
   (Tier B: metronome-locked 8th-note grid with rests/barlines). Both pure and unit-tested.
 

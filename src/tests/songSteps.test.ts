@@ -33,15 +33,15 @@ describe('song catalog validation', () => {
     }
   })
 
-  it('right-hand melodies sit above left-hand parts', () => {
+  it('right-hand parts sit above left-hand parts on average (hands not flipped)', () => {
+    // Real repertoire crosses voices within a bar, so compare per-song means
+    // rather than per-measure extremes — this still catches swapped hands.
     for (const song of SONG_CATALOG) {
-      for (const measure of song.measures) {
-        const rh = measure.notes.filter((n) => n.hand === 'R').map((n) => n.midi)
-        const lh = measure.notes.filter((n) => n.hand === 'L').map((n) => n.midi)
-        if (rh.length && lh.length) {
-          expect(Math.min(...rh), song.id).toBeGreaterThan(Math.max(...lh))
-        }
+      const mean = (hand: string) => {
+        const midis = song.measures.flatMap((m) => m.notes.filter((n) => n.hand === hand).map((n) => n.midi))
+        return midis.reduce((a, b) => a + b, 0) / midis.length
       }
+      expect(mean('R'), song.id).toBeGreaterThan(mean('L'))
     }
   })
 })

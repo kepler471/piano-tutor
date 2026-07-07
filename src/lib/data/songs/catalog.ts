@@ -1,4 +1,5 @@
 import type { Finger, Hand } from '../../theory/types'
+import { IMPORTED_SONGS } from './catalogImported'
 import type { Song, SongMeasure, SongNote } from './types'
 
 /**
@@ -722,4 +723,5 @@ export const SONG_CATALOG: Song[] = [
   saintsStride,
   mozartK545,
   entertainerStride,
-]
+  ...IMPORTED_SONGS,
+].sort((a, b) => a.grade - b.grade)
