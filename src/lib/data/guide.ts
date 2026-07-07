@@ -187,6 +187,19 @@ export const GUIDE_STAGES: GuideStage[] = [
           sight(1, 'Practice reading single notes in C position'),
         ],
       },
+      {
+        title: 'Counting time',
+        body:
+          'Rhythm is arithmetic you can feel: a whole note lasts four beats, a half note two, a ' +
+          'quarter one. The time signature tells you how many beats fill a bar. Count out loud — ' +
+          '"1, 2, 3, 4" — while you play; the notes that feel long are the ones you are counting ' +
+          'through. The metronome is not a critic, it is a dance partner: put it on 60 and land ' +
+          'your quarters exactly with the clicks.',
+        links: [
+          rhythm(1, 'Tap level-1 rhythms against the metronome'),
+          quiz('rhythm-dictation', 1, 'Quiz: hear a rhythm, pick its notation'),
+        ],
+      },
     ],
     weeklyPlan: {
       totalMinutes: 20,
@@ -461,6 +474,19 @@ export const GUIDE_STAGES: GuideStage[] = [
           quiz('key-signature', 3, 'Quiz: key signatures around the circle'),
         ],
       },
+      {
+        title: 'Three flavours of minor',
+        body:
+          'Minor is not one scale but a family. Natural minor is what the key signature gives ' +
+          'you; harmonic minor raises the 7th so the dominant chord can pull home; melodic minor ' +
+          'also raises the 6th on the way up so the line climbs smoothly, then relaxes back to ' +
+          'natural on the way down. Composers mix all three freely inside a single minor-key ' +
+          'piece — that is why minor pieces are speckled with accidentals.',
+        links: [
+          lesson('scale-A-melodic-minor', 'A melodic minor — hear both directions'),
+          { kind: 'scale', root: 'A', type: 'harmonic minor', label: 'Compare in the scale library' },
+        ],
+      },
     ],
     weeklyPlan: {
       totalMinutes: 45,
@@ -545,6 +571,20 @@ export const GUIDE_STAGES: GuideStage[] = [
         links: [
           lesson('jazz-251-C', 'ii–V–I drill in C'),
           song('ii-v-i-etude', 'Hear it as music in the étude'),
+        ],
+      },
+      {
+        title: 'Modes: old scales, new colours',
+        body:
+          'Play the white keys from D to D and you get Dorian — a minor scale with a bright 6th, ' +
+          'the sound of Scarborough Fair and half of jazz. From G to G is Mixolydian: a major ' +
+          'scale with a lowered 7th, the sound of the blues and rock. Modes are not new notes to ' +
+          'learn, just familiar keys heard from a different home base — which is why training ' +
+          'your ear to spot them matters more than memorizing them.',
+        links: [
+          { kind: 'scale', root: 'D', type: 'dorian', label: 'D Dorian in the scale library' },
+          { kind: 'scale', root: 'G', type: 'mixolydian', label: 'G Mixolydian in the scale library' },
+          quiz('scale-type', 4, 'Quiz: name the scale type by ear'),
         ],
       },
       {
