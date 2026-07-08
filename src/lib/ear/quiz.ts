@@ -216,8 +216,12 @@ const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
   'harmonic minor': 'Harmonic minor',
   blues: 'Blues',
   'major pentatonic': 'Major pentatonic',
+  'minor pentatonic': 'Minor pentatonic',
   dorian: 'Dorian',
   mixolydian: 'Mixolydian',
+  lydian: 'Lydian',
+  phrygian: 'Phrygian',
+  locrian: 'Locrian',
 }
 
 /** What to listen for, per scale type. */
@@ -231,6 +235,11 @@ export const SCALE_TYPE_EXPLANATIONS: Record<ScaleTypeId, string> = {
     'Major pentatonic is five notes with no semitones at all — open and folky, nothing clashes.',
   dorian: 'Dorian sounds minor but with a brighter, raised 6th — think "Scarborough Fair".',
   mixolydian: 'Mixolydian sounds major until the lowered 7th near the top — bluesy, never quite finishing.',
+  'minor pentatonic':
+    'Minor pentatonic is five notes, minor and bluesy — the blues scale without its "blue" note.',
+  lydian: 'Lydian is major with a raised 4th — floating and film-score bright, one step dreamier than major.',
+  phrygian: 'Phrygian is minor with a lowered 2nd right at the start — dark and Spanish-sounding.',
+  locrian: 'Locrian lowers both the 2nd and the 5th — unstable and unresolved, it never quite lands.',
 }
 
 /** Roots every scale type supports (kept to low-accidental keys the library covers). */
@@ -240,7 +249,7 @@ export const SCALE_TYPE_LEVELS: ScaleTypeId[][] = [
   ['major', 'natural minor'],
   ['major', 'natural minor', 'harmonic minor'],
   ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic'],
-  ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic', 'dorian', 'mixolydian'],
+  ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic', 'minor pentatonic', 'dorian', 'mixolydian'],
 ]
 
 export function makeScaleTypeQuestion(level: number, rng: Rng = Math.random): ScaleTypeQuestion {

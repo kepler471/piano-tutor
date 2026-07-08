@@ -1,3 +1,4 @@
+import { Note } from 'tonal'
 import { getScale, MAJOR_ROOTS, MINOR_ROOTS } from '../../theory/scales'
 import { scaleFingerings } from '../scaleFingerings'
 import type { Finger } from '../../theory/types'
@@ -43,7 +44,7 @@ export const handsTogether = (rhMidis: number[], rh: (Finger | null)[], lh: (Fin
   }))
 }
 
-function scaleSegments(root: string, type: 'major' | 'harmonic minor'): LessonSegment[] {
+function scaleSegments(root: string, type: 'major' | 'natural minor' | 'harmonic minor'): LessonSegment[] {
   const scale = getScale(root, type)
   const fingering = scaleFingerings[scale.id]
   const oneOct = scale.midi
@@ -78,6 +79,19 @@ const THUMB_TIPS: Record<string, string> = {
   F: 'Right hand uses 1-2-3-4 — the thumb passes under after finger 4 (on Bb there is no thumb!).',
 }
 
+/** C–E majors share C major's finger numbers — learn them as a family (pianofs). */
+const SHARED_PATTERN_ROOTS = new Set(['C', 'G', 'D', 'A', 'E'])
+const BLACK_KEY_ROOTS = new Set(['F#', 'Db', 'Ab', 'Eb', 'Bb'])
+
+/**
+ * The natural minors in learn-first order (pianofs): A first (all white keys),
+ * then C — its three flattened notes are all black keys, so they stand out —
+ * then the rest by increasing accidentals. Same 12 spellings as MINOR_ROOTS.
+ */
+export const NATURAL_MINOR_ORDER = ['A', 'C', 'G', 'F', 'D', 'E', 'B', 'F#', 'C#', 'G#', 'Eb', 'Bb']
+
+const relativeMajor = (minorRoot: string): string => Note.pitchClass(Note.transpose(`${minorRoot}4`, '3m'))
+
 export function scaleRoutineLessons(): Lesson[] {
   const majors: Lesson[] = MAJOR_ROOTS.map((root) => ({
     id: `scale-${root}-major`,
@@ -86,6 +100,12 @@ export function scaleRoutineLessons(): Lesson[] {
     description: `Play the ${root} major scale up and down with the standard fingering shown on the score — hands separate first, then together.`,
     tips: [
       ...(THUMB_TIPS[root] ? [THUMB_TIPS[root]] : []),
+      ...(SHARED_PATTERN_ROOTS.has(root)
+        ? ['C, G, D, A and E major all share this exact finger pattern — learn them as a family.']
+        : []),
+      ...(BLACK_KEY_ROOTS.has(root)
+        ? ['Starting on a black key means a different fingering — learn this pattern fresh rather than forcing the C major one.']
+        : []),
       'Keep the wrist level as the thumb passes under — no elbow flick.',
       'Aim for a smooth, connected (legato) line at a steady pulse.',
       'Hands together: start very slowly — accuracy first, speed later.',
@@ -95,13 +115,32 @@ export function scaleRoutineLessons(): Lesson[] {
     tempoBpm: 72,
     segments: scaleSegments(root, 'major'),
   }))
-  const minors: Lesson[] = MINOR_ROOTS.map((root) => ({
+  const naturalMinors: Lesson[] = NATURAL_MINOR_ORDER.map((root) => ({
+    id: `scale-${root}-natural-minor`,
+    title: `${root} natural minor scale`,
+    method: 'Scale routine',
+    description: `Play the ${root} natural minor scale up and down — only the notes of the key signature, the same notes as ${relativeMajor(root)} major starting from ${root}.`,
+    tips: [
+      `Find it from the relative major: play ${relativeMajor(root)} major starting on its 6th note and you get this scale.`,
+      ...(root === 'C'
+        ? ['The three notes flattened from C major (Eb, Ab, Bb) are all black keys — let your eyes find them.']
+        : []),
+      'Keep the wrist level as the thumb passes under — no elbow flick.',
+      'Hands together: start very slowly — accuracy first, speed later.',
+    ],
+    detectionMode: 'mono',
+    keySignature: `${root}m`,
+    tempoBpm: 66,
+    segments: scaleSegments(root, 'natural minor'),
+  }))
+  const harmonicMinors: Lesson[] = MINOR_ROOTS.map((root) => ({
     id: `scale-${root}-harmonic-minor`,
     title: `${root} harmonic minor scale`,
     method: 'Scale routine',
     description: `Play the ${root} harmonic minor scale up and down — note the raised 7th, which gives the scale its distinctive sound.`,
     tips: [
       'The raised 7th creates a wide step from the 6th degree — listen for it.',
+      'Practice this alongside the melodic minor in the same key — two answers to the same problem (a stronger pull home).',
       'Keep the wrist level as the thumb passes under — no elbow flick.',
       'Hands together: start very slowly — accuracy first, speed later.',
     ],
@@ -110,5 +149,5 @@ export function scaleRoutineLessons(): Lesson[] {
     tempoBpm: 66,
     segments: scaleSegments(root, 'harmonic minor'),
   }))
-  return [...majors, ...minors]
+  return [...majors, ...naturalMinors, ...harmonicMinors]
 }
