@@ -1,5 +1,5 @@
 import { INTENT_BANK, type IntentTemplate } from './intentBank'
-import { matchIntent, type MatchOptions } from './intentMatcher'
+import { matchIntentBanded, type MatchOptions } from './intentMatcher'
 import type { Intent } from './intents'
 
 /**
@@ -11,11 +11,16 @@ import type { Intent } from './intents'
 
 export type EmbedFn = (texts: string[]) => Promise<Float32Array[]>
 
+/**
+ * match = confident, act on it; suggest = uncertain band, confirm with the
+ * user first; null = no usable match.
+ */
+export type FallbackOutcome = { kind: 'match' | 'suggest'; intent: Intent } | null
+
 export interface FallbackResolver {
   /** Resolves once the bank is embedded; rejects if embedding the bank failed. */
   ready: Promise<void>
-  /** null = no confident match (caller keeps the original unknown intent). */
-  resolve(text: string): Promise<Intent | null>
+  resolve(text: string): Promise<FallbackOutcome>
 }
 
 export function createFallbackResolver(
@@ -45,12 +50,16 @@ export function createFallbackResolver(
     get ready() {
       return ensureBank()
     },
-    async resolve(text: string): Promise<Intent | null> {
+    async resolve(text: string): Promise<FallbackOutcome> {
       await ensureBank()
       const [query] = await embed([text])
-      const match = matchIntent(query, bankVectors!, groups, opts)
+      const match = matchIntentBanded(query, bankVectors!, groups, opts)
       if (!match) return null
-      return templates[match.group].resolve(text)
+      // A suggestion whose slots can't be filled is unexecutable — never
+      // confirm something we couldn't act on.
+      const intent = templates[match.group].resolve(text)
+      if (!intent) return null
+      return { kind: match.kind === 'accept' ? 'match' : 'suggest', intent }
     },
   }
 }

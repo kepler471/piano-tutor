@@ -1,4 +1,4 @@
-import { ROUTE_FOR_KIND, type Intent, type VoiceScopeSpec } from './intents'
+import { ROUTE_FOR_KIND, SCREEN_NAME_FOR_ROUTE, type Intent, type VoiceScopeSpec } from './intents'
 
 /**
  * Routes parsed intents to command scopes. Screens register a scope while
@@ -19,16 +19,6 @@ export interface DispatchEnv {
 }
 
 const PENDING_TTL_MS = 10_000
-
-const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
-  '/guide': 'the Guide',
-  '/quizzes': 'Quizzes',
-  '/scales': 'Scales',
-  '/chords': 'Chords',
-  '/practice': 'Practice',
-  '/play': 'Free Play',
-  '/tuner': 'Note Detector',
-}
 
 export interface Dispatcher {
   /** Pushes a scope onto the stack; returns a disposer. Replays a pending intent if this scope handles it. */
@@ -76,11 +66,8 @@ export function createDispatcher(env: DispatchEnv): Dispatcher {
       return { handled: true, feedback: outcome.say ?? '' }
     }
 
-    if (intent.kind === 'unknown') {
-      const feedback = "Sorry, I didn't catch that. Say help for commands."
-      env.say(feedback)
-      return { handled: false, feedback }
-    }
+    // No-match messaging (escalating reprompts) belongs to the convo layer.
+    if (intent.kind === 'unknown') return { handled: false, feedback: '' }
 
     const route = ROUTE_FOR_KIND[intent.kind]
     if (route) {

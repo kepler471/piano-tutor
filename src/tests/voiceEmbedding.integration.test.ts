@@ -9,6 +9,7 @@ import {
   DEFAULT_MARGIN,
   DEFAULT_THRESHOLD,
   matchIntent,
+  SUGGEST_THRESHOLD,
 } from '../lib/voice/intentMatcher'
 import { buildGrammar, parseTranscript } from '../lib/voice/parser'
 
@@ -83,20 +84,30 @@ const POSITIVE_ROWS: [string, object][] = [
 ]
 
 /**
- * Must NOT match anything: gibberish, off-domain, and near-misses. These may
- * use open vocabulary — the open-vocab Vosk fallback path exists, and the
- * matcher must reject whatever reaches it.
+ * Gibberish and clearly off-domain utterances: must produce NO outcome at
+ * all — not even a spoken "did you mean" suggestion — so they calibrate
+ * SUGGEST_THRESHOLD (the suggest floor). These may use open vocabulary — the
+ * open-vocab Vosk fallback path exists, and the matcher must reject whatever
+ * reaches it.
  */
-const NEGATIVE_ROWS: string[] = [
+const HARD_NEGATIVE_ROWS: string[] = [
   'purple monkey dishwasher',
   'the weather is nice today',
   'what time is it',
+  'my sister plays the violin',
+  'turn on the kitchen lights',
+]
+
+/**
+ * On-domain chatter that must never be silently ACTED on. Landing in the
+ * suggest band is acceptable by design: a wrong "…— right?" costs the user
+ * one "no", a wrong action costs undoing it.
+ */
+const NEAR_MISS_ROWS: string[] = [
   'i like this piano',
   'that sounds nice',
   'my hands are tired',
   'this song is really hard',
-  'my sister plays the violin',
-  'turn on the kitchen lights',
 ]
 
 let embed: EmbedFn
@@ -130,15 +141,22 @@ describe('paraphrase table (real model)', () => {
       for (const word of phrase.split(' ')) {
         expect(grammar, `"${word}" not in Vosk grammar`).toContain(word)
       }
-      expect(await resolver.resolve(phrase)).toMatchObject(expected)
+      expect(await resolver.resolve(phrase)).toMatchObject({ kind: 'match', intent: expected })
     })
   }
 })
 
 describe('adversarial negatives (real model)', () => {
-  for (const phrase of NEGATIVE_ROWS) {
-    it(`"${phrase}" → null`, async () => {
+  for (const phrase of HARD_NEGATIVE_ROWS) {
+    it(`hard: "${phrase}" → null (not even a suggestion)`, async () => {
       expect(await resolver.resolve(phrase)).toBeNull()
+    })
+  }
+
+  for (const phrase of NEAR_MISS_ROWS) {
+    it(`near-miss: "${phrase}" → never a silent match`, async () => {
+      const outcome = await resolver.resolve(phrase)
+      expect(outcome?.kind).not.toBe('match')
     })
   }
 })
@@ -157,29 +175,34 @@ describe('threshold calibration', () => {
       positiveScores.push(m!.score)
       positiveGaps.push(m!.margin)
     }
-    const negativeScores: number[] = []
-    for (const phrase of NEGATIVE_ROWS) {
+    const bestScoreFor = async (phrase: string): Promise<number> => {
       const [q] = await embed([phrase])
       let best = -Infinity
       for (const v of bankVectors) best = Math.max(best, cosineSimilarity(q, v))
-      negativeScores.push(best)
+      return best
     }
+    const hardNegativeScores = await Promise.all(HARD_NEGATIVE_ROWS.map(bestScoreFor))
+    const nearMissScores = await Promise.all(NEAR_MISS_ROWS.map(bestScoreFor))
 
     const minPositive = Math.min(...positiveScores)
     const minGap = Math.min(...positiveGaps)
-    const maxNegative = Math.max(...negativeScores)
+    const maxHardNegative = Math.max(...hardNegativeScores)
+    const maxNearMiss = Math.max(...nearMissScores)
     // eslint-disable-next-line no-console
     console.log(
       `[calibration] positives: min=${minPositive.toFixed(3)} minGap=${minGap.toFixed(3)} ` +
-        `| negatives: max=${maxNegative.toFixed(3)} ` +
-        `| threshold=${DEFAULT_THRESHOLD} margin=${DEFAULT_MARGIN}`,
+        `| hard negatives: max=${maxHardNegative.toFixed(3)} | near misses: max=${maxNearMiss.toFixed(3)} ` +
+        `| threshold=${DEFAULT_THRESHOLD} margin=${DEFAULT_MARGIN} suggest=${SUGGEST_THRESHOLD}`,
     )
 
-    // Every accepted paraphrase needs headroom above both gates; every
-    // negative must sit safely below the threshold. If either fails, tune the
-    // constants or the example bank HERE — this test is the calibration record.
+    // Every accepted paraphrase needs headroom above both accept gates; hard
+    // negatives must sit below the suggest floor (no spurious "did you
+    // mean"); near misses must at least stay out of silent-accept territory.
+    // If any fails, tune the constants or the example bank HERE — this test
+    // is the calibration record.
     expect(minPositive).toBeGreaterThan(DEFAULT_THRESHOLD)
     expect(minGap).toBeGreaterThan(DEFAULT_MARGIN)
-    expect(maxNegative).toBeLessThan(DEFAULT_THRESHOLD)
+    expect(maxHardNegative).toBeLessThan(SUGGEST_THRESHOLD)
+    expect(maxNearMiss).toBeLessThan(DEFAULT_THRESHOLD)
   }, 120_000)
 })

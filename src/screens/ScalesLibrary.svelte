@@ -11,6 +11,7 @@
   import { SCALE_TYPES, getScale } from '../lib/theory/scales'
   import type { Finger, Hand, ScaleTypeId } from '../lib/theory/types'
   import { matchRoot } from '../lib/voice/parser'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
 
@@ -63,7 +64,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Scales',
-      phrases: ['show me d major', 'e flat harmonic minor', 'left hand', 'play it'],
+      phrases: SCOPE_PHRASES['Scales'],
       handle(intent) {
         if (intent.kind === 'show-scale') {
           const nextType = intent.scaleType ?? typeId

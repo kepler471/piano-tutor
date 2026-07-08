@@ -45,17 +45,29 @@ const OPTS = { threshold: 0.6, margin: 0.06 }
 describe('createFallbackResolver', () => {
   it('resolves a confident match to the winning template intent', async () => {
     const resolver = createFallbackResolver(makeEmbed(), BANK, OPTS)
-    expect(await resolver.resolve('sounds like alpha')).toEqual({ kind: 'help' })
+    expect(await resolver.resolve('sounds like alpha')).toEqual({
+      kind: 'match',
+      intent: { kind: 'help' },
+    })
   })
 
-  it('below-threshold query → null', async () => {
+  it('below-suggest-threshold query → null', async () => {
     const resolver = createFallbackResolver(makeEmbed(), BANK, OPTS)
     expect(await resolver.resolve('off topic entirely')).toBeNull()
   })
 
-  it('cross-template ambiguity → null', async () => {
-    // Equidistant between templates a and b (cos ≈ 0.707 to each).
+  it('cross-template ambiguity → suggest (confirmed aloud, never silently dispatched)', async () => {
+    // Equidistant between templates a and b (cos ≈ 0.707 to each): fails the
+    // margin gate but clears the suggest floor.
     const resolver = createFallbackResolver(makeEmbed(), BANK, OPTS)
+    expect(await resolver.resolve('somewhere in between')).toEqual({
+      kind: 'suggest',
+      intent: { kind: 'help' },
+    })
+  })
+
+  it('a raised suggest floor turns ambiguity back into null', async () => {
+    const resolver = createFallbackResolver(makeEmbed(), BANK, { ...OPTS, suggestThreshold: 0.8 })
     expect(await resolver.resolve('somewhere in between')).toBeNull()
   })
 
@@ -80,7 +92,7 @@ describe('createFallbackResolver', () => {
     const resolver = createFallbackResolver(makeEmbed(), BANK, OPTS)
     // No await of resolver.ready first — resolve must self-initialize.
     const result = await resolver.resolve('sounds like alpha')
-    expect(result).toEqual({ kind: 'help' })
+    expect(result).toEqual({ kind: 'match', intent: { kind: 'help' } })
   })
 
   it('ready resolves after the bank embeds', async () => {

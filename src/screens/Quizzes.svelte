@@ -34,6 +34,7 @@
   import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/quiz/modes'
   import { midiToVexKey, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams, navigate } from '../router.svelte'
 
@@ -286,7 +287,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Quizzes',
-      phrases: ['hear it again', 'next'],
+      phrases: SCOPE_PHRASES['Quizzes'],
       handle(intent) {
         if (intent.kind === 'play-demo') {
           void play()

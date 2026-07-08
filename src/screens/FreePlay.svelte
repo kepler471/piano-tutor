@@ -10,6 +10,7 @@
   import { scoreFromSequence } from '../lib/notation/vexScore'
   import { clusterOnsets, type Onset } from '../lib/transcribe/cluster'
   import { quantizeToGrid, type QuantizedEvent } from '../lib/transcribe/quantize'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let mode = $state<'melody' | 'chords'>('melody')
@@ -91,7 +92,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Free Play',
-      phrases: ['melody mode / chord mode', 'start listening', 'record at one hundred', 'stop recording', 'clear', 'copy the notes'],
+      phrases: SCOPE_PHRASES['Free Play'],
       handle(intent) {
         if (intent.kind === 'free-play') {
           switch (intent.action) {
@@ -100,7 +101,7 @@
               return { say: mode === 'chords' ? 'Chord mode.' : 'Melody mode.' }
             case 'record':
               if (recState !== 'idle') return { say: 'Already recording.' }
-              if (mic.status !== 'running') return { say: 'Say start listening first, then record.' }
+              if (mic.status !== 'running') return { say: "First say 'start listening', then 'record'." }
               if (intent.bpm !== undefined) recBpm = Math.max(40, Math.min(160, intent.bpm))
               void startRecording()
               return { say: `Recording at ${recBpm} — one bar of count-in.` }

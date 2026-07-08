@@ -32,6 +32,12 @@ export interface MatchOptions {
   threshold: number
   /** Best score must beat the best score of every *other* group by this much. */
   margin: number
+  /**
+   * Floor for the uncertain band: a best score that fails the accept gates
+   * but reaches this becomes a "suggest" (spoken "did you mean" confirmation)
+   * instead of a rejection.
+   */
+  suggestThreshold: number
 }
 
 export interface MatchResult {
@@ -45,22 +51,43 @@ export interface MatchResult {
 }
 
 // Calibrated by src/tests/voiceEmbedding.integration.test.ts against the real
-// model (positives ≥ 0.57, negatives ≤ 0.50, min cross-group gap 0.11);
+// model (positives ≥ 0.57, hard negatives ≤ 0.50, min cross-group gap 0.11);
 // adjust there, not by hand.
 export const DEFAULT_THRESHOLD = 0.55
 export const DEFAULT_MARGIN = 0.06
+export const SUGGEST_THRESHOLD = 0.45
 
-export function matchIntent(
+export type BandedMatch = {
+  /** accept = act on it; suggest = confirm it aloud first ("…— right?"). */
+  kind: 'accept' | 'suggest'
+  /** Index into the bank of the winning vector. */
+  index: number
+  /** Group (template) id of the winner. */
+  group: number
+  score: number
+  /** Gap to the best-scoring vector of any other group (Infinity if none). */
+  margin: number
+} | null
+
+/**
+ * Three-way nearest-neighbor match: "accept" under the original strict gates,
+ * "suggest" when the best score fails either accept gate (below threshold or
+ * inside another group's margin) but still clears suggestThreshold, and null
+ * below that. Suggestions are confirmed with the user before dispatch, so the
+ * uncertain band converts silent rejections into one cheap spoken turn.
+ */
+export function matchIntentBanded(
   query: Float32Array,
   bank: readonly Float32Array[],
   groups: readonly number[],
   opts: Partial<MatchOptions> = {},
-): MatchResult | null {
+): BandedMatch {
   if (groups.length !== bank.length) {
     throw new RangeError(`groups length ${groups.length} does not match bank length ${bank.length}`)
   }
   const threshold = opts.threshold ?? DEFAULT_THRESHOLD
   const margin = opts.margin ?? DEFAULT_MARGIN
+  const suggestThreshold = opts.suggestThreshold ?? SUGGEST_THRESHOLD
 
   let best = -1
   let bestScore = -Infinity
@@ -71,7 +98,7 @@ export function matchIntent(
       best = i
     }
   }
-  if (best < 0 || bestScore < threshold) return null
+  if (best < 0 || bestScore < suggestThreshold) return null
 
   let bestOther = -Infinity
   for (let i = 0; i < bank.length; i++) {
@@ -80,7 +107,20 @@ export function matchIntent(
     if (score > bestOther) bestOther = score
   }
   const gap = bestScore - bestOther // Infinity when no other group exists
-  if (gap < margin) return null
 
-  return { index: best, group: groups[best], score: bestScore, margin: gap }
+  const kind = bestScore >= threshold && gap >= margin ? 'accept' : 'suggest'
+  return { kind, index: best, group: groups[best], score: bestScore, margin: gap }
+}
+
+/** The strict two-gate match: accepts only (suggestions read as null). */
+export function matchIntent(
+  query: Float32Array,
+  bank: readonly Float32Array[],
+  groups: readonly number[],
+  opts: Partial<MatchOptions> = {},
+): MatchResult | null {
+  const match = matchIntentBanded(query, bank, groups, opts)
+  if (!match || match.kind !== 'accept') return null
+  const { index, group, score, margin } = match
+  return { index, group, score, margin }
 }

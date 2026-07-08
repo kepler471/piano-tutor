@@ -12,6 +12,7 @@
   import { StepMatcher } from '../lib/practice/matcher'
   import { gradeTiming } from '../lib/practice/timingGrader'
   import type { Finger } from '../lib/theory/types'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   let {
@@ -213,7 +214,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Lesson',
-      phrases: ['demo', 'restart', 'next part', 'metronome on at eighty', 'slower / faster', 'start listening'],
+      phrases: SCOPE_PHRASES['Lesson'],
       handle(intent) {
         switch (intent.kind) {
           case 'play-demo':

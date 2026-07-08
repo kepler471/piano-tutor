@@ -10,6 +10,7 @@
 <script lang="ts">
   import GlossText from '../components/GlossText.svelte'
   import { guideHref, type GuideLink, type GuideStage } from '../lib/data/guide'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
 
@@ -46,10 +47,10 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Guide',
-      phrases: ['show stage two', 'open stage four'],
+      phrases: SCOPE_PHRASES['Guide'],
       handle(intent) {
         if (intent.kind === 'show-stage') {
-          return showStage(intent.stage) ? { say: `Stage ${intent.stage}.` } : { say: 'There are five stages.' }
+          return showStage(intent.stage) ? { say: `Stage ${intent.stage}.` } : { say: 'Stages go from one to five.' }
         }
         return null
       },

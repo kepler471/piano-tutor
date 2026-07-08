@@ -18,6 +18,8 @@ export type Intent =
   | { kind: 'stop-all' } // "piano, stop"
   | { kind: 'help' }
   | { kind: 'voice-off' }
+  | { kind: 'repeat' } // "say that again" — re-speak the last real feedback
+  | { kind: 'go-back' } // browser-style back (drill-downs are URL-backed)
   | { kind: 'mic'; action: 'start' | 'stop' } // pitch-detection listening, not voice
   // scales (cross-screen capable); explicit = the word "scale" was spoken,
   // so screens that reinterpret bare roots (Chords) must let it fall through
@@ -37,8 +39,26 @@ export type Intent =
       mode?: 'melody' | 'chords'
       bpm?: number
     }
+  // conversation control (one-step correction / confirmation)
+  | { kind: 'deny'; correction?: Intent } // "no" / "no, d minor" — correction is always a parsed intent
+  | { kind: 'affirm' } // "yes" — accepts a pending "did you mean" suggestion
   // wake word heard but the rest didn't parse
   | { kind: 'unknown'; text: string }
+
+/** Spoken names of the screens, used by navigation feedback and paraphrases. */
+export const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
+  '/': 'Home',
+  '/guide': 'the Guide',
+  '/quizzes': 'Quizzes',
+  '/ear': 'Ear Training',
+  '/rhythm': 'the Rhythm Trainer',
+  '/songs': 'Songs',
+  '/scales': 'Scales',
+  '/chords': 'Chords',
+  '/practice': 'Practice',
+  '/play': 'Free Play',
+  '/tuner': 'Note Detector',
+}
 
 /** Where an intent can be fulfilled if no active scope handles it. */
 export const ROUTE_FOR_KIND: Partial<Record<Intent['kind'], string>> = {

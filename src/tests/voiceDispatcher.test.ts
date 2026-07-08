@@ -90,12 +90,12 @@ describe('dispatcher', () => {
     expect(handled).toBe(0)
   })
 
-  it('unknown intent → polite fallback, not handled', () => {
+  it('unknown intent → silent not-handled (no-match messaging is the convo layer)', () => {
     const { env, spoken } = makeEnv()
     const d = createDispatcher(env)
     const res = d.dispatch({ kind: 'unknown', text: 'purple monkey' })
-    expect(res.handled).toBe(false)
-    expect(spoken[0]).toContain("didn't catch")
+    expect(res).toEqual({ handled: false, feedback: '' })
+    expect(spoken).toEqual([])
   })
 
   it('unhandled unroutable intent → screen hint', () => {

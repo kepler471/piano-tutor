@@ -223,6 +223,26 @@ export function parseTranscript(raw: string, opts: { armed?: boolean } = {}): In
     return null
   }
 
+  // One-step correction: a leading "no" disconfirms, optionally followed by
+  // the corrected command ("no, d minor"). When what follows "no" isn't a
+  // parseable command ("no more beat please"), the whole utterance stays
+  // unknown so the embedding fallback sees the full phrasing.
+  if (tokens[0] === 'no') {
+    const rest = tokens.slice(1)
+    if (rest.length === 0) return { kind: 'deny' }
+    const correction = parseCommand(rest)
+    if (correction.kind !== 'unknown') return { kind: 'deny', correction }
+    return { kind: 'unknown', text: tokens.join(' ') }
+  }
+
+  // Accepts a pending "did you mean" suggestion.
+  if (/^(yes|yeah|yep)( please)?$/.test(tokens.join(' '))) return { kind: 'affirm' }
+
+  return parseCommand(tokens)
+}
+
+/** The command body, after wake-word / correction handling. */
+function parseCommand(tokens: string[]): Intent {
   const text = tokens.join(' ')
 
   // --- order matters: multi-word "stop X" phrases before bare "stop" ---
@@ -270,17 +290,21 @@ export function parseTranscript(raw: string, opts: { armed?: boolean } = {}): In
   if (/start listening|check my (chord|playing)|listen to (me|my playing)/.test(text))
     return { kind: 'mic', action: 'start' }
 
+  // Universals: repeat the last spoken feedback / browser-style back.
+  if (/^(repeat( that)?|say (that|it) again|what did you say)$/.test(text)) return { kind: 'repeat' }
+
   // Lesson flow.
   if (/^(restart|start over|again|start again)$/.test(text)) return { kind: 'lesson', action: 'restart' }
   if (/^next( (part|segment|section))?$/.test(text)) return { kind: 'lesson', action: 'next' }
-  if (/^previous( (part|segment|section))?$/.test(text) || /^go back$/.test(text))
-    return { kind: 'lesson', action: 'previous' }
+  if (/^previous( (part|segment|section))?$/.test(text)) return { kind: 'lesson', action: 'previous' }
   if (/back to (the )?lessons|exit( lesson)?$/.test(text)) return { kind: 'lesson', action: 'exit' }
+  if (/^(go )?back$/.test(text)) return { kind: 'go-back' }
   if (/new melody/.test(text)) return { kind: 'lesson', action: 'new-melody' }
 
   // Demo playback.
   if (/^(play|play it|play that|demo|play the (demo|scale|chord)|play it again)$/.test(text))
     return { kind: 'play-demo' }
+  if (/^hear (it|that)( again)?$/.test(text)) return { kind: 'play-demo' }
   if (/^block( chord)?$/.test(text)) return { kind: 'play-demo', variant: 'block' }
   if (/arpeggio|arpeggiate|break it up/.test(text)) return { kind: 'play-demo', variant: 'arpeggio' }
 
@@ -384,6 +408,8 @@ export function buildGrammar(lessons: { title: string; method: string }[]): stri
     record recording clear copy notes score
     listening listen check my chord playing voice sleep mic microphone
     restart over again next previous part segment section back exit lessons lesson new melody
+    repeat did hear no yes yeah yep
+    sight reading
     demo it that block arpeggio arpeggiate break
     sharp flat major minor natural harmonic diminished augmented dominant seventh seven
     root position first second third inversion left right hand

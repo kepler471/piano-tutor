@@ -12,6 +12,7 @@ import { acquireAudioGate } from '../audio/playback'
 
 let speaking = false
 let releaseGate: (() => void) | null = null
+let lastSpoken = ''
 
 function done(): void {
   speaking = false
@@ -19,8 +20,17 @@ function done(): void {
   releaseGate = null
 }
 
-export function speak(text: string): void {
+export interface SpeakOptions {
+  /**
+   * false marks meta-prompts ("Sorry?", "Yes?", confirmations) that the
+   * "repeat" command must not replay; real feedback is remembered.
+   */
+  remember?: boolean
+}
+
+export function speak(text: string, opts: SpeakOptions = {}): void {
   if (typeof speechSynthesis === 'undefined') return
+  if (text && opts.remember !== false) lastSpoken = text
   speechSynthesis.cancel()
   done()
   const utterance = new SpeechSynthesisUtterance(text)
@@ -43,6 +53,9 @@ export function cancel(): void {
 export const tts = {
   get speaking() {
     return speaking
+  },
+  get lastSpoken() {
+    return lastSpoken
   },
   speak,
   cancel,

@@ -3,12 +3,13 @@
   import MicButton from '../components/MicButton.svelte'
   import PianoKeyboard from '../components/PianoKeyboard.svelte'
   import { monoPitch, startMonoDetection, stopMonoDetection } from '../lib/audio/monoPitch.svelte'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
 
   $effect(() =>
     registerVoiceCommands({
       name: 'Note Detector',
-      phrases: ['start listening', 'stop listening'],
+      phrases: SCOPE_PHRASES['Note Detector'],
       handle(intent) {
         if (intent.kind !== 'mic') return null
         if (intent.action === 'start') {

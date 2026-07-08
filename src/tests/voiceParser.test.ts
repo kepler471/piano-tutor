@@ -40,6 +40,40 @@ describe('wake word', () => {
   })
 })
 
+describe('one-step correction and confirmation words', () => {
+  it('bare "no" is a deny', () => {
+    expect(parseTranscript('piano no')).toEqual({ kind: 'deny' })
+    expect(parseTranscript('no', { armed: true })).toEqual({ kind: 'deny' })
+  })
+
+  it('"no, <command>" carries the parsed correction', () => {
+    expect(parseTranscript('piano no d minor')).toEqual({
+      kind: 'deny',
+      correction: expect.objectContaining({ kind: 'show-scale', root: 'D' }),
+    })
+    expect(parseTranscript('no slower', { armed: true })).toEqual({
+      kind: 'deny',
+      correction: { kind: 'set-bpm', delta: -10 },
+    })
+  })
+
+  it('"no" + unparseable rest stays unknown with the FULL text (fallback needs it)', () => {
+    // "no more beat please" is an intent-bank example for metronome-stop;
+    // stripping the "no" would change what the embedding sees.
+    expect(parseTranscript('piano no more beat please')).toEqual({
+      kind: 'unknown',
+      text: 'no more beat please',
+    })
+  })
+
+  it('yes / yeah / yep affirm', () => {
+    expect(parseTranscript('piano yes')).toEqual({ kind: 'affirm' })
+    expect(parseTranscript('yeah', { armed: true })).toEqual({ kind: 'affirm' })
+    expect(parseTranscript('yes please', { armed: true })).toEqual({ kind: 'affirm' })
+    expect(parseTranscript('yep', { armed: true })).toEqual({ kind: 'affirm' })
+  })
+})
+
 describe('navigation', () => {
   const cases: [string, string][] = [
     ['piano go home', '/'],
@@ -258,6 +292,21 @@ describe('global commands', () => {
     expect(parseTranscript('piano go to sleep')).toEqual({ kind: 'voice-off' })
   })
 
+  it('repeat', () => {
+    expect(parseTranscript('piano repeat')).toEqual({ kind: 'repeat' })
+    expect(parseTranscript('piano repeat that')).toEqual({ kind: 'repeat' })
+    expect(parseTranscript('piano say that again')).toEqual({ kind: 'repeat' })
+    expect(parseTranscript('piano what did you say')).toEqual({ kind: 'repeat' })
+  })
+
+  it('go back is browser-back, not lesson-previous', () => {
+    expect(parseTranscript('piano go back')).toEqual({ kind: 'go-back' })
+    expect(parseTranscript('piano back')).toEqual({ kind: 'go-back' })
+    // Lesson navigation keeps its own words.
+    expect(parseTranscript('piano previous part')).toEqual({ kind: 'lesson', action: 'previous' })
+    expect(parseTranscript('piano back to lessons')).toEqual({ kind: 'lesson', action: 'exit' })
+  })
+
   it('mic start/stop', () => {
     expect(parseTranscript('piano start listening')).toEqual({ kind: 'mic', action: 'start' })
     expect(parseTranscript('piano check my chord')).toEqual({ kind: 'mic', action: 'start' })
@@ -289,6 +338,9 @@ describe('lessons and free play', () => {
   it('demo', () => {
     expect(parseTranscript('piano demo')).toEqual({ kind: 'play-demo' })
     expect(parseTranscript('piano play it')).toEqual({ kind: 'play-demo' })
+    expect(parseTranscript('piano hear it again')).toEqual({ kind: 'play-demo' })
+    // But bare "again" stays a lesson restart.
+    expect(parseTranscript('piano again')).toEqual({ kind: 'lesson', action: 'restart' })
   })
 
   it('free play controls', () => {

@@ -7,11 +7,19 @@ import { startPolyDetection, stopPolyDetection } from '../audio/polyPitch.svelte
 import { setMetronomeBpm, startMetronome, stopMetronome } from '../audio/metronome'
 import * as playback from '../audio/playback'
 import { Resampler } from '../audio/resample'
+import { createConvo } from './convo'
 import { createDispatcher, type Dispatcher } from './dispatcher'
-import { createFallbackResolver, createSequenceGate, type FallbackResolver } from './fallback'
+import {
+  createFallbackResolver,
+  createSequenceGate,
+  type FallbackOutcome,
+  type FallbackResolver,
+} from './fallback'
 import type { Intent, VoiceScopeSpec } from './intents'
+import { logMiss } from './missLog'
 import { loadModelArchive } from './modelLoader'
 import { buildGrammar, parseTranscript } from './parser'
+import { SCOPE_PHRASES, SPOKEN_HELP_EXAMPLES } from './phrases'
 import { tts } from './tts'
 
 /**
@@ -22,7 +30,6 @@ import { tts } from './tts'
  */
 
 const VOSK_SAMPLE_RATE = 16000
-const ARMED_WINDOW_MS = 8000
 const STORAGE_KEY = 'piano-tutor.voice-enabled'
 const captureProcessorUrl = '/worklets/capture-processor.js'
 
@@ -47,7 +54,6 @@ let recognizer: KaldiRecognizer | null = null
 let workletNode: AudioWorkletNode | null = null
 let resampler: Resampler | null = null
 let workletModuleLoaded: AudioContext | null = null
-let armedUntil = 0
 let holdingMic = false
 
 export const voiceSupported =
@@ -64,6 +70,16 @@ const dispatcher: Dispatcher = createDispatcher({
   say: (text) => tts.speak(text),
 })
 
+// Conversation layer: armed/correction windows, escalating reprompts, and
+// "did you mean — right?" confirmations. Decisions live in the pure convo;
+// this module only feeds it parsed intents and fallback outcomes.
+const convo = createConvo({
+  dispatch: (intent) => dispatcher.dispatch(intent),
+  say: (text, opts) => tts.speak(text, opts),
+  activePhrases: () => dispatcher.activePhrases(),
+  logMiss,
+})
+
 /** Screens call this inside $effect to add commands while mounted. */
 export function registerVoiceCommands(scope: VoiceScopeSpec): () => void {
   return dispatcher.register(scope)
@@ -75,18 +91,7 @@ export function voiceHelpTopics(): { scope: string; phrases: string[] }[] {
 
 const globalScope: VoiceScopeSpec = {
   name: 'Anywhere',
-  phrases: [
-    'open scales / chords / practice / free play / tuner',
-    'go home',
-    'start the metronome at ninety',
-    'metronome off',
-    'set tempo to one hundred',
-    'slower / faster',
-    'stop',
-    'stop the mic',
-    'help',
-    'voice off',
-  ],
+  phrases: SCOPE_PHRASES['Anywhere'],
   handle(intent: Intent) {
     switch (intent.kind) {
       case 'navigate':
@@ -119,7 +124,14 @@ const globalScope: VoiceScopeSpec = {
         }
         return null // starting needs screen context (mono vs poly)
       case 'help':
-        return { say: 'Try: open scales. Show me D major. Start the metronome. Or say stop.' }
+        return {
+          say: `You can say things like: ${SPOKEN_HELP_EXAMPLES.join(', or ')}. For everything else, tap 'What can I say'.`,
+        }
+      case 'repeat':
+        return { say: tts.lastSpoken || "I haven't said anything yet." }
+      case 'go-back':
+        history.back()
+        return { say: '' }
       case 'voice-off':
         disable()
         return { say: 'Voice control off.' }
@@ -157,18 +169,17 @@ function ensureFallback(): void {
     })
 }
 
-async function handleUnknown(intent: Extract<Intent, { kind: 'unknown' }>, seq: number): Promise<void> {
-  let resolved: Intent | null = null
+async function handleUnknown(text: string, seq: number): Promise<void> {
+  let outcome: FallbackOutcome = null
   if (fallback) {
     try {
-      resolved = await fallback.resolve(intent.text)
+      outcome = await fallback.resolve(text)
     } catch (err) {
       console.warn('[voice] intent fallback failed:', err)
     }
   }
   if (!fallbackGate.isCurrent(seq)) return // superseded by a newer utterance
-  const { feedback } = dispatcher.dispatch(resolved ?? intent)
-  lastFeedback = feedback
+  lastFeedback = convo.onFallback(outcome, text)
 }
 
 // ---------------------------------------------------------------------------
@@ -176,25 +187,20 @@ async function handleUnknown(intent: Extract<Intent, { kind: 'unknown' }>, seq: 
 // ---------------------------------------------------------------------------
 
 function handleFinal(text: string): void {
-  const armed = Date.now() < armedUntil
-  const intent = parseTranscript(text, { armed })
+  const intent = parseTranscript(text, { armed: convo.isArmed() })
   if (!intent) return // no wake word — silently ignore
-  armedUntil = 0
   lastHeard = text.replace(/\[unk\]/g, '').replace(/\s+/g, ' ').trim()
   // Every new utterance supersedes any in-flight fallback resolution.
   const seq = fallbackGate.next()
   if (intent.kind === 'wake') {
-    armedUntil = Date.now() + ARMED_WINDOW_MS
-    lastFeedback = 'Yes?'
-    tts.speak('Yes?')
+    lastFeedback = convo.onWake()
     return
   }
   if (intent.kind === 'unknown') {
-    void handleUnknown(intent, seq)
+    void handleUnknown(intent.text, seq)
     return
   }
-  const { feedback } = dispatcher.dispatch(intent)
-  lastFeedback = feedback
+  lastFeedback = convo.onIntent(intent)
 }
 
 let grammarActive = false
@@ -239,7 +245,7 @@ function attachRecognizer(rec: KaldiRecognizer): void {
   })
 }
 
-async function enable(): Promise<void> {
+async function enable(opts: { announce?: boolean } = {}): Promise<void> {
   if (!voiceSupported) {
     status = 'error'
     errorMessage = 'This browser does not support voice control.'
@@ -301,6 +307,9 @@ async function enable(): Promise<void> {
     status = 'listening'
     persist(true)
     ensureFallback()
+    // Confirms the audio path end-to-end on user-initiated enables; the
+    // auto-restore on page load stays silent.
+    if (opts.announce) tts.speak('Voice is on.', { remember: false })
   } catch (err) {
     console.error('[voice] enable failed:', err)
     status = 'error'

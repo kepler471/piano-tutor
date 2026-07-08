@@ -4,6 +4,8 @@ import {
   DEFAULT_MARGIN,
   DEFAULT_THRESHOLD,
   matchIntent,
+  matchIntentBanded,
+  SUGGEST_THRESHOLD,
 } from '../lib/voice/intentMatcher'
 
 const v = (...xs: number[]) => new Float32Array(xs)
@@ -84,5 +86,43 @@ describe('matchIntent', () => {
   it('default gates are biased toward rejection', () => {
     expect(DEFAULT_THRESHOLD).toBeGreaterThanOrEqual(0.5)
     expect(DEFAULT_MARGIN).toBeGreaterThan(0)
+    expect(SUGGEST_THRESHOLD).toBeLessThan(DEFAULT_THRESHOLD)
+  })
+})
+
+describe('matchIntentBanded', () => {
+  const bank = [v(1, 0, 0), v(0, 1, 0), v(0, 0, 1)]
+  const groups = [0, 0, 1]
+  const opts = { threshold: 0.6, margin: 0.06, suggestThreshold: 0.45 }
+
+  it('strict-gate winner → accept', () => {
+    expect(matchIntentBanded(v(1, 0, 0), bank, groups, opts)).toMatchObject({
+      kind: 'accept',
+      group: 0,
+    })
+  })
+
+  it('above suggest floor but below threshold → suggest', () => {
+    // cos ≈ 0.577 to each vector: fails threshold 0.6, clears 0.45.
+    expect(matchIntentBanded(v(1, 1, 1), bank, groups, opts)).toMatchObject({ kind: 'suggest' })
+  })
+
+  it('clears threshold but fails the cross-group margin → suggest', () => {
+    // Nearly equidistant between group 0 (≈0.714) and group 1 (≈0.700).
+    const m = matchIntentBanded(v(1, 0, 0.98), bank, groups, { ...opts, threshold: 0.5 })
+    expect(m).toMatchObject({ kind: 'suggest' })
+    expect(m!.margin).toBeLessThan(0.06)
+  })
+
+  it('below the suggest floor → null', () => {
+    expect(matchIntentBanded(v(0, 0, 0), bank, groups, opts)).toBeNull()
+    // Weak similarity everywhere (≈0.33 with one strong axis missing).
+    expect(matchIntentBanded(v(1, 3, 3), bank, groups, { ...opts, suggestThreshold: 0.8 })).toBeNull()
+  })
+
+  it('matchIntent is the accepts-only view of the banded match', () => {
+    const q = v(1, 1, 1) // suggest band
+    expect(matchIntentBanded(q, bank, groups, opts)).not.toBeNull()
+    expect(matchIntent(q, bank, groups, opts)).toBeNull()
   })
 })

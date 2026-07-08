@@ -16,6 +16,7 @@
   import { SHELL_QUALITIES, shellVoicing } from '../lib/theory/voicings'
   import type { ChordQualityId, Finger, Hand } from '../lib/theory/types'
   import { matchRoot } from '../lib/voice/parser'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
 
@@ -129,7 +130,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Chords',
-      phrases: ['show me d minor seventh', 'first inversion', 'block / arpeggio', 'check my chord'],
+      phrases: SCOPE_PHRASES['Chords'],
       handle(intent) {
         if (intent.kind === 'show-chord') return applyChordPick(intent)
         if (intent.kind === 'show-scale' && !intent.explicit) {

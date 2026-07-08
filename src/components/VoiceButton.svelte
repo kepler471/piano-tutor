@@ -22,7 +22,7 @@
 
   function toggle() {
     if (voice.status === 'listening') voice.disable()
-    else void voice.enable()
+    else void voice.enable({ announce: true })
   }
 </script>
 

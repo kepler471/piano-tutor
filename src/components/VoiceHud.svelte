@@ -9,7 +9,7 @@
     {#if voice.status === 'mic-denied' || voice.status === 'error'}
       <div class="row error">
         <span>{voice.errorMessage || 'Voice control failed.'}</span>
-        <button class="link" onclick={() => void voice.enable()}>Retry</button>
+        <button class="link" onclick={() => void voice.enable({ announce: true })}>Retry</button>
       </div>
     {:else if voice.status === 'downloading-model'}
       <div class="row muted">

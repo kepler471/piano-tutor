@@ -65,6 +65,19 @@ WASM — dynamically imported, fully offline against vendored model files).
     the target screen's scope registers (pending-intent, 10 s TTL). `buildGrammar()` generates
     the Kaldi word-list grammar (+`"[unk]"`) so piano notes/chatter decode as `[unk]` and are
     dropped before the wake-word check.
+  - `convo.ts` — **pure** conversation state machine between parser and dispatcher (design
+    follows the ACIxD VUI wiki, acixd.org — HTTP only, cert is broken for HTTPS): armed window
+    after the wake word AND after every command (5 s one-step correction: "no, d minor" / bare
+    "no" → "My mistake."), escalating no-match reprompts ("Sorry?" → two examples from the
+    active scope → point at the HUD list, then give up until re-woken), and "…— right?"
+    confirmation of uncertain fallback matches ("yes"/"no"). `describe.ts` renders intents as
+    spoken paraphrases for those confirmations. Universal commands: "repeat" (re-speaks
+    `tts.lastSpoken`; meta-prompts are excluded via `speak(text, {remember:false})`) and
+    "go back" (`history.back()` — drill-downs are URL-backed).
+  - `phrases.ts` — single registry of advertised example phrases per scope
+    (`SCOPE_PHRASES`); screens import it, and `src/tests/voicePhrases.test.ts` enforces the
+    mimicry invariant: every advertised phrase must parse AND be decodable under the grammar.
+    Add new example phrases here, never inline in a screen.
   - Embedding fallback (Tier 1): when the regex parser yields `{kind:'unknown'}`,
     `voice.svelte.ts` embeds the transcript (MiniLM via `embedder.ts`, lazily preloaded on
     voice enable) and nearest-neighbor matches it against `intentBank.ts` — example phrasings
@@ -73,8 +86,10 @@ WASM — dynamically imported, fully offline against vendored model files).
     threshold + cross-template margin (calibrated by
     `src/tests/voiceEmbedding.integration.test.ts`, which runs the REAL model offline in node
     env — tune constants there, never by hand). All matching logic is pure
-    (`intentBank`/`intentMatcher`/`fallback` — vitest-covered); a miss falls back to the old
-    "didn't catch that". Bank example words are auto-added to the Vosk grammar
+    (`intentBank`/`intentMatcher`/`fallback` — vitest-covered); scores in the uncertain band
+    (`SUGGEST_THRESHOLD` ≤ score < accept gates) become a spoken "did you mean" confirmation
+    via `convo.ts`; full misses get the escalating reprompts and are logged to
+    `missLog.ts` (localStorage ring buffer, for tuning). Bank example words are auto-added to the Vosk grammar
     (invariant-tested), so keep examples to real English words the small model knows.
     Antonym-ish intents (faster/slower, arpeggio/block) share ONE template with the direction
     read from the transcript — separate templates sit too close in embedding space.
@@ -128,5 +143,3 @@ Re-copy these after upgrading the corresponding packages.
   browser.
 - Audio-detection changes should extend the synthesized-audio tests in
   `src/tests/detection.test.ts` rather than relying on manual mic testing.
-
-Never add claude to the commit messages.

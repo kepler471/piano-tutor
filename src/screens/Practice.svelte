@@ -7,6 +7,7 @@
   import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'
   import { makeSightReading, SIGHT_LEVELS, type SightLevel } from '../lib/sightread/generator'
   import { matchLesson } from '../lib/voice/parser'
+  import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams, navigate } from '../router.svelte'
 
@@ -133,7 +134,7 @@
   $effect(() =>
     registerVoiceCommands({
       name: 'Practice',
-      phrases: ['practice five finger', 'finger exercise', 'sight reading', 'new melody', 'back to lessons'],
+      phrases: SCOPE_PHRASES['Practice'],
       handle(intent) {
         if (intent.kind === 'open-lesson') {
           if (/sight ?reading/.test(intent.query)) {
