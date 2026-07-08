@@ -89,6 +89,76 @@ export function makeNoteNamingQuestion(level: number, rng: Rng = Math.random): N
   }
 }
 
+// --- reading a melody (multi-note sight-reading by name) ---
+
+export interface ReadMelodyQuestion {
+  kind: 'read-melody'
+  clef: 'treble' | 'bass'
+  keySignature: 'C'
+  /** Pitches of the phrase, left to right. */
+  midis: number[]
+  /** Display note name (Unicode accidentals) per midi. */
+  names: string[]
+  /** Letter buttons offered for every note in the phrase. */
+  optionPool: string[]
+  /** Why: shown once the whole phrase has been named. */
+  explanation: string
+}
+
+/** [clefs, midi range, accidentals allowed, note count] per level. */
+export const READ_MELODY_LEVELS: {
+  clefs: ('treble' | 'bass')[]
+  range: [number, number]
+  accidentals: boolean
+  count: number
+}[] = [
+  { clefs: ['treble'], range: [60, 72], accidentals: false, count: 3 }, // C4–C5, in-staff treble
+  { clefs: ['treble', 'bass'], range: [41, 79], accidentals: false, count: 4 }, // adds bass clef
+  { clefs: ['treble', 'bass'], range: [36, 84], accidentals: false, count: 5 }, // wider, longer phrase
+  { clefs: ['treble', 'bass'], range: [55, 77], accidentals: true, count: 4 }, // sharps and flats
+]
+
+const midiName = (midi: number) => Note.pitchClass(Note.fromMidi(midi)).replace('#', '♯').replace('b', '♭')
+
+// Full chromatic in the same spelling makeReadMelodyQuestion produces (flats).
+const CHROMATIC_NAMES = Array.from({ length: 12 }, (_, pc) => midiName(60 + pc))
+
+export function makeReadMelodyQuestion(level: number, rng: Rng = Math.random): ReadMelodyQuestion {
+  const def = READ_MELODY_LEVELS[clampLevel(level, READ_MELODY_LEVELS.length) - 1]
+  const clef = pick(def.clefs, rng)
+  // Keep the whole phrase on the readable side of middle C for the chosen clef.
+  const [lo, hi] =
+    clef === 'treble' ? [Math.max(def.range[0], 57), def.range[1]] : [def.range[0], Math.min(def.range[1], 64)]
+
+  const allowed = (m: number) => m >= lo && m <= hi && (def.accidentals || NATURAL_PCS.has(m % 12))
+  const pickAllowed = () => {
+    let m = lo + Math.floor(rng() * (hi - lo + 1))
+    while (!allowed(m)) m = lo + Math.floor(rng() * (hi - lo + 1))
+    return m
+  }
+
+  // Stepwise random walk, biased small, staying inside the readable range.
+  const midis = [pickAllowed()]
+  for (let i = 1; i < def.count; i++) {
+    const prev = midis[i - 1]
+    const next = shuffle([1, 2, -1, -2, 3, -3, 4, -4], rng)
+      .map((d) => prev + d)
+      .find(allowed)
+    midis.push(next ?? pickAllowed())
+  }
+
+  const names = midis.map(midiName)
+  return {
+    kind: 'read-melody',
+    clef,
+    keySignature: 'C',
+    midis,
+    names,
+    optionPool: def.accidentals ? CHROMATIC_NAMES : LETTERS,
+    explanation: `Reading the notes left to right: ${names.join(' ')}. Name each one as the cursor reaches it.`,
+  }
+}
+
 // --- key signature identification ---
 
 export interface KeySignatureQuestion {

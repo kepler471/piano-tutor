@@ -2,9 +2,11 @@
   import BackToGuide from '../components/BackToGuide.svelte'
   import EchoPlayer from '../components/EchoPlayer.svelte'
   import GlossText from '../components/GlossText.svelte'
+  import MelodyReadCard from '../components/MelodyReadCard.svelte'
   import QuizCard from '../components/QuizCard.svelte'
   import RhythmQuizCard from '../components/RhythmQuizCard.svelte'
   import SheetMusic from '../components/SheetMusic.svelte'
+  import SightReadPlayer from '../components/SightReadPlayer.svelte'
   import { playChord, playChordSequence, playSequence, playSong } from '../lib/audio/playback'
   import {
     makeCadenceQuestion,
@@ -25,14 +27,17 @@
     makeIntervalStaffQuestion,
     makeKeySignatureQuestion,
     makeNoteNamingQuestion,
+    makeReadMelodyQuestion,
     type ChordFunctionQuestion,
     type ChordSpellingQuestion,
     type CircleQuestion,
     type IntervalStaffQuestion,
     type KeySignatureQuestion,
     type NoteNamingQuestion,
+    type ReadMelodyQuestion,
   } from '../lib/theory/quiz'
   import { makeRhythmDictationQuestion, type RhythmDictationQuestion } from '../lib/quiz/rhythmQuiz'
+  import { makeSightReadQuestion, type SightReadQuestion } from '../lib/quiz/sightReadQuiz'
   import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/quiz/modes'
   import { midiToVexKey, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
@@ -53,6 +58,8 @@
     | ChordSpellingQuestion
     | ChordFunctionQuestion
     | RhythmDictationQuestion
+    | ReadMelodyQuestion
+    | SightReadQuestion
 
   interface ModeDef {
     id: QuizModeId
@@ -78,6 +85,8 @@
       label: 'Reading & theory',
       modes: [
         { id: 'note-naming', label: 'Name the note', desc: 'A note on the staff — what is it called?', audio: false },
+        { id: 'read-melody', label: 'Read a melody', desc: 'A short phrase on the staff — name the notes left to right.', audio: false },
+        { id: 'sight-read', label: 'Play what you read', desc: 'A short phrase on the staff — play it on your piano and the mic checks each note.', audio: false },
         { id: 'key-signature', label: 'Key signatures', desc: 'Read the sharps and flats — which key are you in?', audio: false },
         { id: 'circle-of-fifths', label: 'Circle of fifths', desc: 'Fifths, key signatures and relative minors — navigate the clock of keys.', audio: false },
         { id: 'interval-staff', label: 'Intervals on the staff', desc: 'Two written notes — name the interval by sight.', audio: false },
@@ -131,11 +140,12 @@
 
   const modeDef = $derived(ALL_MODES.find((m) => m.id === mode)!)
   const maxLevel = $derived(QUIZ_LEVEL_COUNTS[mode])
-  const roundSize = $derived(mode === 'echo' ? 5 : 10)
+  const roundSize = $derived(mode === 'echo' || mode === 'read-melody' || mode === 'sight-read' ? 5 : 10)
 
   let question = $state<Question | null>(null)
   let selected = $state<string | null>(null)
-  let echoResult = $state<number | null>(null) // mistakes on the completed phrase
+  let echoResult = $state<number | null>(null) // mistakes on the completed echo phrase
+  let phraseResult = $state<number | null>(null) // mistakes on a completed read/play phrase
   let playing = $state(false)
   let heard = $state(false)
 
@@ -152,6 +162,8 @@
       case 'cadence': return makeCadenceQuestion(level)
       case 'rhythm-dictation': return makeRhythmDictationQuestion(level)
       case 'note-naming': return makeNoteNamingQuestion(level)
+      case 'read-melody': return makeReadMelodyQuestion(level)
+      case 'sight-read': return makeSightReadQuestion(level)
       case 'key-signature': return makeKeySignatureQuestion(level)
       case 'circle-of-fifths': return makeCircleQuestion(level)
       case 'interval-staff': return makeIntervalStaffQuestion(level)
@@ -166,6 +178,7 @@
     question = makeQuestion()
     selected = null
     echoResult = null
+    phraseResult = null
     heard = false
   }
 
@@ -257,7 +270,9 @@
   })
 
   function choose(opt: string) {
-    if (!question || question.kind === 'echo' || selected !== null) return
+    if (!question || selected !== null) return
+    // Phrase modes grade themselves via their own components, not QuizCard.
+    if (question.kind === 'echo' || question.kind === 'read-melody' || question.kind === 'sight-read') return
     selected = opt
     answered++
     const answer = question.kind === 'rhythm-dictation' ? question.answer.id : question.answer
@@ -268,6 +283,14 @@
   function onEchoComplete(mistakes: number) {
     if (echoResult !== null) return
     echoResult = mistakes
+    answered++
+    if (mistakes === 0) correct++
+    maybeRecord()
+  }
+
+  function onPhraseComplete(mistakes: number) {
+    if (phraseResult !== null) return
+    phraseResult = mistakes
     answered++
     if (mistakes === 0) correct++
     maybeRecord()
@@ -290,6 +313,7 @@
     question = makeQuestion()
     selected = null
     echoResult = null
+    phraseResult = null
     heard = false
     if (modeDef.audio) void play()
   }
@@ -307,7 +331,7 @@
           return { say: '' }
         }
         if (intent.kind === 'lesson' && intent.action === 'next') {
-          if (!roundDone && (selected !== null || echoResult !== null)) next()
+          if (!roundDone && (selected !== null || echoResult !== null || phraseResult !== null)) next()
           return { say: '' }
         }
         return null
@@ -367,6 +391,34 @@
         {#if echoResult !== null}
           <div class="complete">
             {echoResult === 0 ? '✨ Perfect echo!' : `Got there with ${echoResult} wrong note${echoResult === 1 ? '' : 's'}.`}
+            <button class="primary" onclick={next}>Next phrase →</button>
+          </div>
+        {/if}
+      {:else if question.kind === 'read-melody'}
+        <MelodyReadCard
+          clef={question.clef}
+          keySignature={question.keySignature}
+          midis={question.midis}
+          names={question.names}
+          optionPool={question.optionPool}
+          oncomplete={onPhraseComplete}
+        />
+        {#if phraseResult !== null}
+          <div class="complete">
+            {phraseResult === 0 ? '✨ Every note named!' : `Named them with ${phraseResult} wrong guess${phraseResult === 1 ? '' : 'es'}.`}
+            <button class="primary" onclick={next}>Next phrase →</button>
+          </div>
+        {/if}
+      {:else if question.kind === 'sight-read'}
+        <SightReadPlayer
+          clef={question.clef}
+          keySignature={question.keySignature}
+          steps={question.steps}
+          oncomplete={onPhraseComplete}
+        />
+        {#if phraseResult !== null}
+          <div class="complete">
+            {phraseResult === 0 ? '✨ Played it clean!' : `Played it with ${phraseResult} wrong note${phraseResult === 1 ? '' : 's'}.`}
             <button class="primary" onclick={next}>Next phrase →</button>
           </div>
         {/if}

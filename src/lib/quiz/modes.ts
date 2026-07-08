@@ -12,6 +12,8 @@ export type QuizModeId =
   | 'rhythm-dictation'
   // reading & theory
   | 'note-naming'
+  | 'read-melody'
+  | 'sight-read'
   | 'key-signature'
   | 'circle-of-fifths'
   | 'interval-staff'
@@ -27,6 +29,8 @@ export const QUIZ_LEVEL_COUNTS: Record<QuizModeId, number> = {
   echo: 3,
   'rhythm-dictation': 4,
   'note-naming': 4,
+  'read-melody': 4,
+  'sight-read': 4,
   'key-signature': 4,
   'circle-of-fifths': 4,
   'interval-staff': 4,

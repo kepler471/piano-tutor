@@ -7,12 +7,14 @@ import {
   CIRCLE_LEVEL_COUNT,
   KEY_SIGNATURE_LEVELS,
   NOTE_NAMING_LEVELS,
+  READ_MELODY_LEVELS,
   makeChordFunctionQuestion,
   makeChordSpellingQuestion,
   makeCircleQuestion,
   makeIntervalStaffQuestion,
   makeKeySignatureQuestion,
   makeNoteNamingQuestion,
+  makeReadMelodyQuestion,
   sigAccidentals,
 } from '../lib/theory/quiz'
 import { makeRhythmDictationQuestion } from '../lib/quiz/rhythmQuiz'
@@ -72,6 +74,60 @@ describe('makeNoteNamingQuestion', () => {
       const q = makeNoteNamingQuestion(3, seededRng(seed))
       if (q.clef === 'treble') expect(q.midi).toBeGreaterThanOrEqual(57)
       else expect(q.midi).toBeLessThanOrEqual(64)
+    }
+  })
+})
+
+describe('makeReadMelodyQuestion', () => {
+  const nameOf = (midi: number) => Note.pitchClass(Note.fromMidi(midi)).replace('#', '♯').replace('b', '♭')
+
+  it('names match the rendered midis and live in the option pool', () => {
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of seeds) {
+        const q = makeReadMelodyQuestion(level, seededRng(seed))
+        const def = READ_MELODY_LEVELS[level - 1]
+        expect(q.midis).toHaveLength(def.count)
+        expect(q.names).toHaveLength(def.count)
+        q.midis.forEach((m, i) => {
+          expect(q.names[i]).toBe(nameOf(m))
+          expect(q.optionPool).toContain(q.names[i])
+        })
+        expect(new Set(q.optionPool).size).toBe(q.optionPool.length)
+        expect(def.clefs).toContain(q.clef)
+      }
+    }
+  })
+
+  it('respects the level range, clef side and accidental rule', () => {
+    for (const level of [1, 2, 3] as const) {
+      const def = READ_MELODY_LEVELS[level - 1]
+      for (const seed of seeds) {
+        const q = makeReadMelodyQuestion(level, seededRng(seed))
+        for (const m of q.midis) {
+          expect(m).toBeGreaterThanOrEqual(def.range[0])
+          expect(m).toBeLessThanOrEqual(def.range[1])
+          expect([0, 2, 4, 5, 7, 9, 11]).toContain(m % 12) // naturals only below level 4
+          if (q.clef === 'treble') expect(m).toBeGreaterThanOrEqual(57)
+          else expect(m).toBeLessThanOrEqual(64)
+        }
+      }
+    }
+  })
+
+  it('level 1 is treble-only with the seven natural letters', () => {
+    for (const seed of seeds) {
+      const q = makeReadMelodyQuestion(1, seededRng(seed))
+      expect(q.clef).toBe('treble')
+      expect(q.optionPool).toEqual(['C', 'D', 'E', 'F', 'G', 'A', 'B'])
+    }
+  })
+
+  it('is deterministic under a fixed seed and carries a teaching explanation', () => {
+    for (const seed of seeds) {
+      const a = makeReadMelodyQuestion(3, seededRng(seed))
+      const b = makeReadMelodyQuestion(3, seededRng(seed))
+      expect(a.midis).toEqual(b.midis)
+      expect(a.explanation.length).toBeGreaterThan(20)
     }
   })
 })
@@ -353,6 +409,8 @@ describe('question explanations', () => {
 describe('quiz mode registry', () => {
   it('level counts match the generator level tables', () => {
     expect(QUIZ_LEVEL_COUNTS['note-naming']).toBe(NOTE_NAMING_LEVELS.length)
+    expect(QUIZ_LEVEL_COUNTS['read-melody']).toBe(READ_MELODY_LEVELS.length)
+    expect(QUIZ_LEVEL_COUNTS['sight-read']).toBe(4)
     expect(QUIZ_LEVEL_COUNTS['key-signature']).toBe(KEY_SIGNATURE_LEVELS.length)
     expect(QUIZ_LEVEL_COUNTS['circle-of-fifths']).toBe(CIRCLE_LEVEL_COUNT)
     expect(QUIZ_LEVEL_COUNTS['chord-spelling']).toBe(CHORD_SPELLING_LEVELS.length)
