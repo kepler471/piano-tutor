@@ -38,7 +38,7 @@
 
   const matcher = $derived.by(() => {
     void resetKey
-    return new StepMatcher(steps)
+    return new StepMatcher(steps, { lookahead: true })
   })
 
   $effect(() => {
@@ -61,7 +61,7 @@
     const map = new Map<number, HighlightState>()
     matcher.results.forEach((r, i) => {
       if (r === 'correct') map.set(i, 'correct')
-      else if (r === 'corrected') map.set(i, 'played')
+      else if (r === 'corrected' || r === 'skipped') map.set(i, 'played')
     })
     if (!matcher.done) map.set(matcher.cursor, 'next')
     return map

@@ -49,7 +49,7 @@
   // Recreated whenever the lesson, segment, or resetKey changes.
   const matcher = $derived.by(() => {
     void resetKey
-    return new StepMatcher(lesson.segments[segIndex].steps)
+    return new StepMatcher(lesson.segments[segIndex].steps, { lookahead: true })
   })
 
   // Wall-clock times of each step advance — graded against the beat grid
@@ -116,7 +116,7 @@
     const map = new Map<number, HighlightState>()
     matcher.results.forEach((r, i) => {
       if (r === 'correct') map.set(i, 'correct')
-      else if (r === 'corrected') map.set(i, 'played')
+      else if (r === 'corrected' || r === 'skipped') map.set(i, 'played')
     })
     if (!matcher.done) map.set(matcher.cursor, 'next')
     return map
@@ -160,6 +160,8 @@
     if (done && !loggedDone) {
       loggedDone = true
       // Rhythm read-through grade, relative to the player's own first note.
+      // A lookahead-skipped step advances the cursor twice on one onset, so
+      // the length check fails and the run simply isn't timing-graded.
       const steps = segment.steps
       if (metronomeOn && steps.length > 1 && steps.every((s) => s.startBeat !== undefined) && advanceTimes.length === steps.length) {
         const beatMs = 60000 / bpm

@@ -7,6 +7,9 @@ export interface MonoTrackerOptions {
   minClarity?: number
   minRms?: number
   confirmFrames?: number
+  fastConfirmFrames?: number
+  confirmGraceFrames?: number
+  octaveMemorySec?: number
   releaseFrames?: number
   noiseFloorK?: number
 }
@@ -26,22 +29,35 @@ const MIDI_MAX = 108
 /**
  * Monophonic note tracker: feed it fixed-size audio frames, it emits note
  * on/off events. Pure logic — the same code path runs on live mic frames and
- * on synthesized audio in tests. A note is accepted only after `confirmFrames`
+ * on synthesized audio in tests. A note is accepted only after several
  * consecutive detections of the same MIDI number with sufficient clarity,
- * which suppresses octave flicker from piano harmonics.
+ * which suppresses octave flicker from piano harmonics. The confirmation is
+ * two-tier: candidates at harmonically suspect intervals from the note that
+ * is (or just was) sounding — octave/fifth-related or a large leap (see
+ * `requiredConfirms`) — need the full `confirmFrames`, anything else — e.g.
+ * the next scale step — confirms after `fastConfirmFrames`. One
+ * low-clarity frame mid-confirmation (`confirmGraceFrames`) holds the
+ * candidate instead of restarting the count, so a glitchy transition frame
+ * can't double the latency.
  */
 export class MonoTracker {
   private detector: PitchDetector<Float32Array<ArrayBuffer>>
   private minClarity: number
   private minRms: number
   private confirmFrames: number
+  private fastConfirmFrames: number
+  private confirmGraceFrames: number
+  private octaveMemorySec: number
   private releaseFrames: number
   private noiseFloorK: number
   private noiseFloor = new NoiseFloor()
 
   private candidateMidi: number | null = null
   private candidateCount = 0
+  private graceUsed = 0
   private missCount = 0
+  private lastOffMidi: number | null = null
+  private lastOffT = -Infinity
 
   readonly state: MonoState = { midi: null, freq: null, cents: 0, clarity: 0, rms: 0, noiseFloor: 0 }
 
@@ -50,6 +66,9 @@ export class MonoTracker {
     this.minClarity = opts.minClarity ?? 0.88
     this.minRms = opts.minRms ?? 0.004
     this.confirmFrames = opts.confirmFrames ?? 3
+    this.fastConfirmFrames = opts.fastConfirmFrames ?? 2
+    this.confirmGraceFrames = opts.confirmGraceFrames ?? 1
+    this.octaveMemorySec = opts.octaveMemorySec ?? 0.5
     this.releaseFrames = opts.releaseFrames ?? 6
     this.noiseFloorK = opts.noiseFloorK ?? 2.5
   }
@@ -62,12 +81,19 @@ export class MonoTracker {
   reset(t: number): NoteEvent[] {
     this.candidateMidi = null
     this.candidateCount = 0
+    this.graceUsed = 0
     this.missCount = 0
-    return this.endNote(t)
+    const events = this.endNote(t)
+    // A note that ended because playback muted the mic must not act as an
+    // octave reference when listening resumes.
+    this.lastOffMidi = null
+    return events
   }
 
   private endNote(t: number): NoteEvent[] {
     if (this.state.midi === null) return []
+    this.lastOffMidi = this.state.midi
+    this.lastOffT = t
     const ev: NoteEvent = {
       kind: 'off',
       midi: this.state.midi,
@@ -78,6 +104,27 @@ export class MonoTracker {
     this.state.midi = null
     this.state.freq = null
     return [ev]
+  }
+
+  /**
+   * MPM's failure modes relative to the note that is (or was just) sounding
+   * are harmonically related: octave multiples (±12/±24/±36…), twelfths and
+   * fifth-locks (±19, ±31, ±7 — period × or ÷ 3/2), and, when two notes ring
+   * together, far subharmonics of the mixture's common period. All of those
+   * are either octave/fifth-related mod 12 or big leaps, so they keep the
+   * full `confirmFrames`. Small non-harmonic intervals — scale steps, thirds,
+   * sixths, i.e. actual fast melodic playing — confirm after
+   * `fastConfirmFrames`. With no reference (cold start), keep full
+   * protection: the attack transient is exactly when the detector is least
+   * trustworthy.
+   */
+  private requiredConfirms(midi: number, t: number): number {
+    const ref =
+      this.state.midi ?? (t - this.lastOffT <= this.octaveMemorySec ? this.lastOffMidi : null)
+    if (ref === null) return this.confirmFrames
+    const d = Math.abs(midi - ref)
+    const suspect = d > 9 || d % 12 === 0 || d % 12 === 7
+    return suspect ? this.confirmFrames : this.fastConfirmFrames
   }
 
   process(frame: Float32Array<ArrayBuffer>, sampleRate: number, t: number): NoteEvent[] {
@@ -103,10 +150,18 @@ export class MonoTracker {
     const valid = clarity >= this.minClarity && rms >= effMinRms && midi >= MIDI_MIN && midi <= MIDI_MAX
 
     if (!valid) {
-      this.candidateMidi = null
-      this.candidateCount = 0
       this.missCount++
-      return this.missCount >= this.releaseFrames ? this.endNote(t) : []
+      const events = this.missCount >= this.releaseFrames ? this.endNote(t) : []
+      // Grace preserves the candidate only; the note-off release logic above
+      // is independent — grace is about confirmation continuity, not sustain.
+      if (this.candidateMidi !== null && this.graceUsed < this.confirmGraceFrames) {
+        this.graceUsed++ // hold the candidate; candidateCount does NOT advance
+      } else {
+        this.candidateMidi = null
+        this.candidateCount = 0
+        this.graceUsed = 0
+      }
+      return events
     }
 
     this.missCount = 0
@@ -117,10 +172,11 @@ export class MonoTracker {
     }
     if (midi === this.candidateMidi) {
       this.candidateCount++
-      if (this.candidateCount >= this.confirmFrames) {
+      if (this.candidateCount >= this.requiredConfirms(midi, t)) {
         const events = this.endNote(t)
         this.candidateMidi = null
         this.candidateCount = 0
+        this.graceUsed = 0
         this.state.midi = midi
         this.state.freq = freq
         this.state.cents = cents
@@ -128,8 +184,12 @@ export class MonoTracker {
         return events
       }
     } else {
+      // The grace budget is per candidate run — it is deliberately not
+      // replenished by valid frames, or alternating valid/invalid frames
+      // could confirm a note from 50% garbage.
       this.candidateMidi = midi
       this.candidateCount = 1
+      this.graceUsed = 0
     }
     return []
   }
