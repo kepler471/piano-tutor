@@ -3,8 +3,10 @@ import { allScales, getScale, MAJOR_ROOTS, MINOR_ROOTS } from '../lib/theory/sca
 import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor } from '../lib/theory/chords'
 
 describe('scales', () => {
-  it('builds the full library (36 classical + 20 jazz)', () => {
-    expect(allScales()).toHaveLength(56)
+  it('builds the full library (36 classical + 41 jazz/modal)', () => {
+    // 12 major + 12 natural minor + 12 harmonic minor
+    // + 6 blues + 5 dorian + 5 mixolydian + 5+5 pentatonics + 5+5+5 lydian/phrygian/locrian
+    expect(allScales()).toHaveLength(77)
   })
 
   it('C major has the right notes', () => {
@@ -45,6 +47,23 @@ describe('scales', () => {
     expect(getScale('G', 'dorian').keySignature).toBe('F')
     expect(getScale('G', 'mixolydian').keySignature).toBe('C')
     expect(getScale('D', 'mixolydian').keySignature).toBe('G')
+    expect(getScale('F', 'lydian').keySignature).toBe('C')
+    expect(getScale('Bb', 'lydian').keySignature).toBe('F')
+    expect(getScale('E', 'phrygian').keySignature).toBe('C')
+    expect(getScale('B', 'locrian').keySignature).toBe('C')
+  })
+
+  it('lydian, phrygian and locrian have the right character tones', () => {
+    // C lydian: raised 4 (F#); E phrygian and B locrian: all naturals
+    expect(getScale('C', 'lydian').notes).toEqual(['C', 'D', 'E', 'F#', 'G', 'A', 'B'])
+    expect(getScale('E', 'phrygian').notes).toEqual(['E', 'F', 'G', 'A', 'B', 'C', 'D'])
+    expect(getScale('B', 'locrian').notes).toEqual(['B', 'C', 'D', 'E', 'F', 'G', 'A'])
+  })
+
+  it('minor pentatonic is a five-note subset of the natural minor scale', () => {
+    const s = getScale('A', 'minor pentatonic')
+    expect(s.midi).toEqual([69, 72, 74, 76, 79, 81]) // A C D E G A
+    expect(s.keySignature).toBe('Am')
   })
 
   it('dorian and mixolydian have the right character tones', () => {

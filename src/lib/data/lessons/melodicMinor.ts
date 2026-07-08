@@ -63,6 +63,7 @@ export function melodicMinorLessons(): Lesson[] {
       'Up and down are different scales — say the changing notes out loud at first.',
       'The raised notes only exist on the way up; coming down, everything relaxes.',
       'Same fingering as the other minor forms — only the notes change.',
+      'Learn harmonic and melodic minor side by side — start in C or A, where the changed notes are easiest to see.',
     ],
     detectionMode: 'mono' as const,
     keySignature: `${root}m`,

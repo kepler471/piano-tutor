@@ -139,7 +139,7 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 ### Key signatures: your first sharps and flats
 
-A key signature at the start of each line tells you which notes are always sharp or flat. G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures physical: your fingers learn where the black keys live in each key. The sharps always arrive in the same fixed order (F, C, G, D, A, E, B), so a signature is really just a count — and the last sharp always sits one semitone below the key name. Flats mirror this (B, E, A, D, G, C, F), and the second-to-last flat names the key. Keys arranged by that count form the circle of fifths — worth a first look now, and studied properly in stage 4.
+A key signature at the start of each line tells you which notes are always sharp or flat. G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures physical: your fingers learn where the black keys live in each key. Learn them in this order: C first (all white keys), then one sharp at a time around the circle of fifths — G, D, A and E even share C major's finger numbers, so they come as a family. Flat keys and black-key scales can wait until a piece needs them. The sharps themselves always arrive in a fixed order (F, C, G, D, A, E, B), so a signature is really just a count: the last sharp sits one semitone below the key name, and for flats (the mirror order B, E, A, D, G, C, F) the second-to-last flat names the key.
 
 - Quiz: read the key signature — `#/quizzes?mode=key-signature&level=1&from=guide`
 - G major in the scale library — `#/scales?root=G&type=major&from=guide`
@@ -156,7 +156,7 @@ An interval is the distance between two notes, counted in letter names: C to E i
 
 ### A week at this stage (~30 min/day)
 
-- 8 min — scales C/G/D/F (one key per day, hands separate then together)
+- 8 min — scales C/G/D/F (one key per day, hands separate then together); once three or four are secure, start A natural minor alongside them — don't wait to finish all twelve majors
 - 4 min — arpeggios and the C cadence
 - 10 min — your current piece, in sections, slow then at tempo
 - 4 min — sight-reading level 2 (one new melody a day)
@@ -166,6 +166,7 @@ An interval is the distance between two notes, counted in letter names: C to E i
 
 - [Faber — Adult Piano Adventures Book 1](https://pianoadventures.com/products/adult-piano-adventures-all-in-one-course-book-1/) — The best-structured adult method book. Work through it alongside this app — it teaches reading and musicality the app can only drill.
 - [Bill Hilton (YouTube)](https://www.youtube.com/@BillHilton) — Calm, practical piano tutorials — excellent on technique, practice habits and beginner theory.
+- [pianofs — The Best Scales to Learn First on Piano](https://pianofs.com/the-best-scales-to-learn-first-on-piano-a-helpful-guide/) — The ordering this guide's scale path follows: which keys to learn first in each scale family, why, and how much drilling each family actually needs.
 - [ABRSM Piano syllabus](https://www.abrsm.org/en-gb/our-exams/piano-exams) — The graded exam repertoire lists this guide is aligned to — browse pieces at your stage even if you never sit an exam.
 - [ABRSM Grade 1 piano pieces (current list)](https://www.abrsm.org/en-gb/our-exams/piano-exams/piano-grade-1) — Browse real Grade 1 pieces to supplement the app — most are on IMSLP or in the exam book.
 - [r/pianolearning](https://www.reddit.com/r/pianolearning/) — Friendly community for feedback, practice questions and motivation.
@@ -182,11 +183,11 @@ An interval is the distance between two notes, counted in letter names: C to E i
 
 *≈ ABRSM Grade 2*
 
-Minor scales bring new colours; broken chords and two-octave scales stretch your technique; and the repertoire starts demanding real independence between the hands — a melody that sings over an accompaniment that stays out of its way.
+Minor scales bring new colours — natural minor first (it is just the key signature), then harmonic minor with its raised 7th; broken chords and two-octave scales stretch your technique; and the repertoire starts demanding real independence between the hands — a melody that sings over an accompaniment that stays out of its way.
 
 ### You're working towards
 
-- Play A, E and D harmonic minor scales, hands separately then together
+- Play A and C natural minor, then A, E and D harmonic minor scales, hands separately then together
 - Play broken chords through all inversions in the common keys
 - Play cadences in G and F as well as C
 - Play pieces where the hands do genuinely different things
@@ -198,6 +199,8 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Technique**
 
+- A natural minor scale — `#/practice?lesson=scale-A-natural-minor&from=guide`
+- C natural minor scale — the flattened notes are the black keys — `#/practice?lesson=scale-C-natural-minor&from=guide`
 - A harmonic minor scale — `#/practice?lesson=scale-A-harmonic-minor&from=guide`
 - E harmonic minor scale — `#/practice?lesson=scale-E-harmonic-minor&from=guide`
 - D harmonic minor scale — `#/practice?lesson=scale-D-harmonic-minor&from=guide`
@@ -234,10 +237,11 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 ### Relative minors: two keys, one signature
 
-Every key signature serves two keys: a major and its relative minor, three semitones below (C major / A minor share no sharps or flats). Minor pieces usually raise the 7th note as an accidental in the score — that raised note is why the harmonic minor scale sounds the way it does, and why you practice it.
+Every key signature serves two keys: a major and its relative minor, three semitones below (C major / A minor share no sharps or flats). That is also how to find any natural minor scale: play a major scale starting from its 6th note. Start with A minor (all white keys), then C minor — the three notes flattened from C major are all black keys, so they stand out under your fingers. Minor pieces usually raise the 7th note as an accidental in the score — that raised note is why the harmonic minor scale sounds the way it does, and why you practice it.
 
-- A harmonic minor in the scale library — `#/scales?root=A&type=harmonic%20minor&from=guide`
-- A natural minor for comparison — `#/scales?root=A&type=natural%20minor&from=guide`
+- A natural minor in the scale library — `#/scales?root=A&type=natural%20minor&from=guide`
+- C natural minor — spot the black keys — `#/scales?root=C&type=natural%20minor&from=guide`
+- A harmonic minor for comparison — `#/scales?root=A&type=harmonic%20minor&from=guide`
 
 ### Primary chords: I, IV and V
 
@@ -250,7 +254,7 @@ Almost every simple piece is built from three chords: the tonic (I), subdominant
 
 ### A week at this stage (~40 min/day)
 
-- 10 min — scales: rotate the harmonic minors and keep two majors warm
+- 10 min — scales: rotate the natural and harmonic minors and keep two majors warm
 - 5 min — broken chords and cadences (one key per day)
 - 15 min — repertoire: one classical piece and one blues/jazz piece in parallel
 - 5 min — sight-reading level 3
@@ -281,7 +285,7 @@ The technique net widens: more minor keys, two-octave playing as the norm, and r
 ### You're working towards
 
 - Play major scales with black-key tonics (B♭, E♭, A major) and more minors
-- Play the chromatic scale and your first contrary-motion scales
+- Play the chromatic scale (from a few different starting notes — the fingering transfers instantly) and your first contrary-motion scales
 - Play melodic minor — different notes up and down
 - Play arpeggios from black-key roots (B♭, E♭ major)
 - Keep a walking bass steady under right-hand chords
@@ -347,10 +351,17 @@ The circle of fifths orders all twelve keys by how many sharps or flats they car
 
 ### Three flavours of minor
 
-Minor is not one scale but a family. Natural minor is what the key signature gives you; harmonic minor raises the 7th so the dominant chord can pull home; melodic minor also raises the 6th on the way up so the line climbs smoothly, then relaxes back to natural on the way down. Composers mix all three freely inside a single minor-key piece — that is why minor pieces are speckled with accidentals.
+Minor is not one scale but a family. Natural minor is what the key signature gives you; harmonic minor raises the 7th so the dominant chord can pull home; melodic minor also raises the 6th on the way up so the line climbs smoothly, then relaxes back to natural on the way down. Composers mix all three freely inside a single minor-key piece — that is why minor pieces are speckled with accidentals. Learn harmonic and melodic minor side by side, starting in C or A where the altered notes are easiest to see.
 
 - A melodic minor — hear both directions — `#/practice?lesson=scale-A-melodic-minor&from=guide`
 - Compare in the scale library — `#/scales?root=A&type=harmonic%20minor&from=guide`
+
+### Pentatonic: five notes that always work
+
+Drop the 4th and 7th from a major scale and you get the major pentatonic; drop the 2nd and 6th from natural minor and you get the minor pentatonic. With no semitones left, nothing clashes — which is why these five-note scales power folk, pop, rock and blues. Begin with C and A in both versions, and practice them differently from your majors and minors: learn what the notes are and improvise with them rather than drilling up and down.
+
+- C major pentatonic in the scale library — `#/scales?root=C&type=major%20pentatonic&from=guide`
+- A minor pentatonic in the scale library — `#/scales?root=A&type=minor%20pentatonic&from=guide`
 
 ### A week at this stage (~45 min/day)
 
@@ -410,6 +421,7 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 - ii–V–I in C with guide tones — `#/practice?lesson=jazz-251-C&from=guide`
 - ii–V–I in F — `#/practice?lesson=jazz-251-F&from=guide`
 - C blues scale — `#/practice?lesson=jazz-blues-scale-C&from=guide`
+- A blues scale — `#/practice?lesson=jazz-blues-scale-A&from=guide`
 - 12-bar blues comping in C — `#/practice?lesson=jazz-blues-comp-C&from=guide`
 
 **Pieces**
@@ -448,10 +460,13 @@ Jazz harmony strings dominant motion together: the ii chord leads to V, V resolv
 
 ### Modes: old scales, new colours
 
-Play the white keys from D to D and you get Dorian — a minor scale with a bright 6th, the sound of Scarborough Fair and half of jazz. From G to G is Mixolydian: a major scale with a lowered 7th, the sound of the blues and rock. Modes are not new notes to learn, just familiar keys heard from a different home base — which is why training your ear to spot them matters more than memorizing them.
+Play the white keys from D to D and you get Dorian — a minor scale with a bright 6th, the sound of Scarborough Fair and half of jazz. From G to G is Mixolydian: a major scale with a lowered 7th, the sound of the blues and rock. Learn those two first — they are everywhere in blues, rock, jazz and funk. And you already know more modes than you think: Ionian is just the major scale and Aeolian the natural minor, so Lydian (raised 4th), Phrygian (lowered 2nd) and Locrian (lowered 2nd and 5th) complete the set of seven. Modes are not new notes to learn, just familiar keys heard from a different home base — do not drill them for speed; understand them, find them on the keyboard, and adjust the order you learn any scale to the music you are actually playing.
 
 - D Dorian in the scale library — `#/scales?root=D&type=dorian&from=guide`
 - G Mixolydian in the scale library — `#/scales?root=G&type=mixolydian&from=guide`
+- F Lydian — all white keys from F — `#/scales?root=F&type=lydian&from=guide`
+- E Phrygian — all white keys from E — `#/scales?root=E&type=phrygian&from=guide`
+- B Locrian — all white keys from B — `#/scales?root=B&type=locrian&from=guide`
 - Quiz: name the scale type by ear — `#/quizzes?mode=scale-type&level=4&from=guide`
 
 ### Where to go from here
@@ -470,6 +485,7 @@ Beyond this stage the priorities shift to tone, pedalling, dynamics and interpre
 
 - [Consider a human teacher](https://www.abrsm.org/en-gb/find-a-music-teacher) — From this stage on, occasional lessons (even monthly) catch technique problems an app cannot hear — posture, tension, tone. Worth it if you can.
 - [Josh Wright (YouTube)](https://www.youtube.com/@joshwrightpiano) — Concert pianist; deep dives on technique problems once you have the basics.
+- [pianofs — The Best Scales to Learn First on Piano](https://pianofs.com/the-best-scales-to-learn-first-on-piano-a-helpful-guide/) — The ordering this guide's scale path follows: which keys to learn first in each scale family, why, and how much drilling each family actually needs.
 - [ABRSM Piano syllabus](https://www.abrsm.org/en-gb/our-exams/piano-exams) — The graded exam repertoire lists this guide is aligned to — browse pieces at your stage even if you never sit an exam.
 - [RCM Piano syllabus](https://www.rcmusic.com/en/learning/academic-programs/certificate-program/piano) — The North American equivalent of ABRSM; its repertoire lists are a goldmine of level-appropriate pieces.
 - [IMSLP (Petrucci Music Library)](https://imslp.org) — Free public-domain sheet music — every classical piece in this app and thousands more.

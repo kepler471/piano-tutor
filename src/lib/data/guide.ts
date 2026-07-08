@@ -172,6 +172,11 @@ const R_PIANOLEARNING: ExternalResource = {
   url: 'https://www.reddit.com/r/pianolearning/',
   note: 'Friendly community for feedback, practice questions and motivation.',
 }
+const PIANOFS_SCALE_ORDER: ExternalResource = {
+  title: 'pianofs — The Best Scales to Learn First on Piano',
+  url: 'https://pianofs.com/the-best-scales-to-learn-first-on-piano-a-helpful-guide/',
+  note: 'The ordering this guide\'s scale path follows: which keys to learn first in each scale family, why, and how much drilling each family actually needs.',
+}
 const GET_A_TEACHER: ExternalResource = {
   title: 'Consider a human teacher',
   url: 'https://www.abrsm.org/en-gb/find-a-music-teacher',
@@ -307,11 +312,13 @@ export const GUIDE_STAGES: GuideStage[] = [
           'A key signature at the start of each line tells you which notes are always sharp or flat. ' +
           'G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than ' +
           'reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures ' +
-          'physical: your fingers learn where the black keys live in each key. The sharps always arrive ' +
-          'in the same fixed order (F, C, G, D, A, E, B), so a signature is really just a count — and the ' +
-          'last sharp always sits one semitone below the key name. Flats mirror this (B, E, A, D, G, C, F), ' +
-          'and the second-to-last flat names the key. Keys arranged by that count form the circle of ' +
-          'fifths — worth a first look now, and studied properly in stage 4.',
+          'physical: your fingers learn where the black keys live in each key. Learn them in this ' +
+          'order: C first (all white keys), then one sharp at a time around the circle of fifths — ' +
+          'G, D, A and E even share C major\'s finger numbers, so they come as a family. Flat keys ' +
+          'and black-key scales can wait until a piece needs them. The sharps themselves always ' +
+          'arrive in a fixed order (F, C, G, D, A, E, B), so a signature is really just a count: the ' +
+          'last sharp sits one semitone below the key name, and for flats (the mirror order B, E, A, ' +
+          'D, G, C, F) the second-to-last flat names the key.',
         links: [
           quiz('key-signature', 1, 'Quiz: read the key signature'),
           { kind: 'scale', root: 'G', type: 'major', label: 'G major in the scale library' },
@@ -336,7 +343,7 @@ export const GUIDE_STAGES: GuideStage[] = [
     weeklyPlan: {
       totalMinutes: 30,
       items: [
-        '8 min — scales C/G/D/F (one key per day, hands separate then together)',
+        '8 min — scales C/G/D/F (one key per day, hands separate then together); once three or four are secure, start A natural minor alongside them — don\'t wait to finish all twelve majors',
         '4 min — arpeggios and the C cadence',
         '10 min — your current piece, in sections, slow then at tempo',
         '4 min — sight-reading level 2 (one new melody a day)',
@@ -346,6 +353,7 @@ export const GUIDE_STAGES: GuideStage[] = [
     resources: [
       FABER_1,
       BILL_HILTON,
+      PIANOFS_SCALE_ORDER,
       ABRSM_SYLLABUS,
       {
         title: 'ABRSM Grade 1 piano pieces (current list)',
@@ -365,17 +373,20 @@ export const GUIDE_STAGES: GuideStage[] = [
     title: 'Stage 3 — Minor keys and independence',
     gradeEquivalent: '≈ ABRSM Grade 2',
     overview:
-      'Minor scales bring new colours; broken chords and two-octave scales stretch your technique; and ' +
-      'the repertoire starts demanding real independence between the hands — a melody that sings over ' +
-      'an accompaniment that stays out of its way.',
+      'Minor scales bring new colours — natural minor first (it is just the key signature), then ' +
+      'harmonic minor with its raised 7th; broken chords and two-octave scales stretch your technique; ' +
+      'and the repertoire starts demanding real independence between the hands — a melody that sings ' +
+      'over an accompaniment that stays out of its way.',
     goals: [
-      'Play A, E and D harmonic minor scales, hands separately then together',
+      'Play A and C natural minor, then A, E and D harmonic minor scales, hands separately then together',
       'Play broken chords through all inversions in the common keys',
       'Play cadences in G and F as well as C',
       'Play pieces where the hands do genuinely different things',
       'Recognize major, minor, diminished and augmented chords by ear',
     ],
     technique: [
+      lesson('scale-A-natural-minor', 'A natural minor scale'),
+      lesson('scale-C-natural-minor', 'C natural minor scale — the flattened notes are the black keys'),
       lesson('scale-A-harmonic-minor', 'A harmonic minor scale'),
       lesson('scale-E-harmonic-minor', 'E harmonic minor scale'),
       lesson('scale-D-harmonic-minor', 'D harmonic minor scale'),
@@ -409,12 +420,16 @@ export const GUIDE_STAGES: GuideStage[] = [
         title: 'Relative minors: two keys, one signature',
         body:
           'Every key signature serves two keys: a major and its relative minor, three semitones below ' +
-          '(C major / A minor share no sharps or flats). Minor pieces usually raise the 7th note as an ' +
-          'accidental in the score — that raised note is why the harmonic minor scale sounds the way it ' +
-          'does, and why you practice it.',
+          '(C major / A minor share no sharps or flats). That is also how to find any natural minor ' +
+          'scale: play a major scale starting from its 6th note. Start with A minor (all white keys), ' +
+          'then C minor — the three notes flattened from C major are all black keys, so they stand ' +
+          'out under your fingers. Minor pieces usually raise the 7th note as an accidental in the ' +
+          'score — that raised note is why the harmonic minor scale sounds the way it does, and why ' +
+          'you practice it.',
         links: [
-          { kind: 'scale', root: 'A', type: 'harmonic minor', label: 'A harmonic minor in the scale library' },
-          { kind: 'scale', root: 'A', type: 'natural minor', label: 'A natural minor for comparison' },
+          { kind: 'scale', root: 'A', type: 'natural minor', label: 'A natural minor in the scale library' },
+          { kind: 'scale', root: 'C', type: 'natural minor', label: 'C natural minor — spot the black keys' },
+          { kind: 'scale', root: 'A', type: 'harmonic minor', label: 'A harmonic minor for comparison' },
         ],
       },
       {
@@ -435,7 +450,7 @@ export const GUIDE_STAGES: GuideStage[] = [
     weeklyPlan: {
       totalMinutes: 40,
       items: [
-        '10 min — scales: rotate the harmonic minors and keep two majors warm',
+        '10 min — scales: rotate the natural and harmonic minors and keep two majors warm',
         '5 min — broken chords and cadences (one key per day)',
         '15 min — repertoire: one classical piece and one blues/jazz piece in parallel',
         '5 min — sight-reading level 3',
@@ -465,7 +480,7 @@ export const GUIDE_STAGES: GuideStage[] = [
       'where daily technique practice starts to pay off audibly in the pieces.',
     goals: [
       'Play major scales with black-key tonics (B♭, E♭, A major) and more minors',
-      'Play the chromatic scale and your first contrary-motion scales',
+      'Play the chromatic scale (from a few different starting notes — the fingering transfers instantly) and your first contrary-motion scales',
       'Play melodic minor — different notes up and down',
       'Play arpeggios from black-key roots (B♭, E♭ major)',
       'Keep a walking bass steady under right-hand chords',
@@ -537,10 +552,24 @@ export const GUIDE_STAGES: GuideStage[] = [
           'you; harmonic minor raises the 7th so the dominant chord can pull home; melodic minor ' +
           'also raises the 6th on the way up so the line climbs smoothly, then relaxes back to ' +
           'natural on the way down. Composers mix all three freely inside a single minor-key ' +
-          'piece — that is why minor pieces are speckled with accidentals.',
+          'piece — that is why minor pieces are speckled with accidentals. Learn harmonic and ' +
+          'melodic minor side by side, starting in C or A where the altered notes are easiest to see.',
         links: [
           lesson('scale-A-melodic-minor', 'A melodic minor — hear both directions'),
           { kind: 'scale', root: 'A', type: 'harmonic minor', label: 'Compare in the scale library' },
+        ],
+      },
+      {
+        title: 'Pentatonic: five notes that always work',
+        body:
+          'Drop the 4th and 7th from a major scale and you get the major pentatonic; drop the 2nd ' +
+          'and 6th from natural minor and you get the minor pentatonic. With no semitones left, ' +
+          'nothing clashes — which is why these five-note scales power folk, pop, rock and blues. ' +
+          'Begin with C and A in both versions, and practice them differently from your majors and ' +
+          'minors: learn what the notes are and improvise with them rather than drilling up and down.',
+        links: [
+          { kind: 'scale', root: 'C', type: 'major pentatonic', label: 'C major pentatonic in the scale library' },
+          { kind: 'scale', root: 'A', type: 'minor pentatonic', label: 'A minor pentatonic in the scale library' },
         ],
       },
     ],
@@ -602,6 +631,7 @@ export const GUIDE_STAGES: GuideStage[] = [
       lesson('jazz-251-C', 'ii–V–I in C with guide tones'),
       lesson('jazz-251-F', 'ii–V–I in F'),
       lesson('jazz-blues-scale-C', 'C blues scale'),
+      lesson('jazz-blues-scale-A', 'A blues scale'),
       lesson('jazz-blues-comp-C', '12-bar blues comping in C'),
     ],
     repertoire: [
@@ -643,12 +673,19 @@ export const GUIDE_STAGES: GuideStage[] = [
         body:
           'Play the white keys from D to D and you get Dorian — a minor scale with a bright 6th, ' +
           'the sound of Scarborough Fair and half of jazz. From G to G is Mixolydian: a major ' +
-          'scale with a lowered 7th, the sound of the blues and rock. Modes are not new notes to ' +
-          'learn, just familiar keys heard from a different home base — which is why training ' +
-          'your ear to spot them matters more than memorizing them.',
+          'scale with a lowered 7th, the sound of the blues and rock. Learn those two first — they ' +
+          'are everywhere in blues, rock, jazz and funk. And you already know more modes than you ' +
+          'think: Ionian is just the major scale and Aeolian the natural minor, so Lydian (raised ' +
+          '4th), Phrygian (lowered 2nd) and Locrian (lowered 2nd and 5th) complete the set of seven. ' +
+          'Modes are not new notes to learn, just familiar keys heard from a different home base — ' +
+          'do not drill them for speed; understand them, find them on the keyboard, and adjust the ' +
+          'order you learn any scale to the music you are actually playing.',
         links: [
           { kind: 'scale', root: 'D', type: 'dorian', label: 'D Dorian in the scale library' },
           { kind: 'scale', root: 'G', type: 'mixolydian', label: 'G Mixolydian in the scale library' },
+          { kind: 'scale', root: 'F', type: 'lydian', label: 'F Lydian — all white keys from F' },
+          { kind: 'scale', root: 'E', type: 'phrygian', label: 'E Phrygian — all white keys from E' },
+          { kind: 'scale', root: 'B', type: 'locrian', label: 'B Locrian — all white keys from B' },
           quiz('scale-type', 4, 'Quiz: name the scale type by ear'),
         ],
       },
@@ -675,6 +712,7 @@ export const GUIDE_STAGES: GuideStage[] = [
     resources: [
       GET_A_TEACHER,
       JOSH_WRIGHT,
+      PIANOFS_SCALE_ORDER,
       ABRSM_SYLLABUS,
       RCM_SYLLABUS,
       IMSLP,

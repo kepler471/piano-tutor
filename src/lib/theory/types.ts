@@ -9,6 +9,10 @@ export type ScaleTypeId =
   | 'dorian'
   | 'mixolydian'
   | 'major pentatonic'
+  | 'minor pentatonic'
+  | 'lydian'
+  | 'phrygian'
+  | 'locrian'
 
 export interface ScaleInfo {
   /** e.g. 'C major', 'F# natural minor' — also the key into scaleFingerings */

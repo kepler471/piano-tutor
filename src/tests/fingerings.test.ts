@@ -73,9 +73,9 @@ describe('two-octave fingering expansion', () => {
 })
 
 describe('technique lesson generators', () => {
-  it('scale routine covers 12 majors and 12 harmonic minors with 6 segments each', () => {
+  it('scale routine covers 12 majors, 12 natural minors and 12 harmonic minors with 6 segments each', () => {
     const lessons = scaleRoutineLessons()
-    expect(lessons).toHaveLength(24)
+    expect(lessons).toHaveLength(36)
     for (const l of lessons) {
       expect(l.segments).toHaveLength(6)
       const together = l.segments.filter((s) => s.hand === 'both')

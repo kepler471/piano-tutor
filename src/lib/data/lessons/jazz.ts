@@ -12,7 +12,7 @@ import type { Lesson, LessonSegment, LessonStep } from './types'
 
 const II_V_I_KEYS = ['C', 'F', 'Bb', 'G', 'Eb']
 const BLUES_COMP_KEYS = ['C', 'F', 'Bb']
-const BLUES_SCALE_KEYS = ['C', 'F', 'G']
+const BLUES_SCALE_KEYS = ['C', 'A', 'F', 'G']
 
 const METHOD = 'Jazz & blues'
 
@@ -111,9 +111,10 @@ function bluesScaleLessons(): Lesson[] {
       method: METHOD,
       description: `The ${root} blues scale up and down — six notes with the "blue" flat 3rd, flat 5th and flat 7th that give blues and jazz their colour.`,
       tips: [
+        'This is the minor pentatonic plus one "blue" note — the b5.',
         'Lean into the b5 — it wants to resolve, that tension is the sound.',
         'Try it swung once it is even: long-short, long-short.',
-        'Improvise! Any of these notes works over a blues in this key.',
+        'Don\'t just run it up and down — the point is knowing what the notes are and making phrases from them.',
       ],
       detectionMode: 'mono',
       keySignature: scale.keySignature,

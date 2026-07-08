@@ -7,6 +7,7 @@
   import { playNote, playSequence } from '../lib/audio/playback'
   import { lookupTerm } from '../lib/data/glossary'
   import { scaleFingerings } from '../lib/data/scaleFingerings'
+  import { SCALE_GUIDANCE } from '../lib/data/scaleGuidance'
   import { scoreFromScale } from '../lib/notation/vexScore'
   import { SCALE_TYPES, getScale } from '../lib/theory/scales'
   import type { Finger, Hand, ScaleTypeId } from '../lib/theory/types'
@@ -126,6 +127,8 @@
     {#if lookupTerm(typeId)}
       <p class="hint">{lookupTerm(typeId)!.short}</p>
     {/if}
+    <p class="hint"><GlossText text={SCALE_GUIDANCE[typeId].order} /></p>
+    <p class="hint"><GlossText text={SCALE_GUIDANCE[typeId].practice} /></p>
     <p class="hint">
       Notes: {scale.notes.join(' – ')} · Fingering shown {hand === 'R' ? 'above' : 'below'} the staff
       ({hand === 'R' ? 'right' : 'left'} hand, one octave up and down)
