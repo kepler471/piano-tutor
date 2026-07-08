@@ -18,10 +18,12 @@
     song,
     range,
     stepHighlights,
+    showFingering,
   }: {
     song: Song
     range: SongStepOptions
     stepHighlights?: Map<number, HighlightState>
+    showFingering?: boolean
   } = $props()
 
   let container: HTMLDivElement | undefined = $state()
@@ -33,7 +35,7 @@
   const systems = $derived.by(() => {
     // Per-measure event density, then the most measures per line whose
     // densest line still fits the container at natural spacing.
-    const counts = songSystems(song, { ...range, measuresPerSystem: 1 }).map((s) =>
+    const counts = songSystems(song, { ...range, measuresPerSystem: 1, showFingering }).map((s) =>
       Math.max(s.model.treble.length, s.model.bass.length),
     )
     let per = 1
@@ -48,7 +50,7 @@
         break
       }
     }
-    return songSystems(song, { ...range, measuresPerSystem: per })
+    return songSystems(song, { ...range, measuresPerSystem: per, showFingering })
   })
 
   $effect(() => {
