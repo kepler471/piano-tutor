@@ -1,5 +1,10 @@
 import type { Finger, Hand } from '../../theory/types'
 import { IMPORTED_SONGS } from './catalogImported'
+import { IMPORTED_SONGS_2A } from './catalogImported2'
+import { IMPORTED_SONGS_2B } from './catalogImported3'
+import { IMPORTED_SONGS_2C } from './catalogImported4'
+import { FOLK_SONGS } from './catalogFolk'
+import { GNOSSIENNES } from './catalogGnossiennes'
 import type { Song, SongMeasure, SongNote } from './types'
 
 /**
@@ -724,4 +729,9 @@ export const SONG_CATALOG: Song[] = [
   mozartK545,
   entertainerStride,
   ...IMPORTED_SONGS,
+  ...IMPORTED_SONGS_2A,
+  ...IMPORTED_SONGS_2B,
+  ...IMPORTED_SONGS_2C,
+  ...FOLK_SONGS,
+  ...GNOSSIENNES,
 ].sort((a, b) => a.grade - b.grade)
