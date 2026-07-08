@@ -32,6 +32,11 @@
       desc: 'Triads and 7th chords in every key and inversion, with notation and fingering.',
     },
     {
+      route: '/circle',
+      title: 'Circle of Fifths',
+      desc: 'The map of the twelve keys — key signatures, relative minors and why music modulates where it does, on an interactive wheel.',
+    },
+    {
       route: '/practice',
       title: 'Practice',
       desc: 'Guided beginner routines — five-finger positions, Hanon, scales, cadences and sight-reading — with live feedback from your piano.',

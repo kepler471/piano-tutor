@@ -1,5 +1,6 @@
 import { Note } from 'tonal'
 import { getChord } from './chords'
+import { CIRCLE_KEYS, RELATIVE_MINOR, SHARP_ORDER, fifthDown, fifthUp, neighborsOf, sigAccidentals } from './circle'
 import {
   CHORD_QUALITY_EXPLANATIONS,
   INTERVAL_EXPLANATIONS,
@@ -100,19 +101,7 @@ export interface KeySignatureQuestion {
   explanation: string
 }
 
-const SHARP_ORDER = ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯', 'B♯']
-const FLAT_ORDER = ['B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭', 'F♭']
-const SHARP_COUNTS: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6 }
-const FLAT_COUNTS: Record<string, number> = { F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5 }
-
-/** The accidentals a major key's signature carries, in signature order. */
-export function sigAccidentals(major: string): { kind: 'sharps' | 'flats' | 'none'; names: string[] } {
-  const sharps = SHARP_COUNTS[major]
-  if (sharps !== undefined) {
-    return sharps === 0 ? { kind: 'none', names: [] } : { kind: 'sharps', names: SHARP_ORDER.slice(0, sharps) }
-  }
-  return { kind: 'flats', names: FLAT_ORDER.slice(0, FLAT_COUNTS[major]) }
-}
+export { sigAccidentals } from './circle'
 
 /** Majors ordered by accidental count; minors mirror them at level 4. */
 export const KEY_SIGNATURE_LEVELS: string[][] = [
@@ -121,11 +110,6 @@ export const KEY_SIGNATURE_LEVELS: string[][] = [
   ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 'Db'],
   ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 'Db'], // asked as minors
 ]
-
-const RELATIVE_MINOR: Record<string, string> = {
-  C: 'A', G: 'E', D: 'B', A: 'F#', E: 'C#', B: 'G#', 'F#': 'D#',
-  F: 'D', Bb: 'G', Eb: 'C', Ab: 'F', Db: 'Bb',
-}
 
 export function makeKeySignatureQuestion(level: number, rng: Rng = Math.random): KeySignatureQuestion {
   const lv = clampLevel(level, KEY_SIGNATURE_LEVELS.length)
@@ -161,6 +145,153 @@ export function makeKeySignatureQuestion(level: number, rng: Rng = Math.random):
     answer,
     options: makeOptions(set.map(label), answer, 4, rng),
     explanation,
+  }
+}
+
+// --- the circle of fifths ---
+
+export interface CircleQuestion {
+  kind: 'circle-of-fifths'
+  prompt: string
+  /** Set when the staff should render the signature under discussion (relative-minor level). */
+  keySignature?: string
+  answer: string
+  options: string[]
+  explanation: string
+}
+
+const uni = (name: string) => name.replace('#', '♯').replace('b', '♭')
+const majorLabel = (root: string) => `${uni(root)} major`
+
+/** Prompt keys for the neighbours level — nothing past three accidentals. */
+const EASY_CIRCLE_KEYS = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb']
+
+export const CIRCLE_LEVEL_COUNT = 4
+
+export function makeCircleQuestion(level: number, rng: Rng = Math.random): CircleQuestion {
+  const lv = clampLevel(level, CIRCLE_LEVEL_COUNT)
+  const allMajors = CIRCLE_KEYS.map((k) => majorLabel(k.major))
+
+  if (lv === 1) {
+    // Neighbours: one step clockwise or anticlockwise.
+    const key = pick(EASY_CIRCLE_KEYS, rng)
+    const up = rng() < 0.5
+    const target = up ? fifthUp(key) : fifthDown(key)
+    const answer = majorLabel(target)
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `On the circle of fifths, which key is a fifth ${up ? 'up' : 'down'} from ${majorLabel(key)}?`,
+      answer,
+      options: makeOptions(allMajors, answer, 4, rng),
+      explanation:
+        `A fifth ${up ? 'up' : 'down'} from ${uni(key)} is ${uni(target)} — one step ${up ? 'clockwise, adding one sharp (or dropping one flat)' : 'anticlockwise, adding one flat (or dropping one sharp)'}. ` +
+        'Neighbouring keys share six of their seven notes.',
+    }
+  }
+
+  if (lv === 2) {
+    // Accidental counts, asked in both directions.
+    const k = pick(CIRCLE_KEYS.filter((c) => c.accidentals.kind !== 'none'), rng)
+    const acc = k.accidentals
+    const word = acc.kind === 'sharps' ? 'sharp' : 'flat'
+    const n = acc.names.length
+    const explanation =
+      `${majorLabel(k.major)} has ${n} ${word}${n === 1 ? '' : 's'}: ${acc.names.join(', ')}. ` +
+      (acc.kind === 'sharps'
+        ? 'Sharps always arrive in the fixed order F–C–G–D–A–E–B, and the last sharp sits one semitone below the key name.'
+        : 'Flats arrive in the mirror order B–E–A–D–G–C–F, and the second-to-last flat names the key.')
+    if (rng() < 0.5) {
+      const answer = String(n)
+      return {
+        kind: 'circle-of-fifths',
+        prompt: `How many ${word}s does ${majorLabel(k.major)} have?`,
+        answer,
+        options: makeOptions(['1', '2', '3', '4', '5', '6'], answer, 4, rng),
+        explanation,
+      }
+    }
+    const answer = majorLabel(k.major)
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `Which major key has ${n} ${word}${n === 1 ? '' : 's'}?`,
+      answer,
+      options: makeOptions(allMajors, answer, 4, rng),
+      explanation,
+    }
+  }
+
+  if (lv === 3) {
+    // Relative minors (the inner ring), with the signature on the staff.
+    const k = pick(CIRCLE_KEYS, rng)
+    const toMinor = rng() < 0.5
+    const minorName = `${uni(k.minor)} minor`
+    const explanation =
+      `${minorName} is the relative minor of ${majorLabel(k.major)} — the same key signature, with its tonic three semitones below. ` +
+      'On the circle it sits directly inside its major, on the inner ring.'
+    if (toMinor) {
+      return {
+        kind: 'circle-of-fifths',
+        prompt: `Which minor key shares this key signature with ${majorLabel(k.major)}?`,
+        keySignature: k.major,
+        answer: minorName,
+        options: makeOptions(CIRCLE_KEYS.map((c) => `${uni(c.minor)} minor`), minorName, 4, rng),
+        explanation,
+      }
+    }
+    const answer = majorLabel(k.major)
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `${minorName} is the relative minor of which major key?`,
+      keySignature: k.major,
+      answer,
+      options: makeOptions(allMajors, answer, 4, rng),
+      explanation,
+    }
+  }
+
+  // Level 4 — circle geometry: neighbour pairs, the enharmonic seam, the added sharp.
+  const variant = pick(['neighbours', 'seam', 'added-sharp'] as const, rng)
+  if (variant === 'neighbours') {
+    const k = pick(CIRCLE_KEYS, rng)
+    const [down, up] = neighborsOf(k.major)
+    const pairLabel = (a: string, b: string) => `${uni(a)} and ${uni(b)}`
+    const answer = pairLabel(down, up)
+    const pool = CIRCLE_KEYS.map((c) => pairLabel(...neighborsOf(c.major)))
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `Which two keys sit either side of ${majorLabel(k.major)} on the circle?`,
+      answer,
+      options: makeOptions(pool, answer, 4, rng),
+      explanation:
+        `${uni(down)} and ${uni(up)} are ${uni(k.major)}'s neighbours — each shares six of its seven notes. ` +
+        'That overlap is why music most often modulates one step around the circle.',
+    }
+  }
+  if (variant === 'seam') {
+    const answer = 'G♭ major'
+    return {
+      kind: 'circle-of-fifths',
+      prompt: 'At six o\'clock the sharp and flat sides of the circle meet. F♯ major is the same key as…?',
+      answer,
+      options: makeOptions(['G♭ major', 'E♯ major', 'G major', 'F major', 'D♭ major'], answer, 4, rng),
+      explanation:
+        'F♯ major (six sharps) and G♭ major (six flats) are enharmonic — the same piano keys spelled two ways. ' +
+        'Composers pick whichever spelling is easier to read.',
+    }
+  }
+  // added-sharp: set difference between adjacent signatures on the sharp side.
+  const k = pick(CIRCLE_KEYS.filter((c) => c.index < 6), rng)
+  const next = fifthUp(k.major)
+  const here = new Set(sigAccidentals(k.major).names)
+  const answer = sigAccidentals(next).names.find((n) => !here.has(n))!
+  return {
+    kind: 'circle-of-fifths',
+    prompt: `Going clockwise from ${majorLabel(k.major)} to ${majorLabel(next)}, which sharp is added?`,
+    answer,
+    options: makeOptions(SHARP_ORDER, answer, 4, rng),
+    explanation:
+      `Each clockwise step keeps every accidental and adds the next sharp in the fixed order F–C–G–D–A–E–B. ` +
+      `${majorLabel(next)} takes everything from ${majorLabel(k.major)} and adds ${answer}.`,
   }
 }
 

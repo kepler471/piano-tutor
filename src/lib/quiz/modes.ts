@@ -13,6 +13,7 @@ export type QuizModeId =
   // reading & theory
   | 'note-naming'
   | 'key-signature'
+  | 'circle-of-fifths'
   | 'interval-staff'
   | 'chord-spelling'
   | 'chord-function'
@@ -27,6 +28,7 @@ export const QUIZ_LEVEL_COUNTS: Record<QuizModeId, number> = {
   'rhythm-dictation': 4,
   'note-naming': 4,
   'key-signature': 4,
+  'circle-of-fifths': 4,
   'interval-staff': 4,
   'chord-spelling': 3,
   'chord-function': 3,

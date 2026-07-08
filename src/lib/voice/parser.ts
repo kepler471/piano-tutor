@@ -190,6 +190,9 @@ const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] = [
   ['learning guide', { kind: 'navigate', route: '/guide' }],
   ['scales', { kind: 'navigate', route: '/scales' }],
   ['chords', { kind: 'navigate', route: '/chords' }],
+  ['circle of fifths', { kind: 'navigate', route: '/circle' }],
+  ['circle', { kind: 'navigate', route: '/circle' }],
+  ['fifths', { kind: 'navigate', route: '/circle' }],
   ['practice', { kind: 'navigate', route: '/practice' }],
   ['ear training', { kind: 'navigate', route: '/ear' }],
   ['quizzes', { kind: 'navigate', route: '/quizzes' }],
@@ -401,7 +404,7 @@ export function buildGrammar(lessons: { title: string; method: string }[]): stri
   const staticWords = `
     hey okay ok
     go to open show me the a an of screen page
-    home scales chords practice free play tuner note detector
+    home scales chords circle fifths practice free play tuner note detector
     guide learning stage stages ear training rhythm songs quizzes
     start stop turn off on cancel quiet be help what can i say you do commands
     metronome tempo speed at set slower faster slow down up

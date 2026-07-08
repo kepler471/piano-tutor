@@ -312,6 +312,20 @@ const ENTRIES: GlossaryEntry[] = [
       'The clock of keys: each step clockwise adds a sharp (C→G→D…), each step anticlockwise adds a flat. Neighbours share most notes.',
   },
   {
+    id: 'enharmonic',
+    term: 'Enharmonic',
+    short:
+      'Two names for the same piano key: F♯ and G♭ sound identical. The circle of fifths meets itself at an enharmonic seam at six o\'clock.',
+    aliases: ['enharmonics', 'enharmonic equivalent', 'enharmonically'],
+  },
+  {
+    id: 'modulation',
+    term: 'Modulation',
+    short:
+      'Changing key in the middle of a piece. Most modulations move to a neighbour on the circle of fifths, because those keys share all but one note.',
+    aliases: ['modulate', 'modulates', 'modulating'],
+  },
+  {
     id: 'contrary motion',
     term: 'Contrary motion',
     short:

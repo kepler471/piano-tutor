@@ -53,6 +53,11 @@ export const INTENT_BANK: readonly IntentTemplate[] = [
     'i want to see the chords',
     'where are all the chords',
   ], { kind: 'navigate', route: '/chords' }),
+  fixed('nav-circle', [
+    'how are the keys related',
+    'which keys go well together',
+    'show me the key relationships',
+  ], { kind: 'navigate', route: '/circle' }),
   fixed('nav-practice', [
     'i want to practice something now',
     'what should i practice today',
