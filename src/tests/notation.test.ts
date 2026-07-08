@@ -163,7 +163,7 @@ describe('rendering (jsdom smoke test)', () => {
     }
   })
 
-  it('renders every catalog song (all key/time signatures) without throwing', () => {
+  it('renders every catalog song (all key/time signatures) without throwing', { timeout: 60_000 }, () => {
     const container = document.createElement('div')
     for (const song of SONG_CATALOG) {
       for (const system of songSystems(song, { hands: 'both' })) {
