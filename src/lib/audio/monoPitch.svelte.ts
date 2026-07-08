@@ -4,10 +4,15 @@ import type { NoteEvent, NoteEventListener } from './noteEvents'
 import * as playback from './playback'
 
 /**
- * Live monophonic detection: polls the mic AnalyserNode via
- * requestAnimationFrame and feeds frames to a MonoTracker.
+ * Live monophonic detection: polls the mic AnalyserNode on a short interval
+ * and feeds frames to a MonoTracker. Detection deliberately does NOT run on
+ * requestAnimationFrame — rAF ties note latency to display refresh (and to
+ * tab throttling), while a 10 ms interval keeps the tracker's confirmation
+ * time low and steady. Only the reactive display state syncs on rAF, so
+ * meters update at display rate without runes churning at 100 Hz.
  */
 const FRAME_SIZE = 2048
+const POLL_MS = 10
 
 let running = $state(false)
 let currentMidi = $state<number | null>(null)
@@ -17,6 +22,7 @@ let currentClarity = $state(0)
 let level = $state(0)
 
 let rafId = 0
+let intervalId = 0
 let tracker: MonoTracker | null = null
 let buffer: Float32Array<ArrayBuffer> | null = null
 
@@ -44,7 +50,7 @@ function syncState() {
   level = tracker.state.rms
 }
 
-function tick() {
+function detectTick() {
   const analyser = mic.analyser
   const ctx = mic.audioContext
   if (!analyser || !ctx || !tracker || !buffer) return
@@ -52,13 +58,18 @@ function tick() {
   analyser.getFloatTimeDomainData(buffer)
 
   // Ignore the mic while the app itself is playing a demo through the speakers.
+  // t is the audio clock: monotonic and immune to timer throttling, so the
+  // tracker's noise-floor blocks and octave memory stay wall-clock correct.
   const events = playback.isPlaying
     ? tracker.reset(ctx.currentTime)
     : tracker.process(buffer, ctx.sampleRate, ctx.currentTime)
 
-  syncState()
   emitAll(events)
-  rafId = requestAnimationFrame(tick)
+}
+
+function uiTick() {
+  syncState()
+  rafId = requestAnimationFrame(uiTick)
 }
 
 export async function startMonoDetection(): Promise<void> {
@@ -67,10 +78,12 @@ export async function startMonoDetection(): Promise<void> {
   tracker = new MonoTracker({ frameSize: FRAME_SIZE })
   buffer = new Float32Array(FRAME_SIZE)
   running = true
-  rafId = requestAnimationFrame(tick)
+  intervalId = window.setInterval(detectTick, POLL_MS)
+  rafId = requestAnimationFrame(uiTick)
 }
 
 export function stopMonoDetection(): void {
+  clearInterval(intervalId)
   cancelAnimationFrame(rafId)
   running = false
   currentMidi = null
