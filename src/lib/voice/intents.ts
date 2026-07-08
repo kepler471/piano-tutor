@@ -10,7 +10,7 @@ export type Intent =
   | { kind: 'wake' } // wake word alone — "Yes?" + armed window
   | {
       kind: 'navigate'
-      route: '/' | '/guide' | '/scales' | '/chords' | '/practice' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/tuner'
+      route: '/' | '/guide' | '/scales' | '/chords' | '/circle' | '/practice' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/tuner'
     }
   | { kind: 'show-stage'; stage: number } // "show stage two" — guide (cross-screen capable)
   | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number }
@@ -55,6 +55,7 @@ export const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
   '/songs': 'Songs',
   '/scales': 'Scales',
   '/chords': 'Chords',
+  '/circle': 'the Circle of Fifths',
   '/practice': 'Practice',
   '/play': 'Free Play',
   '/tuner': 'Note Detector',

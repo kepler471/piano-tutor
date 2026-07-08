@@ -94,6 +94,10 @@ describe('navigation', () => {
     ['piano open songs', '/songs'],
     ['piano rhythm trainer', '/rhythm'],
     ['piano go to rhythm', '/rhythm'],
+    ['piano circle of fifths', '/circle'],
+    ['piano show me the circle of fifths', '/circle'],
+    ['piano open the circle', '/circle'],
+    ['piano fifths', '/circle'],
   ]
   for (const [phrase, route] of cases) {
     it(phrase, () => {

@@ -21,11 +21,13 @@
   import {
     makeChordFunctionQuestion,
     makeChordSpellingQuestion,
+    makeCircleQuestion,
     makeIntervalStaffQuestion,
     makeKeySignatureQuestion,
     makeNoteNamingQuestion,
     type ChordFunctionQuestion,
     type ChordSpellingQuestion,
+    type CircleQuestion,
     type IntervalStaffQuestion,
     type KeySignatureQuestion,
     type NoteNamingQuestion,
@@ -46,6 +48,7 @@
     | CadenceQuestion
     | NoteNamingQuestion
     | KeySignatureQuestion
+    | CircleQuestion
     | IntervalStaffQuestion
     | ChordSpellingQuestion
     | ChordFunctionQuestion
@@ -76,6 +79,7 @@
       modes: [
         { id: 'note-naming', label: 'Name the note', desc: 'A note on the staff — what is it called?', audio: false },
         { id: 'key-signature', label: 'Key signatures', desc: 'Read the sharps and flats — which key are you in?', audio: false },
+        { id: 'circle-of-fifths', label: 'Circle of fifths', desc: 'Fifths, key signatures and relative minors — navigate the clock of keys.', audio: false },
         { id: 'interval-staff', label: 'Intervals on the staff', desc: 'Two written notes — name the interval by sight.', audio: false },
         { id: 'chord-spelling', label: 'Spell the chord', desc: 'A chord symbol — pick the notes that build it.', audio: false },
         { id: 'chord-function', label: 'Chord functions', desc: 'Which chord is V in G major? Harmony as the Romans wrote it.', audio: false },
@@ -149,6 +153,7 @@
       case 'rhythm-dictation': return makeRhythmDictationQuestion(level)
       case 'note-naming': return makeNoteNamingQuestion(level)
       case 'key-signature': return makeKeySignatureQuestion(level)
+      case 'circle-of-fifths': return makeCircleQuestion(level)
       case 'interval-staff': return makeIntervalStaffQuestion(level)
       case 'chord-spelling': return makeChordSpellingQuestion(level)
       case 'chord-function': return makeChordFunctionQuestion(level)
@@ -218,6 +223,14 @@
           events: [{ keys: [midiToVexKey(question.midi)], duration: 'w' }],
         }
       case 'key-signature':
+        return {
+          clef: 'treble',
+          keySignature: question.keySignature,
+          events: [{ keys: [], duration: 'w', rest: true }],
+        }
+      case 'circle-of-fifths':
+        // Only the relative-minor level carries a signature to show.
+        if (!question.keySignature) return null
         return {
           clef: 'treble',
           keySignature: question.keySignature,

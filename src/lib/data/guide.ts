@@ -307,11 +307,16 @@ export const GUIDE_STAGES: GuideStage[] = [
           'A key signature at the start of each line tells you which notes are always sharp or flat. ' +
           'G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than ' +
           'reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures ' +
-          'physical: your fingers learn where the black keys live in each key.',
+          'physical: your fingers learn where the black keys live in each key. The sharps always arrive ' +
+          'in the same fixed order (F, C, G, D, A, E, B), so a signature is really just a count — and the ' +
+          'last sharp always sits one semitone below the key name. Flats mirror this (B, E, A, D, G, C, F), ' +
+          'and the second-to-last flat names the key. Keys arranged by that count form the circle of ' +
+          'fifths — worth a first look now, and studied properly in stage 4.',
         links: [
           quiz('key-signature', 1, 'Quiz: read the key signature'),
           { kind: 'scale', root: 'G', type: 'major', label: 'G major in the scale library' },
           { kind: 'scale', root: 'F', type: 'major', label: 'F major in the scale library' },
+          { kind: 'route', route: '/circle', label: 'See it on the circle of fifths' },
         ],
       },
       {
@@ -497,16 +502,31 @@ export const GUIDE_STAGES: GuideStage[] = [
     sight: [sight(4, 'Sight-reading — level 4 (eighths & dotted rhythms)')],
     theory: [
       {
-        title: 'Seventh chords and the circle of fifths',
+        title: 'Seventh chords',
         body:
           'Add one more third on top of a triad and you get a seventh chord — the sound of jazz and of ' +
-          'every dominant that pulls home to its tonic. The circle of fifths orders all twelve keys by ' +
-          'how many sharps or flats they carry; moving one step around it adds one accidental. Practice ' +
-          'scales in circle order (C, G, D, A… / C, F, B♭, E♭…) and the pattern becomes second nature.',
+          'every dominant that pulls home to its tonic. The dominant 7th is the workhorse: its tritone ' +
+          '(the 3rd against the 7th) is what makes V7 lean so strongly onto I.',
         links: [
           { kind: 'chord', root: 'G', quality: 'dominant 7th', label: 'G7 in the chord library' },
           quiz('chords', 3, 'Hear 7th chords in the ear quiz'),
           quiz('chord-spelling', 3, 'Quiz: spell the 7th chords'),
+        ],
+      },
+      {
+        title: 'The circle of fifths',
+        body:
+          'The circle of fifths orders all twelve keys by how many sharps or flats they carry: each ' +
+          'clockwise step goes up a fifth and adds exactly one sharp (in the fixed order F, C, G, D, A, ' +
+          'E, B), each anticlockwise step adds one flat (the mirror order). The inner ring holds each ' +
+          'key\'s relative minor — same signature, tonic three semitones down. Neighbouring keys share ' +
+          'six of their seven notes, which is why music modulates to them so smoothly. At six o\'clock ' +
+          'the two sides meet: F♯ major and G♭ major are enharmonic spellings of the same keys. ' +
+          'Practice scales in circle order (C, G, D, A… / C, F, B♭, E♭…) and the geography becomes ' +
+          'second nature.',
+        links: [
+          { kind: 'route', route: '/circle', label: 'Explore the interactive circle' },
+          quiz('circle-of-fifths', 1, 'Quiz: navigate the circle'),
           quiz('key-signature', 3, 'Quiz: key signatures around the circle'),
         ],
       },
@@ -541,6 +561,11 @@ export const GUIDE_STAGES: GuideStage[] = [
       ABRSM_SYLLABUS,
       RCM_SYLLABUS,
       IMSLP,
+      {
+        title: 'Piano scales poster (gemb0y/piano-scales)',
+        url: 'https://github.com/gemb0y/piano-scales',
+        note: 'A beautifully drawn circle-of-fifths poster with every major and minor scale — free to view and print for yourself (CC BY-NC-ND: no modified redistribution).',
+      },
     ],
     moveOnWhen: [
       'Two-octave hands-together scales feel like the normal way to play a scale',
@@ -602,11 +627,15 @@ export const GUIDE_STAGES: GuideStage[] = [
         body:
           'Jazz harmony strings dominant motion together: the ii chord leads to V, V resolves to I. The ' +
           'guide tones — each chord’s 3rd and 7th — are the two notes that carry the progression; ' +
-          'voice-lead them smoothly and the harmony plays itself. Learn the drill in C and F first, then ' +
-          'take it around the circle of fifths.',
+          'voice-lead them smoothly and the harmony plays itself. Notice the roots: D to G to C is two ' +
+          'falling fifths — one anticlockwise step each on the circle of fifths. That is dominant motion, ' +
+          'and it is the engine under almost every jazz standard. Learn the drill in C and F first, then ' +
+          'take it around the circle.',
         links: [
           lesson('jazz-251-C', 'ii–V–I drill in C'),
           song('ii-v-i-etude', 'Hear it as music in the étude'),
+          { kind: 'route', route: '/circle', label: 'Trace it on the circle' },
+          quiz('circle-of-fifths', 4, 'Quiz: circle geometry'),
         ],
       },
       {

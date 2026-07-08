@@ -4,10 +4,12 @@ import type { Rng } from '../lib/ear/quiz'
 import { getChord } from '../lib/theory/chords'
 import {
   CHORD_SPELLING_LEVELS,
+  CIRCLE_LEVEL_COUNT,
   KEY_SIGNATURE_LEVELS,
   NOTE_NAMING_LEVELS,
   makeChordFunctionQuestion,
   makeChordSpellingQuestion,
+  makeCircleQuestion,
   makeIntervalStaffQuestion,
   makeKeySignatureQuestion,
   makeNoteNamingQuestion,
@@ -95,6 +97,87 @@ describe('makeKeySignatureQuestion', () => {
       const major = q.keySignature
       const minorName = q.answer.replace(' minor', '').replace('♯', '#').replace('♭', 'b')
       expect((Note.chroma(major)! - Note.chroma(minorName)! + 12) % 12).toBe(3)
+    }
+  })
+})
+
+describe('makeCircleQuestion', () => {
+  const chromaOf = (label: string) => Note.chroma(label.replace(' major', '').replace(' minor', '').replace('♯', '#').replace('♭', 'b'))!
+
+  it('level 1 answers sit a fifth away from the asked key', () => {
+    for (const seed of seeds) {
+      const q = makeCircleQuestion(1, seededRng(seed))
+      expectValidOptions(q.options, q.answer)
+      const m = /fifth (up|down) from (\S+) major\?/.exec(q.prompt)!
+      const [, dir, key] = m
+      const expected = dir === 'up' ? 7 : 5
+      expect((chromaOf(q.answer) - chromaOf(key) + 12) % 12).toBe(expected)
+    }
+  })
+
+  it('level 2 counts match sigAccidentals in both question directions', () => {
+    for (const seed of seeds) {
+      const q = makeCircleQuestion(2, seededRng(seed))
+      expectValidOptions(q.options, q.answer)
+      const asCount = /How many (sharp|flat)s does (\S+) major have\?/.exec(q.prompt)
+      if (asCount) {
+        const [, kind, key] = asCount
+        const acc = sigAccidentals(key.replace('♯', '#').replace('♭', 'b'))
+        expect(acc.kind).toBe(`${kind}s`)
+        expect(q.answer).toBe(String(acc.names.length))
+      } else {
+        const m = /Which major key has (\d) (sharp|flat)s?\?/.exec(q.prompt)!
+        const [, n, kind] = m
+        const acc = sigAccidentals(q.answer.replace(' major', '').replace('♯', '#').replace('♭', 'b'))
+        expect(acc.kind).toBe(`${kind}s`)
+        expect(acc.names.length).toBe(Number(n))
+      }
+    }
+  })
+
+  it('level 3 sets the staff signature and keeps the minor three semitones below', () => {
+    for (const seed of seeds) {
+      const q = makeCircleQuestion(3, seededRng(seed))
+      expectValidOptions(q.options, q.answer)
+      expect(q.keySignature).toBeTruthy()
+      const majorChroma = Note.chroma(q.keySignature!)!
+      const minorLabel = q.answer.endsWith('minor')
+        ? q.answer
+        : /^(\S+) minor/.exec(q.prompt)![0]
+      expect((majorChroma - chromaOf(minorLabel) + 12) % 12).toBe(3)
+      if (!q.answer.endsWith('minor')) {
+        expect(q.answer).toBe(`${q.keySignature} major`.replace('#', '♯').replace('b', '♭'))
+      }
+    }
+  })
+
+  it('level 4 geometry answers are consistent with the circle model', () => {
+    for (const seed of seeds) {
+      const q = makeCircleQuestion(4, seededRng(seed))
+      expectValidOptions(q.options, q.answer)
+      const neighbours = /either side of (\S+) major/.exec(q.prompt)
+      const added = /clockwise from (\S+) major to (\S+) major/.exec(q.prompt)
+      if (neighbours) {
+        const key = neighbours[1]
+        const [a, b] = q.answer.split(' and ')
+        expect((chromaOf(key) - chromaOf(a) + 12) % 12).toBe(7)
+        expect((chromaOf(b) - chromaOf(key) + 12) % 12).toBe(7)
+      } else if (added) {
+        // The added accidental is the new key's last sharp.
+        const acc = sigAccidentals(added[2].replace('♯', '#').replace('♭', 'b'))
+        expect(acc.names[acc.names.length - 1]).toBe(q.answer)
+      } else {
+        expect(q.prompt).toContain('F♯ major')
+        expect(q.answer).toBe('G♭ major')
+      }
+    }
+  })
+
+  it('every level carries a teaching explanation', () => {
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of seeds) {
+        expect(makeCircleQuestion(level, seededRng(seed)).explanation.length).toBeGreaterThan(20)
+      }
     }
   })
 })
@@ -271,6 +354,7 @@ describe('quiz mode registry', () => {
   it('level counts match the generator level tables', () => {
     expect(QUIZ_LEVEL_COUNTS['note-naming']).toBe(NOTE_NAMING_LEVELS.length)
     expect(QUIZ_LEVEL_COUNTS['key-signature']).toBe(KEY_SIGNATURE_LEVELS.length)
+    expect(QUIZ_LEVEL_COUNTS['circle-of-fifths']).toBe(CIRCLE_LEVEL_COUNT)
     expect(QUIZ_LEVEL_COUNTS['chord-spelling']).toBe(CHORD_SPELLING_LEVELS.length)
   })
 })

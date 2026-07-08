@@ -5,6 +5,7 @@
   import Home from './screens/Home.svelte'
   import GuideScreen from './screens/GuideScreen.svelte'
   import ScalesLibrary from './screens/ScalesLibrary.svelte'
+  import CircleOfFifths from './screens/CircleOfFifths.svelte'
   import ChordsLibrary from './screens/ChordsLibrary.svelte'
   import Practice from './screens/Practice.svelte'
   import Quizzes from './screens/Quizzes.svelte'
@@ -18,6 +19,7 @@
     { route: '/guide', label: 'Guide' },
     { route: '/scales', label: 'Scales' },
     { route: '/chords', label: 'Chords' },
+    { route: '/circle', label: 'Circle of 5ths' },
     { route: '/practice', label: 'Practice' },
     { route: '/quizzes', label: 'Quizzes' },
     { route: '/rhythm', label: 'Rhythm' },
@@ -46,6 +48,8 @@
     <ScalesLibrary />
   {:else if route === '/chords'}
     <ChordsLibrary />
+  {:else if route === '/circle'}
+    <CircleOfFifths />
   {:else if route === '/practice'}
     <Practice />
   {:else if route === '/quizzes' || route === '/ear'}

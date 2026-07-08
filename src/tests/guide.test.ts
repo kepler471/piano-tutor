@@ -19,6 +19,7 @@ const KNOWN_ROUTES = new Set([
   '/guide',
   '/scales',
   '/chords',
+  '/circle',
   '/practice',
   '/ear',
   '/quizzes',

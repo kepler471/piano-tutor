@@ -10,6 +10,7 @@ const EXPECTED_KIND: Record<string, Intent['kind']> = {
   'nav-guide': 'navigate',
   'nav-scales': 'navigate',
   'nav-chords': 'navigate',
+  'nav-circle': 'navigate',
   'nav-practice': 'navigate',
   'nav-play': 'navigate',
   'nav-tuner': 'navigate',

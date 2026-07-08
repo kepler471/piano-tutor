@@ -139,11 +139,12 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 ### Key signatures: your first sharps and flats
 
-A key signature at the start of each line tells you which notes are always sharp or flat. G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures physical: your fingers learn where the black keys live in each key.
+A key signature at the start of each line tells you which notes are always sharp or flat. G major has one sharp (F♯); F major one flat (B♭); D major two sharps (F♯, C♯). Rather than reading each accidental, think "I am in G, so every F is sharp". Scales make key signatures physical: your fingers learn where the black keys live in each key. The sharps always arrive in the same fixed order (F, C, G, D, A, E, B), so a signature is really just a count — and the last sharp always sits one semitone below the key name. Flats mirror this (B, E, A, D, G, C, F), and the second-to-last flat names the key. Keys arranged by that count form the circle of fifths — worth a first look now, and studied properly in stage 4.
 
 - Quiz: read the key signature — `#/quizzes?mode=key-signature&level=1&from=guide`
 - G major in the scale library — `#/scales?root=G&type=major&from=guide`
 - F major in the scale library — `#/scales?root=F&type=major&from=guide`
+- See it on the circle of fifths — `#/circle?from=guide`
 
 ### Intervals: the distance between notes
 
@@ -328,13 +329,20 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 - Sight-reading — level 4 (eighths & dotted rhythms) — `#/practice?sight=4&from=guide`
 
-### Seventh chords and the circle of fifths
+### Seventh chords
 
-Add one more third on top of a triad and you get a seventh chord — the sound of jazz and of every dominant that pulls home to its tonic. The circle of fifths orders all twelve keys by how many sharps or flats they carry; moving one step around it adds one accidental. Practice scales in circle order (C, G, D, A… / C, F, B♭, E♭…) and the pattern becomes second nature.
+Add one more third on top of a triad and you get a seventh chord — the sound of jazz and of every dominant that pulls home to its tonic. The dominant 7th is the workhorse: its tritone (the 3rd against the 7th) is what makes V7 lean so strongly onto I.
 
 - G7 in the chord library — `#/chords?root=G&quality=dominant%207th&from=guide`
 - Hear 7th chords in the ear quiz — `#/quizzes?mode=chords&level=3&from=guide`
 - Quiz: spell the 7th chords — `#/quizzes?mode=chord-spelling&level=3&from=guide`
+
+### The circle of fifths
+
+The circle of fifths orders all twelve keys by how many sharps or flats they carry: each clockwise step goes up a fifth and adds exactly one sharp (in the fixed order F, C, G, D, A, E, B), each anticlockwise step adds one flat (the mirror order). The inner ring holds each key's relative minor — same signature, tonic three semitones down. Neighbouring keys share six of their seven notes, which is why music modulates to them so smoothly. At six o'clock the two sides meet: F♯ major and G♭ major are enharmonic spellings of the same keys. Practice scales in circle order (C, G, D, A… / C, F, B♭, E♭…) and the geography becomes second nature.
+
+- Explore the interactive circle — `#/circle?from=guide`
+- Quiz: navigate the circle — `#/quizzes?mode=circle-of-fifths&level=1&from=guide`
 - Quiz: key signatures around the circle — `#/quizzes?mode=key-signature&level=3&from=guide`
 
 ### Three flavours of minor
@@ -360,6 +368,7 @@ Minor is not one scale but a family. Natural minor is what the key signature giv
 - [ABRSM Piano syllabus](https://www.abrsm.org/en-gb/our-exams/piano-exams) — The graded exam repertoire lists this guide is aligned to — browse pieces at your stage even if you never sit an exam.
 - [RCM Piano syllabus](https://www.rcmusic.com/en/learning/academic-programs/certificate-program/piano) — The North American equivalent of ABRSM; its repertoire lists are a goldmine of level-appropriate pieces.
 - [IMSLP (Petrucci Music Library)](https://imslp.org) — Free public-domain sheet music — every classical piece in this app and thousands more.
+- [Piano scales poster (gemb0y/piano-scales)](https://github.com/gemb0y/piano-scales) — A beautifully drawn circle-of-fifths poster with every major and minor scale — free to view and print for yourself (CC BY-NC-ND: no modified redistribution).
 
 ### Move on when…
 
@@ -430,10 +439,12 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 ### The ii–V–I: how jazz moves
 
-Jazz harmony strings dominant motion together: the ii chord leads to V, V resolves to I. The guide tones — each chord’s 3rd and 7th — are the two notes that carry the progression; voice-lead them smoothly and the harmony plays itself. Learn the drill in C and F first, then take it around the circle of fifths.
+Jazz harmony strings dominant motion together: the ii chord leads to V, V resolves to I. The guide tones — each chord’s 3rd and 7th — are the two notes that carry the progression; voice-lead them smoothly and the harmony plays itself. Notice the roots: D to G to C is two falling fifths — one anticlockwise step each on the circle of fifths. That is dominant motion, and it is the engine under almost every jazz standard. Learn the drill in C and F first, then take it around the circle.
 
 - ii–V–I drill in C — `#/practice?lesson=jazz-251-C&from=guide`
 - Hear it as music in the étude — `#/songs?song=ii-v-i-etude&from=guide`
+- Trace it on the circle — `#/circle?from=guide`
+- Quiz: circle geometry — `#/quizzes?mode=circle-of-fifths&level=4&from=guide`
 
 ### Modes: old scales, new colours
 
