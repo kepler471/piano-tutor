@@ -25,6 +25,7 @@
   // Songs are reading material: no keyboard by default, and when shown it only
   // mirrors what was played — never the expected keys or fingers.
   let showKeyboard = $state(false)
+  let showFingering = $state(true)
 
   function selectSection(from: number, to: number) {
     fromMeasure = from
@@ -243,9 +244,12 @@
     </p>
   {/if}
 
-  <GrandSheetMusic {song} {range} stepHighlights={highlights} />
+  <GrandSheetMusic {song} {range} stepHighlights={highlights} {showFingering} />
   <label class="show-kb">
     <input type="checkbox" bind:checked={showKeyboard} /> Show keyboard (played notes only — no hints)
+  </label>
+  <label class="show-kb">
+    <input type="checkbox" bind:checked={showFingering} /> Show fingering
   </label>
   {#if showKeyboard}
     <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.activeNotes} wrong={wrongFlash} />

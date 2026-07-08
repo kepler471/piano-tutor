@@ -40,7 +40,7 @@ function displayDuration(beats: number): number {
 
 export function songSystems(
   song: Song,
-  opts: SongStepOptions & { measuresPerSystem?: number },
+  opts: SongStepOptions & { measuresPerSystem?: number; showFingering?: boolean },
 ): SongSystem[] {
   const bpm = beatsPerMeasure(song)
   const perSystem = opts.measuresPerSystem ?? 4
@@ -95,7 +95,8 @@ export function songSystems(
               keys: group.notes.map((n) => midiToVexKeyInKey(n.midi, song.keySignature)),
               duration,
               dots,
-              fingerings: group.notes.map((n) => n.finger ?? null),
+              fingerings:
+                opts.showFingering === false ? undefined : group.notes.map((n) => n.finger ?? null),
             },
             stepIndexByBeat.get(Math.round(absBeat * 64)) ?? null,
           )
