@@ -1,10 +1,14 @@
 import {
   BLUES_ROOTS,
   DORIAN_ROOTS,
+  LOCRIAN_ROOTS,
+  LYDIAN_ROOTS,
   MAJOR_ROOTS,
+  MINOR_PENTATONIC_ROOTS,
   MINOR_ROOTS,
   MIXOLYDIAN_ROOTS,
   PENTATONIC_ROOTS,
+  PHRYGIAN_ROOTS,
 } from '../theory/scales'
 import type { Finger } from '../theory/types'
 
@@ -57,7 +61,7 @@ const BLUES_FINGERING: ScaleFingering = {
   lh: [5, 4, 3, 2, 1, 2, 1],
 }
 
-/** Major pentatonic (5 notes + octave = 6 entries). */
+/** Pentatonic (5 notes + octave = 6 entries) — same shape works for major and minor roots. */
 const PENTATONIC_FINGERING: ScaleFingering = {
   rh: [1, 2, 3, 1, 2, 5],
   lh: [5, 4, 3, 2, 1, 3],
@@ -72,6 +76,11 @@ for (const root of MINOR_ROOTS) {
 }
 for (const root of BLUES_ROOTS) scaleFingerings[`${root} blues`] = BLUES_FINGERING
 // Modes borrow the parallel major's pattern — the standard jazz-pedagogy default.
+// (Roots lists are constrained to spellings that exist in MAJOR with sane thumb placement.)
 for (const root of DORIAN_ROOTS) scaleFingerings[`${root} dorian`] = MAJOR[root]
 for (const root of MIXOLYDIAN_ROOTS) scaleFingerings[`${root} mixolydian`] = MAJOR[root]
+for (const root of LYDIAN_ROOTS) scaleFingerings[`${root} lydian`] = MAJOR[root]
+for (const root of PHRYGIAN_ROOTS) scaleFingerings[`${root} phrygian`] = MAJOR[root]
+for (const root of LOCRIAN_ROOTS) scaleFingerings[`${root} locrian`] = MAJOR[root]
 for (const root of PENTATONIC_ROOTS) scaleFingerings[`${root} major pentatonic`] = PENTATONIC_FINGERING
+for (const root of MINOR_PENTATONIC_ROOTS) scaleFingerings[`${root} minor pentatonic`] = PENTATONIC_FINGERING

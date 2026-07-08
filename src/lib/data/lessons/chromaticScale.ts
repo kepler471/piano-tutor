@@ -57,7 +57,7 @@ export function chromaticScaleLessons(): Lesson[] {
       tips: [
         'Stay close to the keys — the pattern is all about economy of movement.',
         'Keep it perfectly even; the thumb notes love to stick out.',
-        'Same fingering from any starting note — learn the rule, not the run.',
+        'Get comfortable from one starting note, then try a few others — the fingering rule transfers instantly.',
       ],
       detectionMode: 'mono' as const,
       keySignature: 'C',

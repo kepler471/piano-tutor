@@ -261,6 +261,30 @@ const ENTRIES: GlossaryEntry[] = [
     aliases: ['pentatonic'],
   },
   {
+    id: 'minor pentatonic',
+    term: 'Minor pentatonic',
+    short:
+      'Five notes — the natural minor scale minus its 2nd and 6th. The go-to improvising scale of rock and blues; add one "blue" note and it becomes the blues scale.',
+  },
+  {
+    id: 'lydian',
+    term: 'Lydian',
+    short:
+      'A major-sounding mode with a raised 4th — floating, film-score bright. F lydian is all white keys from F to F.',
+  },
+  {
+    id: 'phrygian',
+    term: 'Phrygian',
+    short:
+      'A minor-sounding mode with a lowered 2nd right at the start — dark and Spanish. E phrygian is all white keys from E to E.',
+  },
+  {
+    id: 'locrian',
+    term: 'Locrian',
+    short:
+      'The rarest mode: lowered 2nd and 5th make it unstable and unresolved. B locrian is all white keys from B to B.',
+  },
+  {
     id: 'chromatic',
     term: 'Chromatic',
     short:
