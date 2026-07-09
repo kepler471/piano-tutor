@@ -6,6 +6,8 @@
   import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
   import { playChord, playChordSequence, playSequence } from '../lib/audio/playback'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
+  import { expectedMicSource } from '../lib/input/routing'
+  import { settings } from '../lib/settings.svelte'
   import type { Lesson } from '../lib/data/lessons'
   import { scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
@@ -90,7 +92,9 @@
   // (e.g. moving to a hands-together segment), restart with the right detector.
   $effect(() => {
     const mode = effectiveMode
-    if (noteInput.activeSource === (mode === 'poly' ? 'mic-mono' : 'mic-poly')) {
+    const activeSource = noteInput.activeSource
+    const isMic = activeSource !== 'midi' && activeSource !== 'none'
+    if (isMic && activeSource !== expectedMicSource(mode, settings.fusion)) {
       noteInput.stop()
       void noteInput.start(mode)
     }
@@ -299,8 +303,10 @@
   <InputPicker preferred={effectiveMode} />
   {#if effectiveMode === 'poly' && noteInput.activeSource !== 'midi' && segment.hand === 'both'}
     <p class="hint">
-      🎹 Hands-together grading works best with a MIDI keyboard — mic chord detection runs about a
-      second behind your playing.
+      🎹 Hands-together grading works best with a MIDI keyboard —
+      {noteInput.activeSource === 'mic-fused'
+        ? 'the mic grades the top line instantly, but the remaining chord notes land about a second behind.'
+        : 'mic chord detection runs about a second behind your playing.'}
     </p>
   {/if}
 

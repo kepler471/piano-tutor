@@ -12,6 +12,8 @@ export interface MonoTrackerOptions {
   octaveMemorySec?: number
   releaseFrames?: number
   noiseFloorK?: number
+  /** Tuning reference in Hz (default 440) — see settings.a4. */
+  a4?: number
 }
 
 export interface MonoState {
@@ -50,6 +52,7 @@ export class MonoTracker {
   private octaveMemorySec: number
   private releaseFrames: number
   private noiseFloorK: number
+  private a4: number
   private noiseFloor = new NoiseFloor()
 
   private candidateMidi: number | null = null
@@ -71,6 +74,7 @@ export class MonoTracker {
     this.octaveMemorySec = opts.octaveMemorySec ?? 0.5
     this.releaseFrames = opts.releaseFrames ?? 6
     this.noiseFloorK = opts.noiseFloorK ?? 2.5
+    this.a4 = opts.a4 ?? 440
   }
 
   /**
@@ -146,7 +150,7 @@ export class MonoTracker {
     const [freq, clarity] = this.detector.findPitch(frame, sampleRate)
     this.state.clarity = clarity
 
-    const { midi, cents } = frequencyToMidi(freq)
+    const { midi, cents } = frequencyToMidi(freq, this.a4)
     const valid = clarity >= this.minClarity && rms >= effMinRms && midi >= MIDI_MIN && midi <= MIDI_MAX
 
     if (!valid) {

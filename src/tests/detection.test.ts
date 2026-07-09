@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MonoTracker } from '../lib/audio/monoTracker'
-import { midiToFrequency, type NoteEvent } from '../lib/audio/noteEvents'
+import { calibratedA4, frequencyToMidi, midiToFrequency, type NoteEvent } from '../lib/audio/noteEvents'
 import { clusterOnsets } from '../lib/transcribe/cluster'
 
 const SAMPLE_RATE = 44100
@@ -270,6 +270,51 @@ describe('octave-flicker protection (frame-level)', () => {
     // path only applies when a reference note is (or was just) sounding.
     const frames = [...Array.from({ length: 10 }, () => new Float32Array(FRAME)), toneFrame(64), toneFrame(64)]
     expect(ons(run(frames))).toEqual([])
+  })
+})
+
+describe('A4 calibration', () => {
+  /** Steady tone frame from an instrument tuned to the given A4. */
+  function detunedFrame(midi: number, a4: number): Float32Array<ArrayBuffer> {
+    const freq = midiToFrequency(midi, a4)
+    const out = new Float32Array(FRAME)
+    for (let i = 0; i < FRAME; i++) {
+      const t = i / SAMPLE_RATE
+      out[i] =
+        0.6 * Math.sin(2 * Math.PI * freq * t) +
+        0.25 * Math.sin(2 * Math.PI * 2 * freq * t) +
+        0.1 * Math.sin(2 * Math.PI * 3 * freq * t)
+    }
+    return out
+  }
+
+  function settle(tracker: MonoTracker, midi: number, a4: number) {
+    for (let i = 0; i < 20; i++) tracker.process(detunedFrame(midi, a4), SAMPLE_RATE, i * 0.01)
+  }
+
+  it('a 442-tuned instrument reads sharp under the default reference', () => {
+    const tracker = new MonoTracker({ frameSize: FRAME })
+    settle(tracker, 69, 442)
+    expect(tracker.state.midi).toBe(69)
+    // 442 vs 440 is +7.85 cents.
+    expect(tracker.state.cents).toBeGreaterThan(5)
+    expect(tracker.state.cents).toBeLessThan(11)
+  })
+
+  it('a tracker calibrated to 442 reads the same tone in tune', () => {
+    const tracker = new MonoTracker({ frameSize: FRAME, a4: 442 })
+    settle(tracker, 69, 442)
+    expect(tracker.state.midi).toBe(69)
+    expect(Math.abs(tracker.state.cents)).toBeLessThan(3)
+  })
+
+  it('calibratedA4 zeroes the measured offset (round-trip)', () => {
+    const trueA4 = 443.2
+    const { cents } = frequencyToMidi(midiToFrequency(69, trueA4), 440)
+    const corrected = calibratedA4(440, cents)
+    expect(corrected).toBeCloseTo(trueA4, 6)
+    // …and re-measuring under the corrected reference reads ~0 cents.
+    expect(frequencyToMidi(midiToFrequency(69, trueA4), corrected).cents).toBeCloseTo(0, 6)
   })
 })
 

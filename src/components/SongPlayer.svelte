@@ -358,8 +358,10 @@
   <InputPicker preferred={needsChords ? 'poly' : 'mono'} />
   {#if needsChords && noteInput.activeSource !== 'midi'}
     <p class="hint">
-      🎹 This piece has chords or both hands — it works best with a MIDI keyboard. Mic chord
-      detection runs about a second behind.
+      🎹 This piece has chords or both hands — it works best with a MIDI keyboard.
+      {noteInput.activeSource === 'mic-fused'
+        ? 'The mic grades the top line instantly; the remaining chord notes land about a second behind.'
+        : 'Mic chord detection runs about a second behind.'}
     </p>
   {/if}
 

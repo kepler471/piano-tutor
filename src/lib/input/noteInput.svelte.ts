@@ -2,22 +2,33 @@ import { mic } from '../audio/mic.svelte'
 import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDetection } from '../audio/monoPitch.svelte'
 import type { NoteEvent, NoteEventListener } from '../audio/noteEvents'
 import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '../audio/polyPitch.svelte'
+import { settings } from '../settings.svelte'
+import { MonoPolyFuser } from './fusion'
 import { midi, onMidiEvent } from './midi.svelte'
 import { chooseSource, shouldForward, type ActiveSource } from './routing'
 
 /**
  * Unified note-input hub: one subscription point over MIDI, mic-mono and
- * mic-poly. Screens call start('mono' | 'poly') with the detector they'd
- * want *if* the mic is used; when a MIDI keyboard is connected it is always
- * preferred and the mic never starts.
+ * mic-poly/fused. Screens call start('mono' | 'poly') with the detector
+ * they'd want *if* the mic is used; when a MIDI keyboard is connected it is
+ * always preferred and the mic never starts. In 'mic-fused' mode (chord
+ * practice with fusion enabled) both mic detectors forward and the fuser
+ * drops poly re-reports of notes mono already graded.
  */
 let active = $state<ActiveSource>('none')
 let midiNotes = $state(new Set<number>())
 
+const fuser = new MonoPolyFuser()
 const listeners = new Set<NoteEventListener>()
 
 function emit(ev: NoteEvent) {
   if (!shouldForward(ev.source, active)) return
+  if (
+    active === 'mic-fused' &&
+    !fuser.accept({ source: ev.source, kind: ev.kind, midi: ev.midi, tMs: ev.tMs ?? performance.now() })
+  ) {
+    return
+  }
   listeners.forEach((fn) => fn(ev))
 }
 
@@ -36,20 +47,22 @@ export function onInput(fn: NoteEventListener): () => void {
 }
 
 async function start(preferred: 'mono' | 'poly'): Promise<void> {
-  const source = chooseSource(midi.hasInput, preferred)
+  const source = chooseSource(midi.hasInput, preferred, settings.fusion)
   if (source === 'midi') {
     active = 'midi'
     return
   }
   await startMonoDetection()
   if (mic.status !== 'running') return // denied or errored; stay 'none'
-  if (source === 'mic-poly') await startPolyDetection()
+  if (source === 'mic-poly' || source === 'mic-fused') await startPolyDetection()
+  fuser.reset()
   active = source
 }
 
 function stop(): void {
-  if (active === 'mic-poly') stopPolyDetection()
-  if (active === 'mic-mono' || active === 'mic-poly') stopMonoDetection()
+  if (active === 'mic-poly' || active === 'mic-fused') stopPolyDetection()
+  if (active !== 'midi' && active !== 'none') stopMonoDetection()
+  fuser.reset()
   active = 'none'
 }
 
@@ -65,7 +78,7 @@ export const noteInput = {
     if (active === 'midi') return midiNotes
     const s = new Set<number>()
     if (monoPitch.midi !== null) s.add(monoPitch.midi)
-    if (active === 'mic-poly') for (const m of polyPitch.activeNotes) s.add(m)
+    if (active === 'mic-poly' || active === 'mic-fused') for (const m of polyPitch.activeNotes) s.add(m)
     return s
   },
   start,

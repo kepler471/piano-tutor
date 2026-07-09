@@ -54,7 +54,9 @@ describe('input routing', () => {
 
   it('falls back to the preferred mic detector', () => {
     expect(chooseSource(false, 'mono')).toBe('mic-mono')
-    expect(chooseSource(false, 'poly')).toBe('mic-poly')
+    // Chord practice fuses by default; poly-only behind the fusion toggle.
+    expect(chooseSource(false, 'poly')).toBe('mic-fused')
+    expect(chooseSource(false, 'poly', false)).toBe('mic-poly')
   })
 
   it('forwards only the active source to subscribers', () => {
