@@ -15,14 +15,15 @@ export interface OnsetOutcome {
 
 export interface StepMatcherOptions {
   /**
-   * When the onset misses the current step but matches the NEXT one, mark the
-   * current step 'skipped' and move on instead of flagging a wrong note — a
-   * single missed detection (mic detection is lossy on fast playing) then
-   * costs one grey step instead of derailing the rest of the run. Depth is
-   * exactly 1; a wrong-octave detection advancing is mitigated by the
-   * tracker's octave hysteresis.
+   * When the onset misses the current step but matches an upcoming one within
+   * this many steps, mark the intervening steps 'skipped' and move on instead
+   * of flagging a wrong note — a missed detection (mic detection is lossy on
+   * fast playing) then costs grey steps instead of derailing the rest of the
+   * run. The shallowest match wins, and the current step is always checked
+   * first, so repeated notes never skip; a wrong-octave detection advancing
+   * is mitigated by the tracker's octave hysteresis. 0 (default) disables.
    */
-  lookahead?: boolean
+  lookahead?: 0 | 1 | 2
 }
 
 /**
@@ -39,12 +40,12 @@ export class StepMatcher {
   skips = 0
   private collected = new Set<number>()
   private stumbled = false
-  private lookahead: boolean
+  private lookahead: number
 
   constructor(steps: LessonStep[], opts: StepMatcherOptions = {}) {
     this.steps = steps
     this.results = steps.map(() => 'pending')
-    this.lookahead = opts.lookahead ?? false
+    this.lookahead = opts.lookahead ?? 0
   }
 
   get done(): boolean {
@@ -62,16 +63,24 @@ export class StepMatcher {
     return new Set(cur.midis.filter((m) => !this.collected.has(m)))
   }
 
+  /** Midis of every step marked 'skipped', in step order. */
+  get skippedMidis(): number[] {
+    return this.steps.flatMap((s, i) => (this.results[i] === 'skipped' ? s.midis : []))
+  }
+
   onOnset(midi: number): OnsetOutcome {
     if (this.done) return { advanced: false, wrong: false, done: true }
     if (this.current!.midis.includes(midi)) return this.collect(midi)
-    if (this.lookahead && this.steps[this.cursor + 1]?.midis.includes(midi)) {
-      this.results[this.cursor] = 'skipped'
-      this.skips++
-      this.cursor++
+    for (let d = 1; d <= this.lookahead; d++) {
+      if (!this.steps[this.cursor + d]?.midis.includes(midi)) continue
+      for (let i = 0; i < d; i++) {
+        this.results[this.cursor] = 'skipped'
+        this.skips++
+        this.cursor++
+      }
       this.collected.clear()
       this.stumbled = false
-      return { ...this.collect(midi), skipped: 1 }
+      return { ...this.collect(midi), skipped: d }
     }
     this.mistakes++
     this.stumbled = true
