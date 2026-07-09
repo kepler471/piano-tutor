@@ -10,6 +10,8 @@
 <script lang="ts">
   import GlossText from '../components/GlossText.svelte'
   import { guideHref, type GuideLink, type GuideStage } from '../lib/data/guide'
+  import { guideItemStats } from '../lib/practice/guideProgress'
+  import { practiceHistory } from '../lib/practice/history.svelte'
   import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
@@ -44,6 +46,17 @@
     return LINK_GROUPS.map((g) => ({ label: g.label, links: stage[g.key] })).filter((g) => g.links.length > 0)
   }
 
+  // The guide data stays progress-blind; the screen derives "practiced"
+  // badges from the history log (null for reference-only links).
+  function stats(link: GuideLink) {
+    return guideItemStats(link, practiceHistory.records, new Date())
+  }
+
+  function badgeTitle(s: NonNullable<ReturnType<typeof stats>>): string {
+    const when = s.lastAt ? ` — last on ${new Date(s.lastAt).toLocaleDateString()}` : ''
+    return `Practiced ${s.count} time${s.count === 1 ? '' : 's'}${when}`
+  }
+
   $effect(() =>
     registerVoiceCommands({
       name: 'Guide',
@@ -62,8 +75,9 @@
   <h1>Learning Guide</h1>
   <p class="hint">
     A path from your first notes to early intermediate playing, using everything in this app —
-    and pointing to the outside learning worth adding along the way. There is nothing to unlock
-    and nothing is tracked: read a stage, practice from it, and move on when it feels secure.
+    and pointing to the outside learning worth adding along the way. There is nothing to unlock:
+    read a stage, practice from it, and move on when it feels secure. A green ✓ marks material
+    you've already practiced.
   </p>
   <p class="hint">
     Work a stage for a few weeks. Little and often beats long and rare — twenty focused minutes a
@@ -97,7 +111,11 @@
               <span class="group-label">{group.label}</span>
               <div class="chips">
                 {#each group.links as link (link.label)}
-                  <a class="chip" href={guideHref(link)}>{link.label}</a>
+                  {@const s = stats(link)}
+                  <a class="chip" class:practiced={s?.recent} href={guideHref(link)}>
+                    {link.label}{#if s && s.count > 0}<span class="tick" title={badgeTitle(s)}>
+                        ✓{s.count > 1 ? `×${s.count}` : ''}</span>{/if}
+                  </a>
                 {/each}
               </div>
             </div>
@@ -110,7 +128,11 @@
               {#if section.links.length}
                 <div class="chips">
                   {#each section.links as link (link.label)}
-                    <a class="chip" href={guideHref(link)}>{link.label}</a>
+                    {@const s = stats(link)}
+                    <a class="chip" class:practiced={s?.recent} href={guideHref(link)}>
+                      {link.label}{#if s && s.count > 0}<span class="tick" title={badgeTitle(s)}>
+                          ✓{s.count > 1 ? `×${s.count}` : ''}</span>{/if}
+                    </a>
                   {/each}
                 </div>
               {/if}
@@ -228,6 +250,20 @@
   }
   .chip:hover {
     background: #dbeafe;
+  }
+  .chip.practiced {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #15803d;
+  }
+  .chip.practiced:hover {
+    background: #dcfce7;
+  }
+  .tick {
+    margin-left: 5px;
+    font-size: 12px;
+    color: #16a34a;
+    font-weight: 600;
   }
   .theory p {
     color: #334155;

@@ -13,7 +13,7 @@ export interface PracticeRecord {
 }
 
 const STORAGE_KEY = 'piano-tutor.practice-history'
-const MAX_RECORDS = 200
+const MAX_RECORDS = 500
 
 function load(): PracticeRecord[] {
   try {

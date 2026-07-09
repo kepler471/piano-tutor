@@ -1,8 +1,11 @@
 <script lang="ts">
   import { practiceHistory } from '../lib/practice/history.svelte'
+  import { dayStreak, weekSegments } from '../lib/practice/stats'
   import { navigate } from '../router.svelte'
 
   const recent = $derived(practiceHistory.records.slice(0, 6))
+  const streak = $derived(dayStreak(practiceHistory.records, new Date()))
+  const weekCount = $derived(weekSegments(practiceHistory.records, new Date()))
 
   // One-time welcome for first-run users (a UI flag, not progress tracking).
   const WELCOMED_KEY = 'piano-tutor.welcomed'
@@ -108,11 +111,11 @@
 
   {#if recent.length}
     <h2 class="recent-h">Recent practice</h2>
-    {#if practiceHistory.today.length}
-      <p class="hint">
-        {practiceHistory.today.length} segment{practiceHistory.today.length === 1 ? '' : 's'} completed today — keep it up!
-      </p>
-    {/if}
+    <p class="hint">
+      {#if streak > 1}🔥 {streak}-day streak ·{/if}
+      {weekCount} segment{weekCount === 1 ? '' : 's'} this week{#if practiceHistory.today.length}
+        · {practiceHistory.today.length} today — keep it up!{/if}
+    </p>
     <ul class="recent">
       {#each recent as r (r.at)}
         <li>
