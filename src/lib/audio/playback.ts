@@ -1,5 +1,8 @@
 import * as Tone from 'tone'
 import { Note } from 'tonal'
+import { planEndSec, schedulePlan, type PlayableNote } from './schedule'
+
+export type { PlayableNote } from './schedule'
 
 const SALAMANDER_BASE = 'https://tonejs.github.io/audio/salamander/'
 
@@ -31,7 +34,10 @@ export async function ensurePiano(): Promise<void> {
       sampler = new Tone.Sampler({
         urls: SAMPLE_URLS,
         baseUrl: SALAMANDER_BASE,
-        release: 1,
+        // Damper realism: 0.3 s stops the tail within the following chord.
+        // Longer values ring through the next harmony and read as wrong notes
+        // in chromatic passages.
+        release: 0.3,
         onload: () => resolve(),
         onerror: (err) => reject(err),
       }).toDestination()
@@ -114,34 +120,19 @@ export async function playChordSequence(groups: number[][], bpm = 92): Promise<v
   await withPlayingFlag(groups.length * step)
 }
 
-export interface PlayableNote {
-  midi: number
-  /** Absolute onset in beats */
-  startBeat: number
-  durationBeats: number
-}
-
 /**
  * Demo playback for songs: schedules every note at its beat time. With
- * swing, off-beat eighths land at 2/3 of the beat.
+ * swing, the beat axis is warped so off-beat eighths land at 2/3 of the
+ * beat and durations stretch/shrink to match (see schedule.ts).
  */
 export async function playSong(notes: PlayableNote[], bpm: number, swing = false): Promise<void> {
   await ensurePiano()
-  const beatSec = 60 / bpm
-  const swung = (beat: number) => {
-    if (!swing) return beat
-    const frac = beat - Math.floor(beat)
-    return Math.abs(frac - 0.5) < 1e-6 ? Math.floor(beat) + 2 / 3 : beat
-  }
+  const plan = schedulePlan(notes, bpm, swing)
   const now = Tone.now() + 0.05
-  let endSec = 0
-  for (const n of notes) {
-    const start = swung(n.startBeat) * beatSec
-    const dur = Math.max(0.1, n.durationBeats * beatSec * 0.95)
-    sampler!.triggerAttackRelease(midiToName(n.midi), dur, now + start)
-    endSec = Math.max(endSec, start + dur)
+  for (const n of plan) {
+    sampler!.triggerAttackRelease(midiToName(n.midi), n.durSec, now + n.timeSec, n.velocity)
   }
-  await withPlayingFlag(endSec + 0.05)
+  await withPlayingFlag(planEndSec(plan) + 0.05)
 }
 
 /** Plays notes evenly at the given tempo; resolves when the last note has ended. */

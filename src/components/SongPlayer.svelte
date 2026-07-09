@@ -111,7 +111,7 @@
       for (let m = fromMeasure; m <= toMeasure; m++) {
         for (const n of song.measures[m].notes) {
           if (hands !== 'both' && n.hand !== hands) continue
-          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * bpm + n.startBeat, durationBeats: n.durationBeats })
+          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * bpm + n.startBeat, durationBeats: n.durationBeats, hand: n.hand })
         }
       }
       await playSong(notes, song.tempoBpm, song.swing)
