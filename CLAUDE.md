@@ -99,8 +99,26 @@ WASM — dynamically imported, fully offline against vendored model files).
     (`piano-tutor.vosk-model`), then hands vosk-browser a blob URL.
   - Mic lifecycle: voice holds the mic via `mic.acquire()`/`release()` (refcounted) so
     `stopMonoDetection()`'s `mic.stop()` can't tear down the stream while voice listens.
+- `src/lib/input/` — unified note-input hub (`noteInput.svelte.ts`) over MIDI / mic-mono /
+  mic-poly. Routing is pure (`routing.ts`): MIDI always wins; chord practice defaults to
+  `mic-fused` — mono onsets grade instantly, poly fills in the rest of the chord, and the pure
+  `MonoPolyFuser` (`fusion.ts`, unit-tested) drops poly re-reports of mono-graded notes
+  (exact-midi, 2 s lag window). `settings.fusion` toggles back to poly-only.
+- `src/lib/settings.svelte.ts` — persisted app settings (`piano-tutor.settings`): `a4` tuning
+  reference (435–445; threaded through `frequencyToMidi`/`MonoTracker`, applied on detection
+  start; the Tuner has an auto-calibrate flow; Basic Pitch stays at 440 by design), `fusion`,
+  `defaultHand`. Surfaced in the Settings screen (`/settings`), which also shows the voice
+  miss log (`voice/missLog.ts`) and offline status. Setters are no-ops when unchanged —
+  screens write back from `$effect`s.
 - `src/lib/practice/` — `matcher.ts` is a pure cursor matcher ("wait, don't fail": wrong notes
-  flash but never advance); `history.svelte.ts` persists completions to localStorage.
+  flash but never advance); `history.svelte.ts` persists completions to localStorage (cap 500).
+  `progress.svelte.ts` (level/streak, 3 clean runs → level up) backs sight-reading, quizzes
+  (`quiz-${mode}`) and rhythm (`rhythm`). `stats.ts` (Home streak/week counts) and
+  `guideProgress.ts` (maps guide links to the history `lessonId` formats each screen writes;
+  integrity-tested) are pure. `timingGrader.ts` grades onsets against the beat grid — used by
+  RhythmTrainer, LessonPlayer and SongPlayer (metronome on; suppressed on laggy `mic-poly`).
+  `songPrefs.svelte.ts` persists per-song practice tempo; `songSteps.ts` also owns the
+  `bars=3-6` URL-param helpers for arbitrary measure-range practice.
 - `src/lib/data/lessons/` — practice content (five-finger, Hanon No. 1, scale routine incl.
   melodic minors, chromatic, contrary motion, arpeggios in all 24 keys, I–IV–V–I cadences
   (poly), jazz, generated sight-reading melodies).
@@ -111,7 +129,8 @@ WASM — dynamically imported, fully offline against vendored model files).
   `npx vite-node scripts/midiToCatalog.ts file.mid`, paste + clamp/curate.
 - `src/lib/data/guide.ts` — the learning guide: five curriculum stages whose deep links are
   integrity-tested against the lesson/song/quiz registries (`src/tests/guide.test.ts`).
-  Deliberately static — the guide never tracks progress.
+  Deliberately static data — GuideScreen derives "practiced ✓" badges from history via
+  `practice/guideProgress.ts`; never add tracking to the guide data itself.
 - `src/lib/quiz/` + `src/lib/theory/quiz.ts` + `src/lib/ear/quiz.ts` — pure quiz generators
   (11 modes) behind `/quizzes` (`/ear` is an alias route).
 - `src/lib/transcribe/` — `cluster.ts` (Tier A: onsets → chords, no rhythm) and `quantize.ts`
@@ -133,6 +152,17 @@ WASM — dynamically imported, fully offline against vendored model files).
   instead because Vite refuses to `import()` modules out of public/ (see `embedder.ts`).
 
 Re-copy these after upgrading the corresponding packages.
+
+## PWA / offline (vite-plugin-pwa in vite.config.ts)
+
+Installable, offline-capable (prod only; the dev SW is disabled because dev serves ort-wasm
+from node_modules). Precache = app shell only; `globIgnores` keeps every model/WASM dir (and
+the ~6 MB lazy vosk JS chunk) out of it. Runtime CacheFirst routes: hashed `/assets/`,
+same-origin `/model|tfjs-wasm|ort-wasm|worklets/` (cache `piano-tutor.sw-static` — **bump the
+cache name when re-copying those dirs**, they aren't content-hashed), and the Salamander
+sample host so demos play offline. Deliberately NO route for `model-vosk/` (modelLoader.ts
+already Cache-API-caches it with a progress bar; an SW route would double-store 41 MB) or
+`model-minilm/` (transformers.js self-caches).
 
 ## Conventions
 

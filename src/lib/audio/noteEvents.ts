@@ -23,12 +23,21 @@ export interface NoteEvent {
 
 export type NoteEventListener = (ev: NoteEvent) => void
 
-export function frequencyToMidi(freq: number): { midi: number; cents: number } {
-  const midiFloat = 69 + 12 * Math.log2(freq / 440)
+export function frequencyToMidi(freq: number, a4 = 440): { midi: number; cents: number } {
+  const midiFloat = 69 + 12 * Math.log2(freq / a4)
   const midi = Math.round(midiFloat)
   return { midi, cents: (midiFloat - midi) * 100 }
 }
 
-export function midiToFrequency(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12)
+export function midiToFrequency(midi: number, a4 = 440): number {
+  return a4 * Math.pow(2, (midi - 69) / 12)
+}
+
+/**
+ * Tuning-calibration step: if a reference A4 read `avgCents` off under the
+ * current tuning, this is the A4 that would read it as 0. (Callers clamp to
+ * a sane range — see settings.clampA4.)
+ */
+export function calibratedA4(currentA4: number, avgCents: number): number {
+  return currentA4 * Math.pow(2, avgCents / 1200)
 }

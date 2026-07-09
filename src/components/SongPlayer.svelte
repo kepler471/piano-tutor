@@ -2,15 +2,22 @@
   import GrandSheetMusic from './GrandSheetMusic.svelte'
   import InputPicker from './InputPicker.svelte'
   import PianoKeyboard from './PianoKeyboard.svelte'
+  import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
   import { playSong } from '../lib/audio/playback'
   import { beatsPerMeasure, type Song } from '../lib/data/songs/types'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
   import { midiToNameInKey, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
-  import { stepsFromSong } from '../lib/practice/songSteps'
+  import { songPrefs } from '../lib/practice/songPrefs.svelte'
+  import { barsParam, parseBarsParam, stepsFromSong } from '../lib/practice/songSteps'
+  import { gradeTiming } from '../lib/practice/timingGrader'
+  import { currentParams, navigate } from '../router.svelte'
 
   let { song, onexit }: { song: Song; onexit?: () => void } = $props()
+
+  const MIN_BPM = 40
+  const MAX_BPM = 180
 
   type Hands = 'both' | 'R' | 'L'
   let hands = $state<Hands>('both')
@@ -26,12 +33,56 @@
   // mirrors what was played — never the expected keys or fingers.
   let showKeyboard = $state(false)
   let showFingering = $state(true)
+  let metronomeOn = $state(false)
+  let loop = $state(false)
+  // Practice tempo, persisted per song. svelte-ignore as above: keyed per song.
+  // svelte-ignore state_referenced_locally
+  let bpm = $state(songPrefs.get(song.id)?.bpm ?? song.tempoBpm)
+
+  // Range and hand sub-state mirrors into the URL (?bars=3-6&hands=R) with
+  // replace navigation — restorable on refresh, no history pollution.
+  // (Param is `bars`, not `from`/`to`: `from=guide` is the guide breadcrumb.)
+  {
+    const params = currentParams()
+    // svelte-ignore state_referenced_locally
+    const linked = parseBarsParam(params.bars, song.measures.length)
+    if (linked) {
+      fromMeasure = linked.fromMeasure
+      toMeasure = linked.toMeasure
+    }
+    if (params.hands === 'R' || params.hands === 'L') hands = params.hands
+  }
+
+  function reflectRoute() {
+    const params: Record<string, string> = { song: song.id }
+    if (fromMeasure !== 0 || toMeasure !== song.measures.length - 1) {
+      params.bars = barsParam(fromMeasure, toMeasure)
+    }
+    if (hands !== 'both') params.hands = hands
+    const from = currentParams().from
+    if (from) params.from = from
+    navigate('/songs', params, { replace: true })
+  }
 
   function selectSection(from: number, to: number) {
     fromMeasure = from
     toMeasure = to
     resetKey++
     version++
+    reflectRoute()
+  }
+
+  function setHands(h: Hands) {
+    hands = h
+    resetKey++
+    version++
+    reflectRoute()
+  }
+
+  function setBpm(value: number) {
+    const n = Math.round(Number(value))
+    bpm = Number.isFinite(n) && n > 0 ? Math.min(MAX_BPM, Math.max(MIN_BPM, n)) : song.tempoBpm
+    songPrefs.setBpm(song.id, bpm)
   }
 
   const range = $derived({ hands, fromMeasure, toMeasure })
@@ -42,14 +93,40 @@
     return new StepMatcher(steps, { lookahead: 2 })
   })
 
-  // Wrong-note flash lasts one beat, clamped so it stays visible but snappy.
-  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / song.tempoBpm)))
+  // Wall-clock times of each step advance — graded against the beat grid on
+  // completion when the metronome is on (same pattern as LessonPlayer).
+  let advanceTimes: number[] = []
+  let timingPct = $state<number | null>(null)
+  $effect(() => {
+    void matcher
+    advanceTimes = []
+    timingPct = null
+  })
+
+  // Metronome with a one-bar count-in; restarted on every attempt so each
+  // run gets its own count-in. It deliberately does NOT gate the mic
+  // (playback.isPlaying stays false) — grading listens while it ticks.
+  $effect(() => {
+    void resetKey
+    if (metronomeOn) {
+      void startMetronome(bpm, { countInBeats: song.timeSignature[0] })
+      return () => stopMetronome()
+    }
+  })
+  $effect(() => {
+    if (metronomeOn) setMetronomeBpm(bpm)
+  })
+
+  // Wrong-note flash lasts one beat at the practice tempo, clamped so it
+  // stays visible but snappy.
+  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / bpm)))
 
   $effect(() => {
     return onInput((ev) => {
       if (ev.kind !== 'on' || matcher.done) return
       const outcome = matcher.onOnset(ev.midi)
       version++
+      if (outcome.advanced) advanceTimes.push(ev.tMs ?? performance.now())
       if (outcome.wrong) {
         const flashed = ev.midi
         wrongFlash = new Set([...wrongFlash, flashed])
@@ -96,10 +173,44 @@
     return matcher.cursor
   })
 
+  // Loop-the-section drilling: auto-restart shortly after completion.
+  $effect(() => {
+    if (loop && done && steps.length > 0) {
+      const t = setTimeout(() => {
+        resetKey++
+        version++
+      }, 1200)
+      return () => clearTimeout(t)
+    }
+  })
+
   let loggedDone = false
   $effect(() => {
     if (done && steps.length > 0 && !loggedDone) {
       loggedDone = true
+      // Rhythm read-through grade, relative to the run's own first note.
+      // Suppressed on mic-poly input: its 0.5–1.5 s detection latency makes
+      // millisecond grading meaningless. A lookahead-skip advances the cursor
+      // twice on one onset, so the length check fails and the run simply
+      // isn't timing-graded.
+      if (
+        metronomeOn &&
+        noteInput.activeSource !== 'mic-poly' &&
+        steps.length > 1 &&
+        steps.every((s) => s.startBeat !== undefined) &&
+        advanceTimes.length === steps.length
+      ) {
+        const beatMs = 60000 / bpm
+        const anchor = advanceTimes[0] - steps[0].startBeat! * beatMs
+        const result = gradeTiming(
+          steps.map((s) => ({ startBeat: s.startBeat! })),
+          advanceTimes.map((tMs) => ({ tMs })),
+          bpm,
+          anchor,
+          song.swing ? { swingRatio: 2 / 3 } : {},
+        )
+        timingPct = Math.round(result.accuracy * 100)
+      }
       addRecord({
         lessonId: `song-${song.id}`,
         title: song.title,
@@ -122,15 +233,16 @@
     if (demoPlaying) return
     demoPlaying = true
     try {
-      const bpm = beatsPerMeasure(song)
+      const beatsPerBar = beatsPerMeasure(song)
       const notes = []
       for (let m = fromMeasure; m <= toMeasure; m++) {
         for (const n of song.measures[m].notes) {
           if (hands !== 'both' && n.hand !== hands) continue
-          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * bpm + n.startBeat, durationBeats: n.durationBeats, hand: n.hand })
+          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * beatsPerBar + n.startBeat, durationBeats: n.durationBeats, hand: n.hand })
         }
       }
-      await playSong(notes, song.tempoBpm, song.swing)
+      // Demo at the chosen practice tempo (state `bpm`), not the score tempo.
+      await playSong(notes, bpm, song.swing)
     } finally {
       demoPlaying = false
     }
@@ -178,20 +290,71 @@
         {s.label}
       </button>
     {/each}
+    <label class="bars">
+      Bars
+      <input
+        type="number"
+        min="1"
+        max={toMeasure + 1}
+        value={fromMeasure + 1}
+        onchange={(e) => {
+          const v = Math.round(Number(e.currentTarget.value))
+          const from = Number.isFinite(v) ? Math.min(Math.max(v, 1), toMeasure + 1) : 1
+          e.currentTarget.value = String(from)
+          selectSection(from - 1, toMeasure)
+        }}
+      />
+      –
+      <input
+        type="number"
+        min={fromMeasure + 1}
+        max={song.measures.length}
+        value={toMeasure + 1}
+        onchange={(e) => {
+          const v = Math.round(Number(e.currentTarget.value))
+          const to = Number.isFinite(v) ? Math.min(Math.max(v, fromMeasure + 1), song.measures.length) : song.measures.length
+          e.currentTarget.value = String(to)
+          selectSection(fromMeasure, to - 1)
+        }}
+      />
+    </label>
+    <label class="opt">
+      <input type="checkbox" bind:checked={loop} /> Loop
+    </label>
+  </div>
+
+  <div class="controls-row">
+    <span class="control-label">Tempo:</span>
+    <input
+      class="tempo-slider"
+      type="range"
+      min={MIN_BPM}
+      max={MAX_BPM}
+      value={bpm}
+      oninput={(e) => setBpm(Number(e.currentTarget.value))}
+    />
+    <input
+      class="tempo-num"
+      type="number"
+      min={MIN_BPM}
+      max={MAX_BPM}
+      value={bpm}
+      onchange={(e) => {
+        setBpm(Number(e.currentTarget.value))
+        e.currentTarget.value = String(bpm)
+      }}
+    />
+    <span class="hint-inline">BPM{bpm !== song.tempoBpm ? ` (score: ♩=${song.tempoBpm})` : ''}</span>
+    <label class="opt">
+      <input type="checkbox" bind:checked={metronomeOn} />
+      Metronome ({song.timeSignature[0]}-beat count-in, grades your timing)
+    </label>
   </div>
 
   <div class="controls-row">
     <span class="control-label">Hands:</span>
     {#each [['both', 'Both'], ['R', 'Right'], ['L', 'Left']] as const as [value, label] (value)}
-      <button
-        class="seg"
-        class:active={hands === value}
-        onclick={() => {
-          hands = value
-          resetKey++
-          version++
-        }}
-      >
+      <button class="seg" class:active={hands === value} onclick={() => setHands(value)}>
         {label}
       </button>
     {/each}
@@ -213,8 +376,10 @@
   <InputPicker preferred={needsChords ? 'poly' : 'mono'} />
   {#if needsChords && noteInput.activeSource !== 'midi'}
     <p class="hint">
-      🎹 This piece has chords or both hands — it works best with a MIDI keyboard. Mic chord
-      detection runs about a second behind.
+      🎹 This piece has chords or both hands — it works best with a MIDI keyboard.
+      {noteInput.activeSource === 'mic-fused'
+        ? 'The mic grades the top line instantly; the remaining chord notes land about a second behind.'
+        : 'Mic chord detection runs about a second behind.'}
     </p>
   {/if}
 
@@ -224,6 +389,12 @@
       {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong note${mistakes === 1 ? '' : 's'} along the way.`}
       {#if skips > 0}
         {skips} note{skips === 1 ? '' : 's'} slipped by — missed: {missedLabel} (shown in gray on the score).
+      {/if}
+      {#if timingPct !== null}
+        <span class="timing">Timing: {timingPct}% in the pocket at ♩={bpm}.</span>
+      {/if}
+      {#if loop}
+        <span class="timing">Looping — starting again…</span>
       {/if}
       <button
         class="primary"
@@ -290,6 +461,38 @@
   }
   .spacer {
     flex: 1;
+  }
+  .bars,
+  .opt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #475569;
+  }
+  .bars input {
+    width: 52px;
+    padding: 4px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+  .tempo-slider {
+    width: 140px;
+  }
+  .tempo-num {
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+  .hint-inline {
+    font-size: 13px;
+    color: #64748b;
+  }
+  .timing {
+    display: block;
+    font-size: 13px;
+    color: #475569;
   }
   .show-kb {
     display: flex;

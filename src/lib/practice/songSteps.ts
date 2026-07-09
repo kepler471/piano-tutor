@@ -42,6 +42,29 @@ export function songSlices(song: Song, opts: SongStepOptions): SongSlice[] {
   return [...groups.values()].sort((a, b) => a.startBeat - b.startBeat)
 }
 
+/**
+ * Parse a `bars=3-6` URL param (1-based inclusive) into a 0-based measure
+ * range, or null when absent/invalid. Ranges are clamped to the song, so a
+ * stale link to a shorter piece still lands somewhere sensible.
+ */
+export function parseBarsParam(
+  value: string | undefined,
+  measureCount: number,
+): { fromMeasure: number; toMeasure: number } | null {
+  if (!value) return null
+  const m = /^(\d+)-(\d+)$/.exec(value)
+  if (!m) return null
+  const from = Number(m[1])
+  const to = Number(m[2])
+  if (from < 1 || to < from || from > measureCount) return null
+  return { fromMeasure: from - 1, toMeasure: Math.min(to, measureCount) - 1 }
+}
+
+/** Inverse of parseBarsParam: 0-based range → `3-6` (1-based inclusive). */
+export function barsParam(fromMeasure: number, toMeasure: number): string {
+  return `${fromMeasure + 1}-${toMeasure + 1}`
+}
+
 export function stepsFromSong(song: Song, opts: SongStepOptions): LessonStep[] {
   return songSlices(song, opts).map((slice) => {
     const ordered = [...slice.notes].sort((a, b) => a.midi - b.midi)

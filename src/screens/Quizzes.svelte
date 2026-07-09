@@ -41,6 +41,7 @@
   import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/quiz/modes'
   import { midiToVexKey, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
+  import { getProgress, recordRun, setLevel as setStoredLevel, STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'
   import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams, navigate } from '../router.svelte'
@@ -101,10 +102,16 @@
   let mode = $state<QuizModeId>('intervals')
   let level = $state(1)
 
+  /** Persisted level for a mode, capped to its level count. */
+  function storedLevel(m: QuizModeId): number {
+    return Math.min(getProgress(`quiz-${m}`).level, QUIZ_LEVEL_COUNTS[m])
+  }
+
   // Mode and level are mirrored in the URL (?mode=&level=) with replace
   // navigation: refresh and back-into-the-screen restore them, but toggling
   // modes never stacks history entries. The $effect below also applies
-  // guide deep links and back/forward param changes.
+  // guide deep links and back/forward param changes. A URL without a valid
+  // level falls back to the mode's persisted level.
   const routeParams = $derived(currentParams())
 
   function fromParams(params: Readonly<Record<string, string>>): { mode: QuizModeId; level: number } | null {
@@ -113,7 +120,7 @@
     const linkedLevel = Number(params.level)
     const validLevel =
       Number.isInteger(linkedLevel) && linkedLevel >= 1 && linkedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]
-    return { mode: linkedMode, level: validLevel ? linkedLevel : 1 }
+    return { mode: linkedMode, level: validLevel ? linkedLevel : storedLevel(linkedMode) }
   }
 
   // Initial deep link, applied before the first render.
@@ -121,6 +128,10 @@
   if (initial) {
     mode = initial.mode
     level = initial.level
+  } else {
+    // Default mode — resume its persisted level. (Literal id: referencing
+    // `mode` here would only capture its initial value anyway.)
+    level = storedLevel('intervals')
   }
 
   function reflectRoute() {
@@ -180,17 +191,20 @@
     echoResult = null
     phraseResult = null
     heard = false
+    roundFeedback = null
+    autoLeveled = false
   }
 
   function setMode(m: QuizModeId) {
     mode = m
-    level = 1
+    level = storedLevel(m)
     resetRound()
     reflectRoute()
   }
 
   function setLevel(l: number) {
     level = l
+    setStoredLevel(`quiz-${mode}`, l)
     resetRound()
     reflectRoute()
   }
@@ -296,6 +310,11 @@
     maybeRecord()
   }
 
+  // Feedback for the round-complete card: streak towards the next level, or
+  // the level-up itself (three perfect rounds in a row bump the stored level).
+  let roundFeedback = $state<string | null>(null)
+  let autoLeveled = $state(false)
+
   function maybeRecord() {
     if (answered < roundSize) return
     addRecord({
@@ -307,6 +326,17 @@
       kind: 'ear',
       score: { correct, total: answered },
     })
+    const { leveledUp, progress } = recordRun(`quiz-${mode}`, correct === answered, maxLevel)
+    if (leveledUp) {
+      level = progress.level
+      autoLeveled = true
+      roundFeedback = `🎉 Three perfect rounds — you're now on level ${progress.level}.`
+      reflectRoute()
+    } else if (correct === answered && level < maxLevel) {
+      roundFeedback = `Perfect round — ${progress.streak}/${STREAK_TO_LEVEL_UP} towards level ${level + 1}.`
+    } else {
+      roundFeedback = null
+    }
   }
 
   function next() {
@@ -374,8 +404,11 @@
     {#if roundDone}
       <div class="complete">
         🎉 Round complete — {correct} / {answered} correct.
+        {#if roundFeedback}
+          <span class="feedback">{roundFeedback}</span>
+        {/if}
         <button class="primary" onclick={resetRound}>New round</button>
-        {#if correct === answered && level < maxLevel}
+        {#if !autoLeveled && correct === answered && level < maxLevel}
           <button class="primary" onclick={() => setLevel(level + 1)}>Level up →</button>
         {/if}
       </div>
@@ -532,6 +565,11 @@
   }
   .next {
     align-self: flex-start;
+  }
+  .feedback {
+    display: block;
+    font-size: 13px;
+    color: #475569;
   }
   button.primary {
     align-self: flex-start;

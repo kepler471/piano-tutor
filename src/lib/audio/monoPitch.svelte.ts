@@ -1,3 +1,4 @@
+import { settings } from '../settings.svelte'
 import { mic } from './mic.svelte'
 import { MonoTracker } from './monoTracker'
 import type { NoteEvent, NoteEventListener } from './noteEvents'
@@ -75,7 +76,8 @@ function uiTick() {
 export async function startMonoDetection(): Promise<void> {
   await mic.start()
   if (mic.status !== 'running' || running) return
-  tracker = new MonoTracker({ frameSize: FRAME_SIZE })
+  // a4 is read at detection start; the Tuner restarts detection to apply it.
+  tracker = new MonoTracker({ frameSize: FRAME_SIZE, a4: settings.a4 })
   buffer = new Float32Array(FRAME_SIZE)
   running = true
   intervalId = window.setInterval(detectTick, POLL_MS)

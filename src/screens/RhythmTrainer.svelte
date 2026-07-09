@@ -8,23 +8,28 @@
   import { onInput } from '../lib/input/noteInput.svelte'
   import { durationFromBeats, type HighlightState, type ScoreModel } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
+  import { getProgress, recordRun, setLevel as setStoredLevel, STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'
   import { gradeTiming, type TimingResult } from '../lib/practice/timingGrader'
   import { currentParams } from '../router.svelte'
 
   const SWING_RATIO = 2 / 3
   const COUNT_IN = 4
+  const MAX_LEVEL = 4
+  const ACTIVITY = 'rhythm'
 
-  let level = $state<1 | 2 | 3 | 4>(1)
+  type Level = 1 | 2 | 3 | 4
+
+  let level = $state<Level>(1)
   let patternId = $state(RHYTHM_PATTERNS[0].id)
   let bpm = $state(80)
 
-  // Deep link from the learning guide, read once at mount.
+  // Guide deep link (read once at mount) wins; otherwise resume the
+  // persisted level.
   {
     const linked = Number(currentParams().level)
-    if (linked === 1 || linked === 2 || linked === 3 || linked === 4) {
-      level = linked
-      patternId = RHYTHM_PATTERNS.find((p) => p.level === linked)!.id
-    }
+    const stored = Math.min(getProgress(ACTIVITY).level, MAX_LEVEL) as Level
+    level = linked === 1 || linked === 2 || linked === 3 || linked === 4 ? linked : stored
+    patternId = RHYTHM_PATTERNS.find((p) => p.level === level)!.id
   }
 
   const levelPatterns = $derived(RHYTHM_PATTERNS.filter((p) => p.level === level))
@@ -34,6 +39,9 @@
   let phase = $state<Phase>('idle')
   let countBeat = $state(0)
   let result = $state<TimingResult | null>(null)
+  // Streak-towards-level-up message for the summary card. Level-ups unlock
+  // the next level in the store but never switch patterns mid-view.
+  let runFeedback = $state<string | null>(null)
 
   let onsets: { tMs: number }[] = []
   let stopBeatListener: (() => void) | null = null
@@ -41,15 +49,20 @@
 
   const totalBeats = $derived(pattern.bars * ((pattern.timeSignature[0] * 4) / pattern.timeSignature[1]))
 
-  function setLevel(l: 1 | 2 | 3 | 4) {
+  function setLevel(l: Level) {
     stopRun()
     level = l
     patternId = RHYTHM_PATTERNS.find((p) => p.level === l)!.id
+    result = null
+    runFeedback = null
+    setStoredLevel(ACTIVITY, l)
   }
 
   function selectPattern(id: string) {
     stopRun()
     patternId = id
+    result = null
+    runFeedback = null
   }
 
   function stopRun() {
@@ -84,12 +97,25 @@
           total: pattern.events.length,
         },
       })
+      const clean =
+        result.missed.length === 0 &&
+        result.extra.length === 0 &&
+        result.hits.every((h) => h.rating === 'perfect' || h.rating === 'good')
+      const { leveledUp, progress } = recordRun(ACTIVITY, clean, MAX_LEVEL)
+      if (leveledUp) {
+        runFeedback = `🎉 Three clean runs in a row — Level ${progress.level} unlocked.`
+      } else if (clean && level < MAX_LEVEL) {
+        runFeedback = `Clean run — ${progress.streak}/${STREAK_TO_LEVEL_UP} towards level ${level + 1}.`
+      } else {
+        runFeedback = null
+      }
     }
     phase = 'done'
   }
 
   async function start() {
     result = null
+    runFeedback = null
     onsets = []
     phase = 'count-in'
     countBeat = 0
@@ -205,6 +231,9 @@
         {#if summary.off}· {summary.off} early/late{/if}
         {#if summary.missed}· {summary.missed} missed{/if}
         {#if summary.extra}· {summary.extra} stray tap{summary.extra === 1 ? '' : 's'}{/if}
+        {#if runFeedback}
+          <span class="feedback">{runFeedback}</span>
+        {/if}
         <button class="primary" onclick={start}>↺ Again</button>
       </div>
       <p class="hint legend">
@@ -256,6 +285,11 @@
   }
   .count.live {
     color: #16a34a;
+  }
+  .feedback {
+    display: block;
+    font-size: 13px;
+    color: #475569;
   }
   .legend .lg.green {
     color: #16a34a;

@@ -38,11 +38,13 @@
       <div class="meter" title="Input level">
         <div class="meter-fill" style="width: {levelPct}%"></div>
       </div>
-      {#if noteInput.activeSource === 'mic-poly'}
+      {#if noteInput.activeSource === 'mic-poly' || noteInput.activeSource === 'mic-fused'}
         {#if polyPitch.status === 'loading'}
           <span class="badge loading">loading chord model…</span>
         {:else if polyPitch.status === 'listening'}
-          <span class="badge ready">chord detection on ({polyPitch.backend})</span>
+          <span class="badge ready">
+            chord detection on ({polyPitch.backend}{noteInput.activeSource === 'mic-fused' ? ' + instant melody' : ''})
+          </span>
         {:else if polyPitch.status === 'error'}
           <span class="input-error">chord model failed: {polyPitch.errorMessage}</span>
         {/if}
