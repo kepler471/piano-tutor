@@ -120,7 +120,9 @@
           {#if r.score}
             {r.score.correct}/{r.score.total} correct{r.score.correct === r.score.total ? ' ✨' : ''}
           {:else}
-            {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes} wrong note${r.mistakes === 1 ? '' : 's'}`}
+            {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes} wrong note${r.mistakes === 1 ? '' : 's'}`}{(r.skips ?? 0) > 0
+              ? ` · ${r.skips} slipped by`
+              : ''}
           {/if}
           <span class="when">{new Date(r.at).toLocaleString()}</span>
         </li>
