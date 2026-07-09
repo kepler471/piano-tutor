@@ -13,6 +13,7 @@
   import Songs from './screens/Songs.svelte'
   import FreePlay from './screens/FreePlay.svelte'
   import Tuner from './screens/Tuner.svelte'
+  import Settings from './screens/Settings.svelte'
 
   const links = [
     { route: '/', label: 'Home' },
@@ -26,6 +27,7 @@
     { route: '/songs', label: 'Songs' },
     { route: '/play', label: 'Free Play' },
     { route: '/tuner', label: 'Note Detector' },
+    { route: '/settings', label: '⚙︎' },
   ]
 
   const route = $derived(currentRoute())
@@ -62,6 +64,8 @@
     <FreePlay />
   {:else if route === '/tuner'}
     <Tuner />
+  {:else if route === '/settings'}
+    <Settings />
   {:else}
     <Home />
   {/if}

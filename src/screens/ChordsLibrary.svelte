@@ -19,11 +19,16 @@
   import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
+  import { settings } from '../lib/settings.svelte'
 
   let root = $state('C')
   let quality: ChordQualityId = $state('major')
   let inversion = $state(0)
-  let hand: Hand = $state('R')
+  // Initial hand comes from the persisted setting; changing it here also
+  // updates the default (svelte-ignore: initial read is intended).
+  // svelte-ignore state_referenced_locally
+  let hand: Hand = $state(settings.defaultHand)
+  $effect(() => settings.setDefaultHand(hand))
   let playing = $state(false)
 
   // Deep link from the learning guide, read once at mount.

@@ -69,6 +69,11 @@
       title: 'Note Detector',
       desc: 'Single-note detector and tuner — check what the app hears and how it is calibrated.',
     },
+    {
+      route: '/settings',
+      title: 'Settings',
+      desc: 'Tuning reference, detection options, practice defaults, voice-control diagnostics and offline status.',
+    },
   ]
 </script>
 

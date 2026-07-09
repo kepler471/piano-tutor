@@ -60,15 +60,21 @@ export const settings = {
   get defaultHand() {
     return store.defaultHand
   },
+  // Setters are no-ops when unchanged — callers write back from $effects,
+  // and an unconditional store swap would retrigger them.
   setA4(value: number): void {
-    store = { ...store, a4: clampA4(value) }
+    const a4 = clampA4(value)
+    if (store.a4 === a4) return
+    store = { ...store, a4 }
     persist()
   },
   setFusion(on: boolean): void {
+    if (store.fusion === on) return
     store = { ...store, fusion: on }
     persist()
   },
   setDefaultHand(hand: 'R' | 'L'): void {
+    if (store.defaultHand === hand) return
     store = { ...store, defaultHand: hand }
     persist()
   },
