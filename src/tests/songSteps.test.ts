@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SONG_CATALOG } from '../lib/data/songs/catalog'
 import { beatsPerMeasure } from '../lib/data/songs/types'
-import { songSlices, stepsFromSong } from '../lib/practice/songSteps'
+import { barsParam, parseBarsParam, songSlices, stepsFromSong } from '../lib/practice/songSteps'
 import { songSystems } from '../lib/notation/songScore'
 
 const ode = SONG_CATALOG.find((s) => s.id === 'ode-to-joy')!
@@ -132,5 +132,27 @@ describe('songSystems', () => {
       expect(system.model.bass.every((ev) => ev.rest)).toBe(true)
       expect(system.bassSteps.every((s) => s === null)).toBe(true)
     }
+  })
+})
+
+describe('bars URL param', () => {
+  it('round-trips a 0-based range through the 1-based param', () => {
+    expect(barsParam(2, 5)).toBe('3-6')
+    expect(parseBarsParam('3-6', 10)).toEqual({ fromMeasure: 2, toMeasure: 5 })
+    expect(parseBarsParam(barsParam(0, 9), 10)).toEqual({ fromMeasure: 0, toMeasure: 9 })
+  })
+
+  it('clamps the end of the range to the song length', () => {
+    expect(parseBarsParam('3-99', 10)).toEqual({ fromMeasure: 2, toMeasure: 9 })
+  })
+
+  it('rejects absent, malformed, and out-of-range values', () => {
+    expect(parseBarsParam(undefined, 10)).toBeNull()
+    expect(parseBarsParam('', 10)).toBeNull()
+    expect(parseBarsParam('3', 10)).toBeNull()
+    expect(parseBarsParam('a-b', 10)).toBeNull()
+    expect(parseBarsParam('0-4', 10)).toBeNull() // 1-based
+    expect(parseBarsParam('6-3', 10)).toBeNull() // inverted
+    expect(parseBarsParam('11-12', 10)).toBeNull() // starts past the end
   })
 })

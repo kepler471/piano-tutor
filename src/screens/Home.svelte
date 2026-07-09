@@ -112,9 +112,9 @@
   {#if recent.length}
     <h2 class="recent-h">Recent practice</h2>
     <p class="hint">
-      {#if streak > 1}🔥 {streak}-day streak ·{/if}
-      {weekCount} segment{weekCount === 1 ? '' : 's'} this week{#if practiceHistory.today.length}
-        · {practiceHistory.today.length} today — keep it up!{/if}
+      {(streak > 1 ? `🔥 ${streak}-day streak · ` : '') +
+        `${weekCount} segment${weekCount === 1 ? '' : 's'} this week` +
+        (practiceHistory.today.length ? ` · ${practiceHistory.today.length} today — keep it up!` : '')}
     </p>
     <ul class="recent">
       {#each recent as r (r.at)}
