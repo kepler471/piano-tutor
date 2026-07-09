@@ -9,7 +9,7 @@
   import { expectedMicSource } from '../lib/input/routing'
   import { settings } from '../lib/settings.svelte'
   import type { Lesson } from '../lib/data/lessons'
-  import { scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
+  import { midiToNameInKey, scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import { gradeTiming } from '../lib/practice/timingGrader'
@@ -51,17 +51,19 @@
   // Recreated whenever the lesson, segment, or resetKey changes.
   const matcher = $derived.by(() => {
     void resetKey
-    return new StepMatcher(lesson.segments[segIndex].steps, { lookahead: true })
+    return new StepMatcher(lesson.segments[segIndex].steps, { lookahead: 2 })
   })
 
   // Wall-clock times of each step advance — graded against the beat grid
   // when the metronome is on and the material carries startBeats.
   let advanceTimes: number[] = []
   let timingPct = $state<number | null>(null)
+  let timingUngraded = $state(false)
   $effect(() => {
     void matcher
     advanceTimes = []
     timingPct = null
+    timingUngraded = false
   })
 
   function restartSegment(index = segIndex) {
@@ -69,6 +71,10 @@
     resetKey++
     version++
   }
+
+  // Wrong-note flash lasts one beat at the current tempo, clamped so it
+  // stays visible but snappy.
+  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / bpm)))
 
   $effect(() => {
     // Grading hears the hub's active source: MIDI when a keyboard is
@@ -83,7 +89,7 @@
         wrongFlash = new Set([...wrongFlash, flashed])
         setTimeout(() => {
           wrongFlash = new Set([...wrongFlash].filter((m) => m !== flashed))
-        }, 350)
+        }, flashMs)
       }
     })
   })
@@ -120,7 +126,8 @@
     const map = new Map<number, HighlightState>()
     matcher.results.forEach((r, i) => {
       if (r === 'correct') map.set(i, 'correct')
-      else if (r === 'corrected' || r === 'skipped') map.set(i, 'played')
+      else if (r === 'corrected') map.set(i, 'played')
+      else if (r === 'skipped') map.set(i, 'missed')
     })
     if (!matcher.done) map.set(matcher.cursor, 'next')
     return map
@@ -153,6 +160,17 @@
     void version
     return matcher.mistakes
   })
+  const skips = $derived.by(() => {
+    void version
+    return matcher.skips
+  })
+  const missedNames = $derived.by(() => {
+    void version
+    return [...new Set(matcher.skippedMidis.map((m) => midiToNameInKey(m, lesson.keySignature)))]
+  })
+  const missedLabel = $derived(
+    missedNames.length > 8 ? `${missedNames.slice(0, 8).join(', ')}…` : missedNames.join(', '),
+  )
   const progress = $derived.by(() => {
     void version
     return matcher.cursor
@@ -167,16 +185,20 @@
       // A lookahead-skipped step advances the cursor twice on one onset, so
       // the length check fails and the run simply isn't timing-graded.
       const steps = segment.steps
-      if (metronomeOn && steps.length > 1 && steps.every((s) => s.startBeat !== undefined) && advanceTimes.length === steps.length) {
-        const beatMs = 60000 / bpm
-        const anchor = advanceTimes[0] - steps[0].startBeat! * beatMs
-        const result = gradeTiming(
-          steps.map((s) => ({ startBeat: s.startBeat! })),
-          advanceTimes.map((tMs) => ({ tMs })),
-          bpm,
-          anchor,
-        )
-        timingPct = Math.round(result.accuracy * 100)
+      if (metronomeOn && steps.length > 1 && steps.every((s) => s.startBeat !== undefined)) {
+        if (advanceTimes.length === steps.length) {
+          const beatMs = 60000 / bpm
+          const anchor = advanceTimes[0] - steps[0].startBeat! * beatMs
+          const result = gradeTiming(
+            steps.map((s) => ({ startBeat: s.startBeat! })),
+            advanceTimes.map((tMs) => ({ tMs })),
+            bpm,
+            anchor,
+          )
+          timingPct = Math.round(result.accuracy * 100)
+        } else if (matcher.skips > 0) {
+          timingUngraded = true
+        }
       }
       addRecord({
         lessonId: lesson.id,
@@ -184,6 +206,7 @@
         segment: segment.label,
         mistakes: matcher.mistakes,
         steps: segment.steps.length,
+        skips: matcher.skips,
       })
       oncomplete?.({ mistakes: matcher.mistakes })
     } else if (!done) {
@@ -314,8 +337,13 @@
     <div class="complete">
       🎉 Segment complete — {segment.steps.length} notes,
       {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong note${mistakes === 1 ? '' : 's'} along the way.`}
+      {#if skips > 0}
+        {skips} note{skips === 1 ? '' : 's'} slipped by — missed: {missedLabel} (shown in gray on the score).
+      {/if}
       {#if timingPct !== null}
         Timing: {timingPct}% in the pocket.
+      {:else if timingUngraded}
+        Timing not graded — some notes slipped by; play it again for a rhythm score.
       {/if}
       {#if segIndex < lesson.segments.length - 1}
         <button class="primary" onclick={() => restartSegment(segIndex + 1)}>
@@ -341,6 +369,8 @@
       {/if}
       {#if mistakes > 0}
         Wrong notes so far: {mistakes}.{/if}
+      {#if skips > 0}
+        Missed so far: {skips}.{/if}
     </p>
   {/if}
 

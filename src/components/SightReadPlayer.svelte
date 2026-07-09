@@ -31,7 +31,7 @@
   let pulseTimer: ReturnType<typeof setTimeout> | undefined
   let demoPlaying = $state(false)
 
-  const matcher = $derived(new StepMatcher(steps, { lookahead: true }))
+  const matcher = $derived(new StepMatcher(steps, { lookahead: 1 }))
 
   let completed = false
   $effect(() => {

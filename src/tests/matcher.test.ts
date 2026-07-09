@@ -41,7 +41,7 @@ describe('StepMatcher lookahead', () => {
   })
 
   it('skips a missed step when the onset matches the next one', () => {
-    const m = new StepMatcher(mel(60, 62, 64), { lookahead: true })
+    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 1 })
     expect(m.onOnset(62)).toEqual({ advanced: true, wrong: false, done: false, skipped: 1 })
     expect(m.results[0]).toBe('skipped')
     expect(m.results[1]).toBe('correct')
@@ -52,20 +52,20 @@ describe('StepMatcher lookahead', () => {
   })
 
   it('skipping into the last step completes the lesson', () => {
-    const m = new StepMatcher(mel(60, 62), { lookahead: true })
+    const m = new StepMatcher(mel(60, 62), { lookahead: 1 })
     expect(m.onOnset(62)).toEqual({ advanced: true, wrong: false, done: true, skipped: 1 })
     expect(m.results).toEqual(['skipped', 'correct'])
   })
 
-  it('does not look ahead more than one step', () => {
-    const m = new StepMatcher(mel(60, 62, 64), { lookahead: true })
+  it('depth 1 does not look ahead more than one step', () => {
+    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 1 })
     expect(m.onOnset(64)).toEqual({ advanced: false, wrong: true, done: false })
     expect(m.cursor).toBe(0)
     expect(m.mistakes).toBe(1)
   })
 
   it('recovers from consecutive misses one skip at a time', () => {
-    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead: true })
+    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead: 1 })
     expect(m.onOnset(62).skipped).toBe(1)
     expect(m.onOnset(65).skipped).toBe(1)
     expect(m.done).toBe(true)
@@ -73,14 +73,14 @@ describe('StepMatcher lookahead', () => {
   })
 
   it('a note in neither current nor next step is still wrong', () => {
-    const m = new StepMatcher(mel(60, 62, 64), { lookahead: true })
+    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 1 })
     expect(m.onOnset(70)).toEqual({ advanced: false, wrong: true, done: false })
     expect(m.mistakes).toBe(1)
     expect(m.skips).toBe(0)
   })
 
   it('a repeated note matches the current step, never skips', () => {
-    const m = new StepMatcher(mel(67, 67, 69), { lookahead: true })
+    const m = new StepMatcher(mel(67, 67, 69), { lookahead: 1 })
     expect(m.onOnset(67)).toEqual({ advanced: true, wrong: false, done: false })
     expect(m.results[0]).toBe('correct')
     expect(m.skips).toBe(0)
@@ -92,11 +92,93 @@ describe('StepMatcher lookahead', () => {
         { midis: [60], fingers: [1] },
         { midis: [62, 65, 69], fingers: [1, 2, 4] },
       ],
-      { lookahead: true },
+      { lookahead: 1 },
     )
     expect(m.onOnset(65)).toEqual({ advanced: false, wrong: false, done: false, skipped: 1 })
     expect(m.results[0]).toBe('skipped')
     expect(m.remaining).toEqual(new Set([62, 69]))
+  })
+})
+
+describe('StepMatcher lookahead depth 2', () => {
+  it('recovers two consecutive missed detections in one onset', () => {
+    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead: 2 })
+    expect(m.onOnset(64)).toEqual({ advanced: true, wrong: false, done: false, skipped: 2 })
+    expect(m.results).toEqual(['skipped', 'skipped', 'correct', 'pending'])
+    expect(m.skips).toBe(2)
+    expect(m.mistakes).toBe(0)
+  })
+
+  it('does not look ahead more than two steps', () => {
+    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead: 2 })
+    expect(m.onOnset(65)).toEqual({ advanced: false, wrong: true, done: false })
+    expect(m.cursor).toBe(0)
+    expect(m.mistakes).toBe(1)
+    expect(m.skips).toBe(0)
+  })
+
+  it('the shallowest match wins when a note appears at both depths', () => {
+    const m = new StepMatcher(mel(60, 62, 62), { lookahead: 2 })
+    expect(m.onOnset(62)).toEqual({ advanced: true, wrong: false, done: false, skipped: 1 })
+    expect(m.results).toEqual(['skipped', 'correct', 'pending'])
+    expect(m.skips).toBe(1)
+  })
+
+  it('a repeated note matches the current step, never skips', () => {
+    const m = new StepMatcher(mel(67, 67, 67), { lookahead: 2 })
+    expect(m.onOnset(67)).toEqual({ advanced: true, wrong: false, done: false })
+    expect(m.results[0]).toBe('correct')
+    expect(m.skips).toBe(0)
+  })
+
+  it('double-skips into a chord step and collects one tone without advancing', () => {
+    const m = new StepMatcher(
+      [
+        { midis: [60], fingers: [1] },
+        { midis: [62], fingers: [2] },
+        { midis: [64, 67, 71], fingers: [1, 3, 5] },
+      ],
+      { lookahead: 2 },
+    )
+    expect(m.onOnset(67)).toEqual({ advanced: false, wrong: false, done: false, skipped: 2 })
+    expect(m.results).toEqual(['skipped', 'skipped', 'pending'])
+    expect(m.remaining).toEqual(new Set([64, 71]))
+  })
+
+  it('double-skipping into the last step completes the lesson', () => {
+    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 2 })
+    expect(m.onOnset(64)).toEqual({ advanced: true, wrong: false, done: true, skipped: 2 })
+    expect(m.results).toEqual(['skipped', 'skipped', 'correct'])
+  })
+
+  it('lookahead: 0 never skips', () => {
+    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 0 })
+    expect(m.onOnset(62)).toEqual({ advanced: false, wrong: true, done: false })
+    expect(m.skips).toBe(0)
+  })
+})
+
+describe('StepMatcher skippedMidis', () => {
+  it('is empty when nothing was skipped', () => {
+    const m = new StepMatcher(mel(60, 62), { lookahead: 2 })
+    m.onOnset(60)
+    expect(m.skippedMidis).toEqual([])
+  })
+
+  it('returns the midis of skipped steps in step order, including chord tones', () => {
+    const m = new StepMatcher(
+      [
+        { midis: [60], fingers: [1] },
+        { midis: [62, 65], fingers: [1, 3] },
+        { midis: [67], fingers: [5] },
+        { midis: [69], fingers: [5] },
+      ],
+      { lookahead: 2 },
+    )
+    expect(m.onOnset(67).skipped).toBe(2)
+    m.onOnset(69)
+    expect(m.done).toBe(true)
+    expect(m.skippedMidis).toEqual([60, 62, 65])
   })
 })
 

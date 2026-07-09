@@ -6,7 +6,7 @@
   import { playSong } from '../lib/audio/playback'
   import { beatsPerMeasure, type Song } from '../lib/data/songs/types'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
-  import type { HighlightState } from '../lib/notation/vexScore'
+  import { midiToNameInKey, type HighlightState } from '../lib/notation/vexScore'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import { songPrefs } from '../lib/practice/songPrefs.svelte'
@@ -90,7 +90,7 @@
 
   const matcher = $derived.by(() => {
     void resetKey
-    return new StepMatcher(steps, { lookahead: true })
+    return new StepMatcher(steps, { lookahead: 2 })
   })
 
   // Wall-clock times of each step advance — graded against the beat grid on
@@ -117,6 +117,10 @@
     if (metronomeOn) setMetronomeBpm(bpm)
   })
 
+  // Wrong-note flash lasts one beat at the practice tempo, clamped so it
+  // stays visible but snappy.
+  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / bpm)))
+
   $effect(() => {
     return onInput((ev) => {
       if (ev.kind !== 'on' || matcher.done) return
@@ -128,7 +132,7 @@
         wrongFlash = new Set([...wrongFlash, flashed])
         setTimeout(() => {
           wrongFlash = new Set([...wrongFlash].filter((m) => m !== flashed))
-        }, 350)
+        }, flashMs)
       }
     })
   })
@@ -138,7 +142,8 @@
     const map = new Map<number, HighlightState>()
     matcher.results.forEach((r, i) => {
       if (r === 'correct') map.set(i, 'correct')
-      else if (r === 'corrected' || r === 'skipped') map.set(i, 'played')
+      else if (r === 'corrected') map.set(i, 'played')
+      else if (r === 'skipped') map.set(i, 'missed')
     })
     if (!matcher.done) map.set(matcher.cursor, 'next')
     return map
@@ -152,6 +157,17 @@
     void version
     return matcher.mistakes
   })
+  const skips = $derived.by(() => {
+    void version
+    return matcher.skips
+  })
+  const missedNames = $derived.by(() => {
+    void version
+    return [...new Set(matcher.skippedMidis.map((m) => midiToNameInKey(m, song.keySignature)))]
+  })
+  const missedLabel = $derived(
+    missedNames.length > 8 ? `${missedNames.slice(0, 8).join(', ')}…` : missedNames.join(', '),
+  )
   const progress = $derived.by(() => {
     void version
     return matcher.cursor
@@ -201,6 +217,7 @@
         segment: `bars ${fromMeasure + 1}–${toMeasure + 1}${hands === 'both' ? '' : hands === 'R' ? ' (RH)' : ' (LH)'}`,
         mistakes: matcher.mistakes,
         steps: steps.length,
+        skips: matcher.skips,
         kind: 'song',
       })
     } else if (!done) {
@@ -216,14 +233,15 @@
     if (demoPlaying) return
     demoPlaying = true
     try {
-      const bpm = beatsPerMeasure(song)
+      const beatsPerBar = beatsPerMeasure(song)
       const notes = []
       for (let m = fromMeasure; m <= toMeasure; m++) {
         for (const n of song.measures[m].notes) {
           if (hands !== 'both' && n.hand !== hands) continue
-          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * bpm + n.startBeat, durationBeats: n.durationBeats })
+          notes.push({ midi: n.midi, startBeat: (m - fromMeasure) * beatsPerBar + n.startBeat, durationBeats: n.durationBeats, hand: n.hand })
         }
       }
+      // Demo at the chosen practice tempo (state `bpm`), not the score tempo.
       await playSong(notes, bpm, song.swing)
     } finally {
       demoPlaying = false
@@ -369,6 +387,9 @@
     <div class="complete">
       🎉 Passage complete — {steps.length} steps,
       {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong note${mistakes === 1 ? '' : 's'} along the way.`}
+      {#if skips > 0}
+        {skips} note{skips === 1 ? '' : 's'} slipped by — missed: {missedLabel} (shown in gray on the score).
+      {/if}
       {#if timingPct !== null}
         <span class="timing">Timing: {timingPct}% in the pocket at ♩={bpm}.</span>
       {/if}
@@ -410,6 +431,7 @@
       Wait-mode: the orange note is next; the score waits until you play it. Progress: {progress} /
       {steps.length}.
       {#if mistakes > 0}Wrong notes so far: {mistakes}.{/if}
+      {#if skips > 0}Missed so far: {skips}.{/if}
     </p>
   {/if}
 

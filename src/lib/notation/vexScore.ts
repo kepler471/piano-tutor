@@ -75,13 +75,14 @@ export function durationFromBeats(beats: number): { duration: string; dots: numb
   return { duration: 'q', dots: 0 }
 }
 
-export type HighlightState = 'played' | 'correct' | 'wrong' | 'next'
+export type HighlightState = 'played' | 'correct' | 'wrong' | 'next' | 'missed'
 
 const HIGHLIGHT_COLORS: Record<HighlightState, string> = {
   played: '#2563eb',
   correct: '#16a34a',
   wrong: '#dc2626',
   next: '#d97706',
+  missed: '#94a3b8',
 }
 
 export function noteNameToVexKey(name: string): string {
@@ -99,10 +100,14 @@ const FLAT_KEYS = new Set([
   'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm',
 ])
 
+/** Human-readable note name spelled to suit the key signature (e.g. 'Bb4' in F). */
+export function midiToNameInKey(midi: number, keySignature: string): string {
+  return FLAT_KEYS.has(keySignature) ? Note.fromMidi(midi) : Note.fromMidiSharps(midi)
+}
+
 /** Spell a midi note to suit the key signature (flats in flat keys). */
 export function midiToVexKeyInKey(midi: number, keySignature: string): string {
-  const name = FLAT_KEYS.has(keySignature) ? Note.fromMidi(midi) : Note.fromMidiSharps(midi)
-  return noteNameToVexKey(name)
+  return noteNameToVexKey(midiToNameInKey(midi, keySignature))
 }
 
 function buildNote(

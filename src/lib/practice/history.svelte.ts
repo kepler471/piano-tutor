@@ -4,6 +4,8 @@ export interface PracticeRecord {
   segment: string
   mistakes: number
   steps: number
+  /** Steps skipped by lookahead (missed detections); older records have none (= 0). */
+  skips?: number
   /** What kind of practice this was; older records have none (= 'lesson'). */
   kind?: 'lesson' | 'ear' | 'rhythm' | 'song'
   /** Quiz-style activities: questions answered correctly out of total. */
