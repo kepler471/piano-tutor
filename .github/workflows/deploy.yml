@@ -30,8 +30,10 @@ jobs:
       - run: npm run build
       - uses: actions/configure-pages@v5
         with:
-          # Create the Pages site on first run so no manual repo-settings
-          # step is needed.
+          # Best-effort: creating the Pages site needs repo-admin rights the
+          # default GITHUB_TOKEN lacks, so the site was created once via
+          # `POST /repos/kepler471/piano-tutor/pages {"build_type":"workflow"}`.
+          # Harmless once the site exists.
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
