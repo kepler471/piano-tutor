@@ -10,6 +10,8 @@ export interface Embedder {
   embed(texts: string[]): Promise<Float32Array[]>
 }
 
+import { assetUrl } from '../assetUrl'
+
 let instance: Promise<Embedder> | null = null
 
 export function getEmbedder(): Promise<Embedder> {
@@ -20,7 +22,7 @@ async function create(): Promise<Embedder> {
   const { pipeline, env } = await import('@huggingface/transformers')
   env.allowRemoteModels = false
   env.allowLocalModels = true // browser builds default this to false
-  env.localModelPath = '/model-minilm/'
+  env.localModelPath = assetUrl('model-minilm/')
   env.useBrowserCache = true
   // Must be set AFTER import: transformers.js defaults this to a CDN path.
   // ORT appends its own filename choice (plain vs .asyncify pair — all four
@@ -28,8 +30,8 @@ async function create(): Promise<Embedder> {
   // (Vite forbids it), so the runtime is served from node_modules instead.
   if (env.backends.onnx.wasm) {
     env.backends.onnx.wasm.wasmPaths = import.meta.env.DEV
-      ? '/node_modules/onnxruntime-web/dist/'
-      : '/ort-wasm/'
+      ? assetUrl('node_modules/onnxruntime-web/dist/')
+      : assetUrl('ort-wasm/')
   }
 
   const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {

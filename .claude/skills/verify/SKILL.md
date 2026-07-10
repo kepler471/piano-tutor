@@ -12,8 +12,11 @@ real app, not by re-running vitest.
 
 ```bash
 npm run dev > /tmp/dev.log 2>&1 &   # port 5173, or next free — grep the log
-grep -o "http://localhost:[0-9]*" /tmp/dev.log | head -1
+grep -o "http://localhost:[0-9]*/piano-tutor/" /tmp/dev.log | head -1
 ```
+
+The app is served under the `/piano-tutor/` base path (GitHub Pages deploy);
+the bare origin shows a Vite hint page, not the app.
 
 ## Drive
 
@@ -24,7 +27,7 @@ absolute path (NODE_PATH does not apply to ESM):
 import { chromium } from '/Users/steli/src/piano-tutor/node_modules/playwright/index.mjs'
 ```
 
-- Routes are hash-based: `http://localhost:PORT/#/circle?key=Gb`.
+- Routes are hash-based: `http://localhost:PORT/piano-tutor/#/circle?key=Gb`.
 - **Hash-only `page.goto` does NOT remount the current screen** — screens read
   deep-link params once at mount. To test a deep link, load a different route
   first (or a fresh page), then navigate.

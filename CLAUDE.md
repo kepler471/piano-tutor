@@ -8,10 +8,23 @@ a "piano, …" wake word.
 
 ## Commands
 
-- `npm run dev` — Vite dev server (port 5173)
+- `npm run dev` — Vite dev server (port 5173, app at `/piano-tutor/` — see Deployment)
 - `npm test` — vitest unit tests (`src/tests/`)
 - `npm run check` — svelte-check + tsc
 - `npm run build` — production build to `dist/` (static hosting, no server config needed)
+
+## Deployment (GitHub Pages)
+
+Deployed to **https://kepler471.github.io/piano-tutor/** by `.github/workflows/deploy.yml`
+(check + test + build + deploy on every push to main). Because the site lives under the
+`/piano-tutor/` subpath, Vite `base` is set unconditionally — dev and preview serve the same
+path, so missed absolute URLs 404 in dev too. Rules this imposes:
+
+- Never hard-code root-absolute `public/` asset URLs; go through `src/lib/assetUrl.ts`
+  (works in module workers too — `import.meta.env.BASE_URL` is defined there).
+- The workbox `urlPattern` functions in vite.config.ts are inlined into the generated SW via
+  `.toString()` — they must stay closure-free (no captured variables), hence base-agnostic
+  `url.pathname` matching instead of prefix anchors.
 
 ## Stack
 

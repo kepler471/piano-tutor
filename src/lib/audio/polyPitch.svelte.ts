@@ -2,9 +2,10 @@ import { mic } from './mic.svelte'
 import type { NoteEvent, NoteEventListener } from './noteEvents'
 import * as playback from './playback'
 import { Resampler } from './resample'
+import { assetUrl } from '../assetUrl'
 
 /** Served from public/ — audioWorklet.addModule needs a real same-origin URL. */
-const captureProcessorUrl = '/worklets/capture-processor.js'
+const captureProcessorUrl = assetUrl('worklets/capture-processor.js')
 
 /**
  * Main-thread facade over the Basic Pitch worker. Streams mic audio

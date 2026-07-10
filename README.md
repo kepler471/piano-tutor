@@ -92,9 +92,12 @@ Completed segments are saved to a local practice history on the Home screen.
 
 ## Getting started
 
+Use the hosted app at **https://kepler471.github.io/piano-tutor/** (installable as a PWA —
+on iPad/iPhone: Share → Add to Home Screen), or run it locally:
+
 ```bash
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev        # → http://localhost:5173/piano-tutor/
 ```
 
 Then:

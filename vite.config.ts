@@ -4,6 +4,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Deployed to GitHub Pages at https://kepler471.github.io/piano-tutor/.
+  // Unconditional so dev/preview serve the same subpath — a missed
+  // root-absolute asset path 404s immediately instead of only in prod.
+  // Source code prefixes public/ URLs via src/lib/assetUrl.ts.
+  base: '/piano-tutor/',
   plugins: [
     svelte(),
     // Installable + offline-capable. The app shell is precached; the big model
@@ -25,7 +30,8 @@ export default defineConfig({
         description:
           'Practice companion for your piano — it listens through the microphone (or MIDI) and the score waits for you.',
         display: 'standalone',
-        start_url: '/',
+        // No explicit start_url/scope: vite-plugin-pwa defaults both to the
+        // Vite base, and an explicit value here would override that.
         background_color: '#f8fafc',
         theme_color: '#1d4ed8',
         icons: [
@@ -49,11 +55,14 @@ export default defineConfig({
         ],
         // Model/WASM dirs are only re-copied on package upgrades; bump this
         // cache name when re-copying them (see CLAUDE.md "Static assets").
+        // ⚠️ workbox inlines these urlPattern functions into the generated SW
+        // via .toString() — they must stay closure-free (no captured
+        // variables, e.g. the base path), hence the base-agnostic matching.
         runtimeCaching: [
           {
             // Hash-named build assets skipped by the precache (the vosk
             // chunk) — immutable, so cache-first is safe.
-            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/assets/'),
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.includes('/assets/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'piano-tutor.sw-assets',
@@ -62,8 +71,10 @@ export default defineConfig({
             },
           },
           {
+            // Trailing slash keeps model-vosk/ and model-minilm/ excluded
+            // (they self-cache; see the plugin comment above).
             urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin && /^\/(model|tfjs-wasm|ort-wasm|worklets)\//.test(url.pathname),
+              sameOrigin && /\/(model|tfjs-wasm|ort-wasm|worklets)\//.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'piano-tutor.sw-static',

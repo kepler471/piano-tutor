@@ -4,7 +4,9 @@
  * once). Returns an object URL that vosk-browser's worker can fetch.
  */
 
-export const MODEL_URL = '/model-vosk/vosk-model-small-en-us-0.15.tar.gz'
+import { assetUrl } from '../assetUrl'
+
+export const MODEL_URL = assetUrl('model-vosk/vosk-model-small-en-us-0.15.tar.gz')
 const CACHE_NAME = 'piano-tutor.vosk-model'
 
 export async function loadModelArchive(

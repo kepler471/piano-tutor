@@ -7,6 +7,7 @@ import { startPolyDetection, stopPolyDetection } from '../audio/polyPitch.svelte
 import { setMetronomeBpm, startMetronome, stopMetronome } from '../audio/metronome'
 import * as playback from '../audio/playback'
 import { Resampler } from '../audio/resample'
+import { assetUrl } from '../assetUrl'
 import { createConvo } from './convo'
 import { createDispatcher, type Dispatcher } from './dispatcher'
 import {
@@ -31,7 +32,7 @@ import { tts } from './tts'
 
 const VOSK_SAMPLE_RATE = 16000
 const STORAGE_KEY = 'piano-tutor.voice-enabled'
-const captureProcessorUrl = '/worklets/capture-processor.js'
+const captureProcessorUrl = assetUrl('worklets/capture-processor.js')
 
 export type VoiceStatus =
   | 'off'

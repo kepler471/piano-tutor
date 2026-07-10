@@ -15,6 +15,7 @@ import * as tf from '@tensorflow/tfjs'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import { BasicPitch, noteFramesToTime, outputToNotesPoly } from '@spotify/basic-pitch'
 import { filterPolyNotes } from './polyFilter'
+import { assetUrl } from '../assetUrl'
 
 const SAMPLE_RATE = 22050
 const WINDOW_SAMPLES = SAMPLE_RATE * 2 // 2 s
@@ -64,7 +65,7 @@ function patchWasmFillKernel() {
 
 async function init() {
   try {
-    setWasmPaths('/tfjs-wasm/')
+    setWasmPaths(assetUrl('tfjs-wasm/'))
     try {
       await tf.setBackend('wasm')
     } catch {
@@ -72,7 +73,7 @@ async function init() {
     }
     await tf.ready()
     patchWasmFillKernel()
-    model = new BasicPitch('/model/model.json')
+    model = new BasicPitch(assetUrl('model/model.json'))
     // Warm-up: the first inference compiles kernels; do it on silence now
     // instead of on the user's first chord.
     await runModel(new Float32Array(SAMPLE_RATE))
