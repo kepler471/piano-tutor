@@ -1,0 +1,923 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.205
+           Opus 4.8 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+
+❯ Add a quiz for testing our sheet reading ability. This should be a            
+  supplemental method for learning how to read sheet music.                     
+
+⏺ I'll explore the existing quiz architecture to understand how to add a new
+  quiz mode that fits the codebase conventions.
+
+⏺ Explore(Explore quiz architecture)
+  ⎿  Done (19 tool uses · 71.0k tokens · 2m 18s)
+  (ctrl+o to expand)
+
+⏺ The exploration gave me a thorough picture. One important finding: a
+  note-naming mode already exists — it renders a single note on a staff and asks
+  you to name it, which is itself a basic sheet-reading drill. So to build
+  something genuinely supplemental, I need to know what angle you want. Let me
+  clarify the direction before finalizing the plan.
+
+⏺ User answered Claude's questions:
+  ⎿  · There's already a `note-naming` quiz (shows one note on a staff, you pick
+     its letter). What kind of sheet-reading practice do you want the new quiz 
+     to add? → (notes only)
+
+⏺ Got it — you want both: a "play what you read" mic-verified mode and a "read a
+  melody" multi-note naming mode. The melody-naming mode fits the existing quiz
+  framework cleanly, but "play what you read" is a hands-on mic-based
+  interaction that doesn't fit the multiple-choice QuizCard. Let me explore the
+  practice/mic/lesson infrastructure to design that one properly.
+
+⏺ Explore(Explore practice/mic/lesson path)
+  ⎿  Done (21 tool uses · 46.2k tokens · 1m 52s)
+  (ctrl+o to expand)
+
+⏺ Excellent — this is very clarifying. Notably, LessonPlayer + the sight-reading
+  generator already do "play what you read" inside the Practice screen, so the
+  quiz version mostly reuses existing infrastructure. Let me read the key files
+  directly to ground the plan precisely.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ I now have everything I need. Let me write the plan.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ The plan is ready. Here's the summary:
+
+  Plan: Two new sheet-reading quizzes
+
+  I'll add both modes you asked for to the existing /quizzes screen, as custom
+  interactive branches (the same pattern the echo mode already uses):
+
+  1. Read a melody — a short phrase drawn on the staff; you name the notes
+  left-to-right with letter buttons. Wrong flashes red, correct advances
+  (green).
+  2. Play what you read — a phrase on the staff; you play it on the piano and
+  the mic verifies each note, advancing a cursor.
+
+  Key reuse (little truly-new code):
+  - The mic mode leans on existing infrastructure — StepMatcher ("wait, don't
+  fail"), makeSightReading for phrase content, SheetMusic highlights, and the
+  noteInput hub — assembled into a lean SightReadPlayer modeled on EchoPlayer +
+  LessonPlayer.
+  - The naming mode is a pure generator in theory/quiz.ts (reusing
+  clampLevel/pick/NATURAL_PCS/LETTERS) plus a small button-driven
+  MelodyReadCard.
+  - Both hook into the registry, level system, scored rounds, URL deep-links,
+  and voice "next" with minimal screen wiring.
+
+  Notable decision: the "play what you read" quiz overlaps the existing Practice
+  sight-reading lessons (LessonPlayer + "New melody"), but the quiz framing
+  adds scored rounds, level progression, and guide deep-linking — and I keep it
+  mono-only (levels 1–4) to stay a clean single-line mic quiz.
+
+  Tests and a Playwright end-to-end verification are included in the plan.
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/rosy-wishing-ripple.md · /plan to edit
+     Add sheet-reading quizzes
+
+     Context
+
+     The user (a beginner pianist learning to read music) wants supplemental 
+     sheet-reading
+     practice inside the existing /quizzes screen. A single-note note-naming
+     mode already
+     exists, so we add two distinct, more advanced modes the user explicitly
+     asked for:
+
+     1. Read a melody — a short multi-note phrase is drawn on the staff; the
+     user names the
+     notes left-to-right (button input). Trains reading notes in context, not in
+     isolation.
+     2. Play what you read — a short phrase is drawn on the staff; the user
+     plays it on the
+     real piano and the mic verifies each note, advancing a cursor. True
+     hands-on sight-reading
+     that leverages the app's core mic detection.
+
+     Both plug into the quiz framework (mode registry, levels, scored rounds,
+     URL deep-links,
+     voice "next") but render as custom branches (like the existing echo and
+     rhythm-dictation modes), not the multiple-choice QuizCard, because their
+     interaction is
+     multi-step. Infrastructure for #2 already exists (StepMatcher,
+     makeSightReading,
+     SheetMusic highlights, noteInput hub) — the work is mostly assembly.
+
+     Changes
+
+     1. Registry — src/lib/quiz/modes.ts
+
+     - Add 'read-melody' and 'sight-read' to the QuizModeId union (reading &
+     theory section).
+     - Add to QUIZ_LEVEL_COUNTS: 'read-melody': 4, 'sight-read': 4.
+     (sight-read caps at 4 = single-line mono levels; makeSightReading level 5
+     is grand-staff
+     poly — excluded to keep this a clean mono mic quiz.)
+
+     2. read-melody generator — src/lib/theory/quiz.ts (pure)
+
+     Add ReadMelodyQuestion interface, exported READ_MELODY_LEVELS array, and
+     makeReadMelodyQuestion(level, rng = Math.random). Reuse the file's existing
+     helpers
+     (clampLevel, pick, NATURAL_PCS, LETTERS) and tonal's
+     Note.pitchClass(Note.fromMidi)
+     with the .replace('#','♯').replace('b','♭') convention (see
+     makeNoteNamingQuestion,
+     theory/quiz.ts:63).
+
+     - Question shape: { kind: 'read-melody', clef, keySignature: 'C', midis: 
+     number[], names: string[]  // display note name per midi, optionPool: 
+     string[], explanation }.
+     - READ_MELODY_LEVELS: 4 entries of { clefs, range: [lo,hi], accidentals: 
+     boolean, count },
+     e.g. L1 treble naturals ×3; L2 treble+bass naturals ×4; L3 wider range ×5;
+     L4 accidentals ×4.
+     - Generate midis as a stepwise random walk within range (each step ±1–4
+     semitones, kept in
+     range and on natural pitch-classes unless accidentals), mirroring the
+     natural-note loop in
+     makeNoteNamingQuestion.
+     - optionPool = LETTERS (naturals) or LETTERS + sharp/flat variants
+     (accidental levels).
+     - explanation = e.g. `Reading left to right: ${names.join(' ')}.` (>20
+     chars).
+
+     3. sight-read generator — new src/lib/quiz/sightReadQuiz.ts
+
+     Mirror src/lib/quiz/rhythmQuiz.ts (own file because it depends on
+     non-theory data). Export
+     SightReadQuestion + makeSightReadQuestion(level):
+     - Clamp level to 1–4, call makeSightReading(level as SightLevel) from
+     src/lib/sightread/generator.ts, and return { kind: 'sight-read', clef, 
+     keySignature, steps: LessonStep[] } from lesson.segments[0].
+
+     4. New component — src/components/MelodyReadCard.svelte (button-driven)
+
+     Model on EchoPlayer.svelte but with letter-button input + a staff. Props:
+     { clef, keySignature, midis, names, optionPool, oncomplete: (mistakes) => 
+     void }.
+     - Local cursor, mistakes, wrongFlash state (no StepMatcher — matching is by
+     note
+     name/pitch-class letter, not midi).
+     - Build score via scoreFromSteps(midis.map(m => ({midis:[m], 
+     fingers:[null]})), keySignature, clef) and a highlights: Map<index, 
+     HighlightState> (indices < cursor → 'correct',
+     cursor → 'next'), exactly as LessonPlayer.svelte:114-123. Render
+     <SheetMusic {score} {highlights} />.
+     - Render optionPool as buttons; on click compare to names[cursor]: match →
+     advance /
+     mark green; mismatch → wrongFlash (350 ms) + mistakes++, don't advance
+     ("wait, don't
+     fail"). When cursor === names.length → oncomplete(mistakes) once (latch).
+
+     5. New component — src/components/SightReadPlayer.svelte (mic-driven)
+
+     Model on EchoPlayer.svelte + the score/highlight snippet from
+     LessonPlayer.svelte. Props:
+     { clef, keySignature, steps: LessonStep[], oncomplete: (mistakes) => void 
+     }.
+     - matcher = $derived(new StepMatcher(steps, { lookahead: true })); the
+     version bump +
+     onInput $effect + wrongFlash + completion latch pattern copied verbatim
+     from
+     EchoPlayer.svelte:20-48.
+     - score = scoreFromSteps(steps, keySignature, clef); highlights map from
+     matcher.results
+     ('correct'/'corrected'|'skipped' → played, matcher.cursor → 'next') per
+     LessonPlayer.svelte:114-123. Render <SheetMusic {score} {highlights} /> +
+     <InputPicker preferred="mono" />.
+     - Optional "🔊 Hear it" button calling playSequence(steps.flatMap(s => 
+     s.midis), 84) — the
+     playback gate auto-mutes detection, so the matcher won't hear the reference
+     (playback.ts).
+     - Do not write practice history here (the quiz screen records via
+     maybeRecord).
+
+     6. Screen wiring — src/screens/Quizzes.svelte
+
+     - Imports: MelodyReadCard, SightReadPlayer,
+     makeReadMelodyQuestion/ReadMelodyQuestion,
+     makeSightReadQuestion/SightReadQuestion.
+     - Add both to the Question union (43-55) and the "Reading & theory"
+     MODE_GROUPS entry
+     (79-86) with audio: false (labels e.g. "Read a melody", "Play what you
+     read").
+     - makeQuestion() switch (146-161): add case 'read-melody' / case 
+     'sight-read'.
+     - roundSize (134): phrases are long → 5 per round. Change to
+     mode === 'echo' || mode === 'read-melody' || mode === 'sight-read' ? 5 : 
+     10.
+     - Add a completion-result state (generalize the existing echoResult, or add
+     phraseResult) set by an onPhraseComplete(mistakes) handler mirroring
+     onEchoComplete
+     (268-274): answered++, if (mistakes===0) correct++, maybeRecord(). Reset it
+     in
+     resetRound/next.
+     - Template: add two branches alongside the echo branch (359-372):
+     {:else if question.kind === 'read-melody'} → <MelodyReadCard … 
+     oncomplete={onPhraseComplete}/>
+     and {:else if question.kind === 'sight-read'} → <SightReadPlayer … 
+     oncomplete={onPhraseComplete}/>,
+     each followed by the completion message + "Next phrase →" button gated on
+     the result state.
+     - Voice handler (309-311): extend the "next" gate to also fire when the
+     phrase result is set.
+
+     7. Tests — src/tests/theoryQuiz.test.ts (+ registry)
+
+     - Add a describe('read-melody') block: seeded LCG RNG +
+     expectValidOptions-style checks
+     per note — assert names[i] derives from midis[i] (Unicode accidentals),
+     every name ∈
+     optionPool, midi count/range/clef per READ_MELODY_LEVELS,
+     explanation.length > 20,
+     determinism under a fixed seed.
+     - Registry consistency: assert QUIZ_LEVEL_COUNTS['read-melody'] === 
+     READ_MELODY_LEVELS.length
+     and QUIZ_LEVEL_COUNTS['sight-read'] === 4.
+     - A light sightReadQuiz shape test (own file or appended):
+     makeSightReadQuestion(l) returns
+     a non-empty steps array with valid midis for l = 1–4, and clamps
+     out-of-range levels.
+
+     8. Optional — guide deep-links (src/lib/data/guide.ts)
+
+     Add quiz('read-melody', 1, …) / quiz('sight-read', 1, …) links in a
+     reading-focused
+     curriculum stage (helper quiz() at guide.ts:115). Covered by
+     src/tests/guide.test.ts.
+
+     Verification
+
+     - npm test — new generator + registry tests pass; existing theoryQuiz/guide
+     suites green.
+     - npm run check — svelte-check + tsc clean (exhaustive makeQuestion switch,
+     new props typed).
+     - End-to-end via the verify skill (dev server + Playwright):
+       - /quizzes → Read a melody: staff shows a phrase, current note orange;
+     clicking correct
+     letters advances/greens, wrong flashes red without advancing; completing
+     shows "Next phrase →"
+     and the score counter increments; a round of 5 records history.
+       - Play what you read: staff phrase renders, InputPicker shows mono; the
+     mic (or injected
+     MediaStream per the voice E2E note in memory) drives the cursor; "🔊 Hear
+     it" plays the
+     reference without tripping the matcher.
+       - Deep link #/quizzes?mode=read-melody&level=2 restores mode+level; voice
+     "next" advances a
+     completed phrase.
+
+  Searched for 1 pattern, read 8 files (ctrl+o to expand)
+⏺ Now let me implement. Starting with the registry:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/lib/quiz/modes.ts)
+  ⎿  Added 2 lines
+      12    | 'rhythm-dictation'
+      13    // reading & theory
+      14    | 'note-naming'
+      15 +  | 'read-melody'                                              
+      16 +  | 'sight-read'                                               
+      17    | 'key-signature'
+      18    | 'circle-of-fifths'
+      19    | 'interval-staff'
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/lib/quiz/modes.ts)
+  ⎿  Added 2 lines
+      29    echo: 3,
+      30    'rhythm-dictation': 4,
+      31    'note-naming': 4,
+      32 +  'read-melody': 4,                                            
+      33 +  'sight-read': 4,                                             
+      34    'key-signature': 4,
+      35    'circle-of-fifths': 4,
+      36    'interval-staff': 4,
+
+⏺ Now the read-melody generator in theory/quiz.ts:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/lib/theory/quiz.ts)
+  ⎿  Added 70 lines
+       89    }
+       90  }
+       91  
+       92 +// --- reading a melody (multi-note sight-reading by name) ---
+       93 +                                                              
+       94 +export interface ReadMelodyQuestion {                         
+       95 +  kind: 'read-melody'                                         
+       96 +  clef: 'treble' | 'bass'                                     
+       97 +  keySignature: 'C'                                           
+       98 +  /** Pitches of the phrase, left to right. */                
+       99 +  midis: number[]                                             
+      100 +  /** Display note name (Unicode accidentals) per midi. */    
+      101 +  names: string[]                                             
+      102 +  /** Letter buttons offered for every note in the phrase. */ 
+      103 +  optionPool: string[]                                        
+      104 +  /** Why: shown once the whole phrase has been named. */     
+      105 +  explanation: string                                         
+      106 +}                                                             
+      107 +                                                              
+      108 +/** [clefs, midi range, accidentals allowed, note count] per l
+          +evel. */                                                      
+      109 +export const READ_MELODY_LEVELS: {                            
+      110 +  clefs: ('treble' | 'bass')[]                                
+      111 +  range: [number, number]                                     
+      112 +  accidentals: boolean                                        
+      113 +  count: number                                               
+      114 +}[] = [                                                       
+      115 +  { clefs: ['treble'], range: [60, 72], accidentals: false, co
+          +unt: 3 }, // C4–C5, in-staff treble                           
+      116 +  { clefs: ['treble', 'bass'], range: [41, 79], accidentals: f
+          +alse, count: 4 }, // adds bass clef                           
+      117 +  { clefs: ['treble', 'bass'], range: [36, 84], accidentals: f
+          +alse, count: 5 }, // wider, longer phrase                     
+      118 +  { clefs: ['treble', 'bass'], range: [55, 77], accidentals: t
+          +rue, count: 4 }, // sharps and flats                          
+      119 +]                                                             
+      120 +                                                              
+      121 +const midiName = (midi: number) => Note.pitchClass(Note.fromMi
+          +di(midi)).replace('#', '♯').replace('b', '♭')                 
+      122 +                                                              
+      123 +// Full chromatic in the same spelling makeReadMelodyQuestion 
+          +produces (flats).                                             
+      124 +const CHROMATIC_NAMES = Array.from({ length: 12 }, (_, pc) => 
+          +midiName(60 + pc))                                            
+      125 +                                                              
+      126 +export function makeReadMelodyQuestion(level: number, rng: Rng
+          + = Math.random): ReadMelodyQuestion {                         
+      127 +  const def = READ_MELODY_LEVELS[clampLevel(level, READ_MELODY
+          +_LEVELS.length) - 1]                                          
+      128 +  const clef = pick(def.clefs, rng)                           
+      129 +  // Keep the whole phrase on the readable side of middle C fo
+          +r the chosen clef.                                            
+      130 +  const [lo, hi] =                                            
+      131 +    clef === 'treble' ? [Math.max(def.range[0], 57), def.range
+          +[1]] : [def.range[0], Math.min(def.range[1], 64)]             
+      132 +                                                              
+      133 +  const allowed = (m: number) => m >= lo && m <= hi && (def.ac
+          +cidentals || NATURAL_PCS.has(m % 12))                         
+      134 +  const pickAllowed = () => {                                 
+      135 +    let m = lo + Math.floor(rng() * (hi - lo + 1))            
+      136 +    while (!allowed(m)) m = lo + Math.floor(rng() * (hi - lo +
+          + 1))                                                          
+      137 +    return m                                                  
+      138 +  }                                                           
+      139 +                                                              
+      140 +  // Stepwise random walk, biased small, staying inside the re
+          +adable range.                                                 
+      141 +  const midis = [pickAllowed()]                               
+      142 +  for (let i = 1; i < def.count; i++) {                       
+      143 +    const prev = midis[i - 1]                                 
+      144 +    const next = shuffle([1, 2, -1, -2, 3, -3, 4, -4], rng)   
+      145 +      .map((d) => prev + d)                                   
+      146 +      .find(allowed)                                          
+      147 +    midis.push(next ?? pickAllowed())                         
+      148 +  }                                                           
+      149 +                                                              
+      150 +  const names = midis.map(midiName)                           
+      151 +  return {                                                    
+      152 +    kind: 'read-melody',                                      
+      153 +    clef,                                                     
+      154 +    keySignature: 'C',                                        
+      155 +    midis,                                                    
+      156 +    names,                                                    
+      157 +    optionPool: def.accidentals ? CHROMATIC_NAMES : LETTERS,  
+      158 +    explanation: `Reading the notes left to right: ${names.joi
+          +n(' ')}. Name each one as the cursor reaches it.`,            
+      159 +  }                                                           
+      160 +}                                                             
+      161 +                                                              
+      162  // --- key signature identification ---
+      163  
+      164  export interface KeySignatureQuestion {
+
+⏺ Write(.claude/worktrees/add-piano-sheet-key-test/src/lib/quiz/sightReadQuiz.ts
+       )
+  ⎿  Wrote 33 lines to .claude/worktrees/add-piano-sheet-key-test/src/lib/q
+     uiz/sightReadQuiz.ts
+       1 import { makeSightReading, type SightLevel } from '../sightread/
+       2 import type { LessonStep } from '../data/lessons/types'
+       3 
+       5  * "Play what you read": a short phrase is drawn on the staff an
+         d the player
+         e. A thin
+       7  * wrapper over the sight-reading melody generator (its own file
+       8  * depends on lesson data, not pure theory).
+       9  *
+         underlying
+     … +32 lines (ctrl+o to expand)
+
+⏺ Now the MelodyReadCard.svelte component:
+
+⏺ Write(.claude/worktrees/add-piano-sheet-key-test/src/components/MelodyReadCard
+       .svelte)
+  ⎿  Wrote 121 lines to .claude/worktrees/add-piano-sheet-key-test/src/comp
+     onents/MelodyReadCard.svelte
+       1 <script lang="ts">
+       3   import { scoreFromSteps, type HighlightState } from '../lib/no
+         tation/vexScore'
+       5   /**
+       6    * Reading trainer: a short phrase is drawn on the staff and t
+       7    * the notes left to right by tapping letters. Wrong guesses f
+         lash red but
+         ing the mic
+       9    * modes use. Completion (all notes named) reports the mistake
+      10    */
+     … +120 lines (ctrl+o to expand)
+
+⏺ Now the SightReadPlayer.svelte component:
+
+⏺ Write(.claude/worktrees/add-piano-sheet-key-test/src/components/SightReadPlaye
+       r.svelte)
+  ⎿  Wrote 143 lines to .claude/worktrees/add-piano-sheet-key-test/src/comp
+     onents/SightReadPlayer.svelte
+       1 <script lang="ts">
+       2   import InputPicker from './InputPicker.svelte'
+       3   import SheetMusic from './SheetMusic.svelte'
+       4   import { playSequence } from '../lib/audio/playback'
+       5   import { onInput } from '../lib/input/noteInput.svelte'
+       7   import { scoreFromSteps, type HighlightState } from '../lib/no
+         tation/vexScore'
+       8   import { StepMatcher } from '../lib/practice/matcher'
+       9 
+      10   /**
+     … +147 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Global .seg and .ghost styles exist, and InputPicker takes preferred. Now
+  wiring Quizzes.svelte:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+       2    import BackToGuide from '../components/BackToGuide.svelte'
+       3    import EchoPlayer from '../components/EchoPlayer.svelte'
+       4    import GlossText from '../components/GlossText.svelte'
+       5 +  import MelodyReadCard from '../components/MelodyReadCard.svel
+         +te'                                                            
+       6    import QuizCard from '../components/QuizCard.svelte'
+       7    import RhythmQuizCard from '../components/RhythmQuizCard.svel
+          te'
+       8    import SheetMusic from '../components/SheetMusic.svelte'
+       9 +  import SightReadPlayer from '../components/SightReadPlayer.sv
+         +elte'                                                          
+      10    import { playChord, playChordSequence, playSequence, playSong
+           } from '../lib/audio/playback'
+      11    import {
+      12      makeCadenceQuestion,
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 3 lines
+      27      makeIntervalStaffQuestion,
+      28      makeKeySignatureQuestion,
+      29      makeNoteNamingQuestion,
+      30 +    makeReadMelodyQuestion,                                    
+      31      type ChordFunctionQuestion,
+      32      type ChordSpellingQuestion,
+      33      type CircleQuestion,
+      34      type IntervalStaffQuestion,
+      35      type KeySignatureQuestion,
+      36      type NoteNamingQuestion,
+      37 +    type ReadMelodyQuestion,                                   
+      38    } from '../lib/theory/quiz'
+      39    import { makeRhythmDictationQuestion, type RhythmDictationQue
+          stion } from '../lib/quiz/rhythmQuiz'
+      40 +  import { makeSightReadQuestion, type SightReadQuestion } from
+         + '../lib/quiz/sightReadQuiz'                                   
+      41    import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/qu
+          iz/modes'
+      42    import { midiToVexKey, type ScoreModel } from '../lib/notatio
+          n/vexScore'
+      43    import { addRecord } from '../lib/practice/history.svelte'
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      58      | ChordSpellingQuestion
+      59      | ChordFunctionQuestion
+      60      | RhythmDictationQuestion
+      61 +    | ReadMelodyQuestion                                       
+      62 +    | SightReadQuestion                                        
+      63  
+      64    interface ModeDef {
+      65      id: QuizModeId
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      85        label: 'Reading & theory',
+      86        modes: [
+      87          { id: 'note-naming', label: 'Name the note', desc: 'A n
+          ote on the staff — what is it called?', audio: false },
+      88 +        { id: 'read-melody', label: 'Read a melody', desc: 'A s
+         +hort phrase on the staff — name the notes left to right.', audi
+         +o: false },                                                    
+      89 +        { id: 'sight-read', label: 'Play what you read', desc: 
+         +'A short phrase on the staff — play it on your piano and the mi
+         +c checks each note.', audio: false },                          
+      90          { id: 'key-signature', label: 'Key signatures', desc: '
+          Read the sharps and flats — which key are you in?', audio: fals
+          e },
+      91          { id: 'circle-of-fifths', label: 'Circle of fifths', de
+          sc: 'Fifths, key signatures and relative minors — navigate the 
+          clock of keys.', audio: false },
+      92          { id: 'interval-staff', label: 'Intervals on the staff'
+          , desc: 'Two written notes — name the interval by sight.', audi
+          o: false },
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      161        case 'cadence': return makeCadenceQuestion(level)
+      162        case 'rhythm-dictation': return makeRhythmDictationQuest
+           ion(level)
+      163        case 'note-naming': return makeNoteNamingQuestion(level)
+      164 +      case 'read-melody': return makeReadMelodyQuestion(level)
+      165 +      case 'sight-read': return makeSightReadQuestion(level)  
+      166        case 'key-signature': return makeKeySignatureQuestion(le
+           vel)
+      167        case 'circle-of-fifths': return makeCircleQuestion(level
+           )
+      168        case 'interval-staff': return makeIntervalStaffQuestion(
+           level)
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      140  
+      141    const modeDef = $derived(ALL_MODES.find((m) => m.id === mode
+           )!)
+      142    const maxLevel = $derived(QUIZ_LEVEL_COUNTS[mode])
+      143 -  const roundSize = $derived(mode === 'echo' ? 5 : 10)        
+      143 +  const roundSize = $derived(mode === 'echo' || mode === 'read
+          +-melody' || mode === 'sight-read' ? 5 : 10)                   
+      144  
+      145    let question = $state<Question | null>(null)
+      146    let selected = $state<string | null>(null)
+
+⏺ Now the completion state, handler, resets, and voice gate:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines, removed 1 line
+      144  
+      145    let question = $state<Question | null>(null)
+      146    let selected = $state<string | null>(null)
+      147 -  let echoResult = $state<number | null>(null) // mistakes on 
+          -the completed phrase                                          
+      147 +  let echoResult = $state<number | null>(null) // mistakes on 
+          +the completed echo phrase                                     
+      148 +  let phraseResult = $state<number | null>(null) // mistakes o
+          +n a completed read/play phrase                                
+      149    let playing = $state(false)
+      150    let heard = $state(false)
+      151  
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      178      question = makeQuestion()
+      179      selected = null
+      180      echoResult = null
+      181 +    phraseResult = null                                       
+      182      heard = false
+      183    }
+      184  
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 8 lines
+      286      maybeRecord()
+      287    }
+      288  
+      289 +  function onPhraseComplete(mistakes: number) {               
+      290 +    if (phraseResult !== null) return                         
+      291 +    phraseResult = mistakes                                   
+      292 +    answered++                                                
+      293 +    if (mistakes === 0) correct++                             
+      294 +    maybeRecord()                                             
+      295 +  }                                                           
+      296 +                                                              
+      297    function maybeRecord() {
+      298      if (answered < roundSize) return
+      299      addRecord({
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      311      question = makeQuestion()
+      312      selected = null
+      313      echoResult = null
+      314 +    phraseResult = null                                       
+      315      heard = false
+      316      if (modeDef.audio) void play()
+      317    }
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      329            return { say: '' }
+      330          }
+      331          if (intent.kind === 'lesson' && intent.action === 'nex
+           t') {
+      332 -          if (!roundDone && (selected !== null || echoResult !
+          -== null)) next()                                              
+      332 +          if (!roundDone && (selected !== null || echoResult !
+          +== null || phraseResult !== null)) next()                     
+      333            return { say: '' }
+      334          }
+      335          return null
+
+⏺ Now the template branches, after the echo branch:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 28 lines
+      392              <button class="primary" onclick={next}>Next phrase
+            →</button>
+      393            </div>
+      394          {/if}
+      395 +      {:else if question.kind === 'read-melody'}              
+      396 +        <MelodyReadCard                                       
+      397 +          clef={question.clef}                                
+      398 +          keySignature={question.keySignature}                
+      399 +          midis={question.midis}                              
+      400 +          names={question.names}                              
+      401 +          optionPool={question.optionPool}                    
+      402 +          oncomplete={onPhraseComplete}                       
+      403 +        />                                                    
+      404 +        {#if phraseResult !== null}                           
+      405 +          <div class="complete">                              
+      406 +            {phraseResult === 0 ? '✨ Every note named!' : `Na
+          +med them with ${phraseResult} wrong guess${phraseResult === 1 
+          +? '' : 'es'}.`}                                               
+      407 +            <button class="primary" onclick={next}>Next phrase
+          + →</button>                                                   
+      408 +          </div>                                              
+      409 +        {/if}                                                 
+      410 +      {:else if question.kind === 'sight-read'}               
+      411 +        <SightReadPlayer                                      
+      412 +          clef={question.clef}                                
+      413 +          keySignature={question.keySignature}                
+      414 +          steps={question.steps}                              
+      415 +          oncomplete={onPhraseComplete}                       
+      416 +        />                                                    
+      417 +        {#if phraseResult !== null}                           
+      418 +          <div class="complete">                              
+      419 +            {phraseResult === 0 ? '✨ Played it clean!' : `Pla
+          +yed it with ${phraseResult} wrong note${phraseResult === 1 ? '
+          +' : 's'}.`}                                                   
+      420 +            <button class="primary" onclick={next}>Next phrase
+          + →</button>                                                   
+      421 +          </div>                                              
+      422 +        {/if}                                                 
+      423        {:else if question.kind === 'rhythm-dictation'}
+      424          {#if !heard}
+      425            <button class="primary" onclick={play} disabled={pla
+           ying}>🔊 Hear it</button>
+
+⏺ I need to update choose() so TypeScript narrows out the two answer-less kinds:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/screens/Quizzes.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      270    })
+      271  
+      272    function choose(opt: string) {
+      273 -    if (!question || question.kind === 'echo' || selected !== 
+          -null) return                                                  
+      273 +    if (!question || selected !== null) return                
+      274 +    // Phrase modes grade themselves via their own components,
+          + not QuizCard.                                                
+      275 +    if (question.kind === 'echo' || question.kind === 'read-me
+          +lody' || question.kind === 'sight-read') return               
+      276      selected = opt
+      277      answered++
+      278      const answer = question.kind === 'rhythm-dictation' ? ques
+           tion.answer.id : question.answer
+
+⏺ Now the tests. First the imports and read-melody describe block in
+  theoryQuiz.test.ts:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/tests/theoryQuiz.test.ts
+        )
+  ⎿  Added 2 lines
+       7    CIRCLE_LEVEL_COUNT,
+       8    KEY_SIGNATURE_LEVELS,
+       9    NOTE_NAMING_LEVELS,
+      10 +  READ_MELODY_LEVELS,                                          
+      11    makeChordFunctionQuestion,
+      12    makeChordSpellingQuestion,
+      13    makeCircleQuestion,
+      14    makeIntervalStaffQuestion,
+      15    makeKeySignatureQuestion,
+      16    makeNoteNamingQuestion,
+      17 +  makeReadMelodyQuestion,                                      
+      18    sigAccidentals,
+      19  } from '../lib/theory/quiz'
+      20  import { makeRhythmDictationQuestion } from '../lib/quiz/rhythm
+          Quiz'
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/tests/theoryQuiz.test.ts
+        )
+  ⎿  Added 54 lines
+       78    })
+       79  })
+       80  
+       81 +describe('makeReadMelodyQuestion', () => {                    
+       82 +  const nameOf = (midi: number) => Note.pitchClass(Note.fromMi
+          +di(midi)).replace('#', '♯').replace('b', '♭')                 
+       83 +                                                              
+       84 +  it('names match the rendered midis and live in the option po
+          +ol', () => {                                                  
+       85 +    for (const level of [1, 2, 3, 4]) {                       
+       86 +      for (const seed of seeds) {                             
+       87 +        const q = makeReadMelodyQuestion(level, seededRng(seed
+          +))                                                            
+       88 +        const def = READ_MELODY_LEVELS[level - 1]             
+       89 +        expect(q.midis).toHaveLength(def.count)               
+       90 +        expect(q.names).toHaveLength(def.count)               
+       91 +        q.midis.forEach((m, i) => {                           
+       92 +          expect(q.names[i]).toBe(nameOf(m))                  
+       93 +          expect(q.optionPool).toContain(q.names[i])          
+       94 +        })                                                    
+       95 +        expect(new Set(q.optionPool).size).toBe(q.optionPool.l
+          +ength)                                                        
+       96 +        expect(def.clefs).toContain(q.clef)                   
+       97 +      }                                                       
+       98 +    }                                                         
+       99 +  })                                                          
+      100 +                                                              
+      101 +  it('respects the level range, clef side and accidental rule'
+          +, () => {                                                     
+      102 +    for (const level of [1, 2, 3] as const) {                 
+      103 +      const def = READ_MELODY_LEVELS[level - 1]               
+      104 +      for (const seed of seeds) {                             
+      105 +        const q = makeReadMelodyQuestion(level, seededRng(seed
+          +))                                                            
+      106 +        for (const m of q.midis) {                            
+      107 +          expect(m).toBeGreaterThanOrEqual(def.range[0])      
+      108 +          expect(m).toBeLessThanOrEqual(def.range[1])         
+      109 +          expect([0, 2, 4, 5, 7, 9, 11]).toContain(m % 12) // 
+          +naturals only below level 4                                   
+      110 +          if (q.clef === 'treble') expect(m).toBeGreaterThanOr
+          +Equal(57)                                                     
+      111 +          else expect(m).toBeLessThanOrEqual(64)              
+      112 +        }                                                     
+      113 +      }                                                       
+      114 +    }                                                         
+      115 +  })                                                          
+      116 +                                                              
+      117 +  it('level 1 is treble-only with the seven natural letters', 
+          +() => {                                                       
+      118 +    for (const seed of seeds) {                               
+      119 +      const q = makeReadMelodyQuestion(1, seededRng(seed))    
+      120 +      expect(q.clef).toBe('treble')                           
+      121 +      expect(q.optionPool).toEqual(['C', 'D', 'E', 'F', 'G', '
+          +A', 'B'])                                                     
+      122 +    }                                                         
+      123 +  })                                                          
+      124 +                                                              
+      125 +  it('is deterministic under a fixed seed and carries a teachi
+          +ng explanation', () => {                                      
+      126 +    for (const seed of seeds) {                               
+      127 +      const a = makeReadMelodyQuestion(3, seededRng(seed))    
+      128 +      const b = makeReadMelodyQuestion(3, seededRng(seed))    
+      129 +      expect(a.midis).toEqual(b.midis)                        
+      130 +      expect(a.explanation.length).toBeGreaterThan(20)        
+      131 +    }                                                         
+      132 +  })                                                          
+      133 +})                                                            
+      134 +                                                              
+      135  describe('makeKeySignatureQuestion', () => {
+      136    it('answer matches the rendered signature (major levels)', (
+           ) => {
+      137      for (const level of [1, 2, 3]) {
+
+⏺ Now the registry assertions and a sight-read shape test:
+
+⏺ Update(.claude/worktrees/add-piano-sheet-key-test/src/tests/theoryQuiz.test.ts
+        )
+  ⎿  Added 2 lines
+      409  describe('quiz mode registry', () => {
+      410    it('level counts match the generator level tables', () => {
+      411      expect(QUIZ_LEVEL_COUNTS['note-naming']).toBe(NOTE_NAMING_
+           LEVELS.length)
+      412 +    expect(QUIZ_LEVEL_COUNTS['read-melody']).toBe(READ_MELODY_
+          +LEVELS.length)                                                
+      413 +    expect(QUIZ_LEVEL_COUNTS['sight-read']).toBe(4)           
+      414      expect(QUIZ_LEVEL_COUNTS['key-signature']).toBe(KEY_SIGNAT
+           URE_LEVELS.length)
+      415      expect(QUIZ_LEVEL_COUNTS['circle-of-fifths']).toBe(CIRCLE_
+           LEVEL_COUNT)
+      416      expect(QUIZ_LEVEL_COUNTS['chord-spelling']).toBe(CHORD_SPE
+           LLING_LEVELS.length)
+
+⏺ Write(.claude/worktrees/add-piano-sheet-key-test/src/tests/sightReadQuiz.test.
+       ts)
+  ⎿  Wrote 28 lines to .claude/worktrees/add-piano-sheet-key-test/src/tests
+     /sightReadQuiz.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { makeSightReadQuestion } from '../lib/quiz/sightReadQuiz
+         '
+       4 describe('makeSightReadQuestion', () => {
+       5   it('returns a non-empty single-line phrase with real midis for
+          levels 1–4', () => {
+       6     for (const level of [1, 2, 3, 4]) {
+       7       const q = makeSightReadQuestion(level)
+       9       expect(['treble', 'bass']).toContain(q.clef)
+      10       expect(q.keySignature).toBeTruthy()
+     … +22 lines (ctrl+o to expand)
+
+⏺ Now let me run the test suite and type check:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All tests pass. Now the type check:
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ Both green (733 tests pass, 0 type errors). Let me update task status and
+  verify end-to-end in the app.
+
+⏺ Let me verify end-to-end in the running app using the verify skill.
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Made 1 scratchpad edit +107, ran 2 shell commands (ctrl+o to expand)
+
+⏺ All flows work with no errors. Let me visually confirm the staff highlighting:
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Both modes render correctly — "Read a melody" shows a 3-note treble phrase
+  with the first note highlighted orange and the 7 letter buttons; "Play what
+  you read" shows an 8-note phrase (with the first-note fingering cue from the
+  sight-reading generator), the input picker, "Hear it" button, and progress
+  dots. Let me clean up.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Done. Two new sheet-reading quizzes are live on the /quizzes screen under
+  Reading & theory, both verified end-to-end.
+
+  What was added
+
+  Read a melody (read-melody) — a short phrase is drawn on the staff; you name
+  the notes left-to-right with letter buttons. The current note highlights
+  orange, named notes turn green, and a wrong guess flashes red without
+  advancing the cursor ("wait, don't fail"). 4 levels (treble → both clefs →
+  longer/wider → accidentals).
+
+  Play what you read (sight-read) — a phrase is drawn on the staff; you play it
+  on your real piano and the mic verifies each note via the existing
+  StepMatcher, driving a cursor. Includes an input picker and a "🔊 Hear it"
+  reference button (auto-gated so it doesn't trip detection). No keyboard is
+  shown, since it's a reading test. 4 mono levels (level 5's poly grand-staff is
+  excluded).
+
+  Implementation
+
+  - Registry: src/lib/quiz/modes.ts — two new QuizModeIds + level counts.
+  - Generators: makeReadMelodyQuestion + READ_MELODY_LEVELS (pure) in
+  src/lib/theory/quiz.ts, reusing existing helpers;
+  src/lib/quiz/sightReadQuiz.ts wrapping the existing makeSightReading.
+  - Components: MelodyReadCard.svelte (button-driven) and SightReadPlayer.svelte
+  (mic-driven, modeled on EchoPlayer + LessonPlayer's highlight logic).
+  - Screen: Quizzes.svelte — imports, Question union, mode entries, makeQuestion
+  cases, 5-per-round sizing, a shared phraseResult completion state, two
+  template branches, and the voice "next" gate.
+  - Tests: read-melody generator + registry consistency in theoryQuiz.test.ts; a
+  shape/clamp test in sightReadQuiz.test.ts.
+
+  Verification
+
+  - npm test — 733 pass (1 skipped), including the new tests.
+  - npm run check — 0 errors, 0 warnings.
+  - Playwright drove both modes: staff renders with correct highlighting,
+  correct answers advance, wrong answers flash without advancing, completion +
+  "Next phrase" works, sight-read shows picker/Hear-it with no crash, and the
+  deep link #/quizzes?mode=read-melody&level=2 restores mode + level. No page
+  errors.
+
+  I skipped the optional guide deep-links (step 8 in the plan) since it wasn't
+  essential — say the word if you'd like the new modes linked from the learning
+  guide's reading stage.
+
+✻ Brewed for 15m 42s
+
+❯ commit and merge                                                              
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ I'm on a worktree branch, not main. Let me commit here, then merge into main.
+
+  Merged worktree-add-piano-sheet-key-test, ran 1 shell command (ctrl+o to expand)
+⏺ Committed and merged into main.
+
+  - Commit ced17d1 on worktree-add-piano-sheet-key-test — the 8 files (2
+  generators, 2 components, registry, screen wiring, 2 test files).
+  - Merge 488bc5f — merged into main with --no-ff, clean (no conflicts), 513
+  insertions across 8 files.
+
+  main picked up other worktree work in the meantime (the merge integrated on
+  top of 899f525). I didn't push, since you didn't ask — let me know if you'd
+  like me to git push origin/main.
+
+✻ Worked for 30s

@@ -1,0 +1,358 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.202
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+ ▎ Fable 5 is back.
+ ▎ Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ a lot of the practices such as sight reading, and others, would benefit from  
+  not showing the user the actualy keyboard image and the fingering, as these   
+  can be used to hint towards which note is being shown in the sheet music. We  
+  want these methods to actually help us learn to read sheet music.             
+  There are some instance where we want to show the fingering on the sheet      
+  music, so figure out which ones these are.                                    
+
+⏺ I'll dig into how the practice screens show the keyboard and fingering hints,
+  and how lessons are categorized, so I can decide where hints help vs. hurt
+  sheet-reading.
+
+  Searched for 6 patterns, read 9 files, listed 1 directory (ctrl+o to expand)
+
+⏺ Now I'll implement. Quick check of how the grand-staff song score handles
+  fingering first:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Songs never render fingering on the score — the finger hints only appear as
+  keyboard badges. Now making the changes.
+
+⏺ Update(src/lib/data/lessons/types.ts)
+  ⎿  Added 7 lines
+      29    title: string
+      30    /** Practice method this comes from, e.g. 'Hanon', 'Five-fing
+          er' */
+      31    method: string
+      32 +  /**                                                          
+      33 +   * How much the player may give away. 'technique' (default): 
+         +keyboard shows the                                             
+      34 +   * expected keys + finger badges — right for drills where fin
+         +gering IS the lesson.                                          
+      35 +   * 'reading': the keyboard is hidden (toggleable, and never s
+         +hows the answer) so                                            
+      36 +   * the score must be read, not matched against lit keys.     
+      37 +   */                                                          
+      38 +  hints?: 'technique' | 'reading'                              
+      39    description: string
+      40    /** Practical tips shown in the player */
+      41    tips: string[]
+
+⏺ Update(src/lib/sightread/generator.ts)
+  ⎿  Added 5 lines, removed 3 lines
+      118    let clef: 'treble' | 'bass' | 'grand'
+      119    let hand: 'R' | 'L' | 'both'
+      120  
+      121 +  // Like printed sight-reading tests: only the first note car
+          +ries a finger                                                 
+      122 +  // number (a hand-position cue). Everything after must be re
+          +ad off the staff.                                             
+      123    if (level === 3) {
+      124      clef = 'bass'
+      125      hand = 'L'
+     ...
+      127      const walk = melodyWalk(slots.length, lhOctave.length - 1,
+            rng)
+      128      steps = slots.map((slot, i) => ({
+      129        midis: [lhOctave[walk[i]]],
+      128 -      fingers: [null],                                        
+      130 +      fingers: [i === 0 ? 5 : null], // LH starts with 5 on th
+          +e tonic                                                       
+      131        ...slot,
+      132      }))
+      133    } else if (level === 5) {
+     ...
+      139      steps = slots.map((slot, i) => ({
+      140        // Chorale texture: LH root/fifth moves with the melody.
+      141        midis: [slot.startBeat % 4 < 2 ? root : fifth, fiveFinge
+           r[walk[i]]],
+      140 -      fingers: [null, (walk[i] + 1) as Finger],               
+      142 +      fingers: [null, i === 0 ? ((walk[i] + 1) as Finger) : nu
+          +ll],                                                          
+      143        hands: ['L', 'R'],
+      144        ...slot,
+      145      }))
+     ...
+      150      const walk = melodyWalk(slots.length, material.length - 1,
+            rng)
+      151      steps = slots.map((slot, i) => ({
+      152        midis: [material[walk[i]]],
+      151 -      fingers: [level <= 2 ? ((walk[i] + 1) as Finger) : null]
+          -,                                                             
+      153 +      fingers: [i === 0 && walk[i] < 5 ? ((walk[i] + 1) as Fin
+          +ger) : null],                                                 
+      154        ...slot,
+      155      }))
+      156    }
+
+⏺ Update(src/lib/sightread/generator.ts)
+  ⎿  Added 1 line
+      159      id: `sight-reading-L${level}-${actualSeed}`,
+      160      title: `Sight-reading level ${level}: ${key} — ${SIGHT_LEV
+           ELS[level]}`,
+      161      method: 'Sight-reading',
+      162 +    hints: 'reading',                                         
+      163      description:
+      164        level === 5
+      165          ? 'Read both staves at once: the left hand anchors on 
+           the root and fifth while the right hand carries the melody.'
+
+⏺ Now the LessonPlayer — hide the keyboard in reading mode behind a toggle that
+  never shows the answer:
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 4 lines
+      25  
+      26    let segIndex = $state(0)
+      27    const segment = $derived(lesson.segments[segIndex])
+      28 +  // Reading-focused lessons hide the keyboard (and its expecte
+         +d-key/finger                                                   
+      29 +  // hints) so the score can't be shortcut by watching for the 
+         +lit key.                                                       
+      30 +  const reading = $derived(lesson.hints === 'reading')         
+      31 +  let showKeyboard = $state(false)                             
+      32    // Hands-together segments override to chord detection when o
+          n the mic.
+      33    const effectiveMode = $derived(segment.detectionMode ?? lesso
+          n.detectionMode)
+      34  
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 16 lines, removed 3 lines
+      314      </div>
+      315    {:else}
+      316      <p class="hint">
+      317 -      Progress: {progress} / {segment.steps.length} · The oran
+          -ge note is next — green keys show                             
+      318 -      where it is and which finger to use.                    
+      317 +      Progress: {progress} / {segment.steps.length} ·         
+      318 +      {#if reading}                                           
+      319 +        The orange note is next — read it off the staff; eyes 
+          +on the score, not your hands.                                 
+      320 +      {:else}                                                 
+      321 +        The orange note is next — green keys show where it is 
+          +and which finger to use.                                      
+      322 +      {/if}                                                   
+      323        {#if mistakes > 0}
+      324          Wrong notes so far: {mistakes}.{/if}
+      325      </p>
+      326    {/if}
+      327  
+      328    <SheetMusic {score} {highlights} />
+      325 -  <PianoKeyboard from={kbFrom} to={kbTo} {pressed} {expected} 
+          -wrong={wrongFlash} fingers={fingerMap} />                     
+      329 +  {#if reading}                                               
+      330 +    <label class="metro">                                     
+      331 +      <input type="checkbox" bind:checked={showKeyboard} /> Sh
+          +ow keyboard (played notes only — no hints)                    
+      332 +    </label>                                                  
+      333 +    {#if showKeyboard}                                        
+      334 +      <PianoKeyboard from={kbFrom} to={kbTo} {pressed} wrong={
+          +wrongFlash} />                                                
+      335 +    {/if}                                                     
+      336 +  {:else}                                                     
+      337 +    <PianoKeyboard from={kbFrom} to={kbTo} {pressed} {expected
+          +} wrong={wrongFlash} fingers={fingerMap} />                   
+      338 +  {/if}                                                       
+      339  
+      340    {#if lesson.tips.length}
+      341      <details>
+
+⏺ Now the SongPlayer — repertoire is reading material too, so it gets the same
+  treatment:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Removed 1 line
+       9    import { addRecord } from '../lib/practice/history.svelte'
+      10    import { StepMatcher } from '../lib/practice/matcher'
+      11    import { stepsFromSong } from '../lib/practice/songSteps'
+      12 -  import type { Finger } from '../lib/theory/types'            
+      12  
+      13    let { song, onexit }: { song: Song; onexit?: () => void } = $
+          props()
+      14  
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Removed 16 lines
+      64      return map
+      65    })
+      66  
+      67 -  const expected = $derived.by(() => {                         
+      68 -    void version                                               
+      69 -    return matcher.done ? new Set<number>() : matcher.remaining
+      70 -  })                                                           
+      71 -                                                               
+      72 -  const fingerMap = $derived.by(() => {                        
+      73 -    void version                                               
+      74 -    const map = new Map<number, Finger>()                      
+      75 -    const cur = matcher.current                                
+      76 -    cur?.midis.forEach((m, i) => {                             
+      77 -      const f = cur.fingers[i]                                 
+      78 -      if (f) map.set(m, f)                                     
+      79 -    })                                                         
+      80 -    return map                                                 
+      81 -  })                                                           
+      82 -                                                               
+      67    const done = $derived.by(() => {
+      68      void version
+      69      return matcher.done
+
+⏺ Update(src/components/SongPlayer.svelte)  ⎿  Added 3 lines
+      22    let resetKey = $state(0)
+      23    let wrongFlash = $state(new Set<number>())
+      24    let demoPlaying = $state(false)
+      25 +  // Songs are reading material: no keyboard by default, and wh
+         +en shown it only                                               
+      26 +  // mirrors what was played — never the expected keys or finge
+         +rs.                                                            
+      27 +  let showKeyboard = $state(false)                             
+      28  
+      29    function selectSection(from: number, to: number) {
+      30      fromMeasure = from
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 6 lines, removed 1 line
+      217    {/if}
+      218  
+      219    <GrandSheetMusic {song} {range} stepHighlights={highlights} 
+           />
+      220 -  <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.ac
+          -tiveNotes} {expected} wrong={wrongFlash} fingers={fingerMap} /
+          ->                                                             
+      220 +  <label class="show-kb">                                     
+      221 +    <input type="checkbox" bind:checked={showKeyboard} /> Show
+          + keyboard (played notes only — no hints)                      
+      222 +  </label>                                                    
+      223 +  {#if showKeyboard}                                          
+      224 +    <PianoKeyboard from={kbFrom} to={kbTo} pressed={noteInput.
+          +activeNotes} wrong={wrongFlash} />                            
+      225 +  {/if}                                                       
+      226  </div>
+      227  
+      228  <style>
+
+⏺ expected is now unused in SongPlayer — removing it and adding the toggle's
+  style:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Error editing file
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 7 lines
+      259      cursor: pointer;
+      260      font-size: 14px;
+      261    }
+      262 +  .show-kb {                                                  
+      263 +    display: flex;                                            
+      264 +    align-items: center;                                      
+      265 +    gap: 6px;                                                 
+      266 +    font-size: 13px;                                          
+      267 +    color: #475569;                                           
+      268 +  }                                                           
+      269    .complete {
+      270      display: flex;
+      271      align-items: center;
+
+⏺ Update(src/tests/sightreading.test.ts)
+  ⎿  Added 15 lines, removed 2 lines
+      46      }
+      47    })
+      48  
+      49 -  it('level 1 stays in the C five-finger position with fingerin
+         -g', () => {                                                    
+      49 +  it('level 1 stays in the C five-finger position', () => {    
+      50      for (const seed of seeds) {
+      51        const lesson = makeSightReading(1, seed)
+      52        expect(lesson.keySignature).toBe('C')
+     ...
+      54          expect(step.midis[0]).toBeGreaterThanOrEqual(60)
+      55          expect(step.midis[0]).toBeLessThanOrEqual(67)
+      56          expect(step.durationBeats).toBe(1)
+      57 -        expect(step.fingers[0]).not.toBeNull()                 
+      57        }
+      58      }
+      59    })
+      60  
+      61 +  it('is a reading lesson: fingering appears only as a first-no
+         +te position cue', () => {                                      
+      62 +    for (const level of LEVELS) {                              
+      63 +      for (const seed of seeds) {                              
+      64 +        const lesson = makeSightReading(level, seed)           
+      65 +        expect(lesson.hints).toBe('reading')                   
+      66 +        const steps = lesson.segments[0].steps                 
+      67 +        // First step may carry a starting finger; every later 
+         +step must not.                                                 
+      68 +        for (const step of steps.slice(1)) {                   
+      69 +          expect(step.fingers.every((f) => f === null), `${less
+         +on.id}`).toBe(true)                                            
+      70 +        }                                                      
+      71 +      }                                                        
+      72 +    }                                                          
+      73 +  })                                                           
+      74 +                                                               
+      75    it('level 3 is a bass-clef left-hand line in low register', (
+          ) => {
+      76      for (const seed of seeds) {
+      77        const lesson = makeSightReading(3, seed)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ All tests (504) and type checks pass. Let me make sure no other copy still
+  promises green-key hints for reading contexts:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Everything is in place. Both remaining mentions are in the right contexts
+  (technique lessons and free play).
+
+  What changed
+
+  The leak: both practice players always rendered the piano keyboard with the
+  next expected key lit green plus a finger-number badge, and the sight-reading
+  generator wrote finger numbers into every step, which the score renders — in a
+  five-finger position, "finger 3" literally names the note. You could complete
+  any reading exercise without decoding a single notehead.
+
+  The fix — a new hints: 'technique' | 'reading' field on Lesson
+  (src/lib/data/lessons/types.ts):
+
+  - Reading mode (sight-reading, all 5 levels, and all songs): the keyboard is
+  hidden by default. A "Show keyboard" checkbox brings it back, but even then it
+  only mirrors what you played (plus red wrong-note flashes) — never the
+  expected keys or fingers. The on-screen hint now says "read it off the staff"
+  instead of "green keys show where it is".
+  - Technique mode (everything else — unchanged default): full keyboard with
+  expected keys and finger badges.
+
+  Which lessons keep fingering, and why: fingering stays for five-finger 
+  positions, Hanon, scale routines, melodic minors, chromatic scale, contrary 
+  motion, arpeggios, broken chords, cadences, and jazz voicings — there the
+  fingering is the pedagogy (the hand-authored ABRSM/Hanon charts exist
+  precisely to drill thumb-under patterns and chord hand-shapes), and printed
+  editions of these exercises always show it. Sight-reading keeps exactly one
+  fingering: a starting finger on the first note of each exercise (LH gets 5 on
+  the tonic in the bass-clef level) — this mirrors real ABRSM sight-reading
+  tests, where the opening finger is a hand-position cue and everything after
+  must be read. Songs never rendered fingering on the grand staff anyway; their
+  per-note finger data only surfaced through the now-removed keyboard badges.
+
+  Tests updated: sightreading.test.ts now asserts every level is hints: 
+  'reading' with fingering on the first note only. All 504 tests and npm run 
+  check pass.
+
+  One thing to consider later: in reading mode wrong notes now only show as a
+  running count (the red flash lived on the keyboard). If that feels too quiet
+  in practice, flashing the played wrong note on the staff would be the
+  notation-first way to restore it.
+
+✻ Cooked for 5m 19s
+
+※ recap: Making sight-reading and songs actually teach score reading: keyboard hints and fingerings are now hidden for reading-mode practices, kept for technique drills; all tests pass. Next action: try it in the app and see if wrong-note feedback feels sufficient. (disable recaps in /config)

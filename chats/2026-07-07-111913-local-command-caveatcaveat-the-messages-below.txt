@@ -1,0 +1,998 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.199
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+ ▎ Fable 5 is back.
+ ▎ Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ /clear                                                                        
+
+❯ Add in more sheet music, at grades up to Grade 7. Make sure to include some   
+  jazz and classical at each level                                              
+
+⏺ I'll look at how the existing graded songs are structured, then add more
+  pieces across grades 1–7 with jazz and classical at each level.
+
+  Read 2 files, listed 1 directory (ctrl+o to expand)
+
+⏺ Now let me see how the catalog and grade field are consumed elsewhere.
+
+  Searched for 3 patterns, read 5 files (ctrl+o to expand)
+
+⏺ Update(src/lib/data/songs/types.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      24    id: string
+      25    title: string
+      26    composer: string
+      27 -  /** Difficulty grade, roughly aligned with early exam grades 
+         -*/                                                             
+      28 -  grade: 1 | 2 | 3 | 4                                         
+      27 +  /** Difficulty grade, roughly aligned with exam grades */    
+      28 +  grade: 1 | 2 | 3 | 4 | 5 | 6 | 7                             
+      29    style: 'classical' | 'folk' | 'jazz' | 'blues'
+      30    keySignature: string
+      31    timeSignature: [number, number]
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      10    let importError = $state('')
+      11    let fileInput: HTMLInputElement | undefined = $state()
+      12  
+      13 -  const grades = [1, 2, 3, 4] as const                         
+      13 +  const grades = [1, 2, 3, 4, 5, 6, 7] as const                
+      14    const byGrade = (g: number) => SONG_CATALOG.filter((s) => s.g
+          rade === g)
+      15  
+      16    const STYLE_ICONS: Record<Song['style'], string> = {
+
+⏺ Now the catalog — first the header comment and MIDI constants:
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 4 lines, removed 3 lines
+       3  
+       4  /**
+       5   * Bundled graded repertoire — public-domain pieces in our own 
+          simple
+       6 - * arrangements. Compact tuple encoding: [midi, startBeat, dura
+         -tionBeats,                                                     
+       7 - * finger?]. More (and longer) pieces arrive via the MusicXML p
+         -ipeline;                                                       
+       8 - * this starter set covers grades 1–2.                         
+       6 + * arrangements (plus a few original études). Compact tuple enc
+         +oding:                                                         
+       7 + * [midi, startBeat, durationBeats, finger?]. More (and longer)
+         + pieces                                                        
+       8 + * arrive via the MusicXML pipeline; this set covers grades 1–7
+         + with                                                          
+       9 + * classical and jazz at every level.                          
+      10   */
+      11  type N = [number, number, number, Finger?]
+      12  
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 14 lines, removed 1 line
+      15  
+      16  const bar = (rh: N[], lh: N[]): SongMeasure => ({ notes: [...no
+          tes('R', rh), ...notes('L', lh)] })
+      17  
+      18 -// Midi shorthands (octave 2–5)                                
+      18 +// Midi shorthands (octave 2–6)                                
+      19  const G2 = 43, A2 = 45, B2 = 47
+      20  const C3 = 48, D3 = 50, Eb3 = 51, F3 = 53, G3 = 55, A3 = 57, Bb
+          3 = 58, B3 = 59
+      21  const C4 = 60, D4 = 62, Eb4 = 63, E4 = 64, F4 = 65, Fs4 = 66, G
+          4 = 67, A4 = 69, Bb4 = 70, B4 = 71
+      22  const C5 = 72, D5 = 74, E5 = 76, Fs5 = 78, G5 = 79
+      23  const F2 = 41
+      24 +const C2 = 36, D2 = 38, E2 = 40, Fs2 = 42                      
+      25 +const Cs3 = 49, Ds3 = 51, Fs3 = 54, Gs3 = 56                   
+      26 +const Cs4 = 61, Ds4 = 63, Gs4 = 68                             
+      27 +const Cs5 = 73, Ds5 = 75, F5 = 77, A5 = 81, B5 = 83            
+      28 +const C6 = 84                                                  
+      29  
+      30 +/** Stride/ragtime LH: bass on 1 & 3, chord on 2 & 4. */       
+      31 +const oomPah = (bass1: number, chord: number[], bass2: number, 
+         +chord2 = chord): N[] => [                                      
+      32 +  [bass1, 0, 1],                                               
+      33 +  ...chord.map((m): N => [m, 1, 1]),                           
+      34 +  [bass2, 2, 1],                                               
+      35 +  ...chord2.map((m): N => [m, 3, 1]),                          
+      36 +]                                                              
+      37 +                                                               
+      38  const odeToJoy: Song = {
+      39    id: 'ode-to-joy',
+      40    title: 'Ode to Joy',
+
+⏺ Now the new pieces — grades 2–7, jazz and classical at each level:
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 498 lines, removed 1 line
+      225    })(),
+      226  }
+      227  
+      228 -export const SONG_CATALOG: Song[] = [odeToJoy, twinkle, mary, 
+          -jingleBells, saints, minuetInG, bluesShells]                  
+      228 +const stJames: Song = {                                       
+      229 +  id: 'st-james-infirmary',                                   
+      230 +  title: 'St. James Infirmary',                               
+      231 +  composer: 'Traditional',                                    
+      232 +  grade: 2,                                                   
+      233 +  style: 'jazz',                                              
+      234 +  keySignature: 'Am',                                         
+      235 +  timeSignature: [4, 4],                                      
+      236 +  tempoBpm: 88,                                               
+      237 +  swing: true,                                                
+      238 +  sections: [                                                 
+      239 +    { label: 'First line', fromMeasure: 0, toMeasure: 3 },    
+      240 +    { label: 'Second line', fromMeasure: 4, toMeasure: 7 },   
+      241 +  ],                                                          
+      242 +  measures: [                                                 
+      243 +    bar([[E4, 0, 1, 1], [A4, 1, 1, 4], [A4, 2, 1, 4], [A4, 3, 
+          +1, 4]], [[A2, 0, 2], [E3, 2, 2]]),                            
+      244 +    bar([[G4, 0, 1, 3], [A4, 1, 3, 4]], [[A2, 0, 4]]),        
+      245 +    bar([[C5, 0, 1, 5], [B4, 1, 1, 4], [A4, 2, 1, 3], [B4, 3, 
+          +1, 4]], [[D3, 0, 2], [F3, 2, 2]]),                            
+      246 +    bar([[A4, 0, 2, 3], [E4, 2, 2, 1]], [[A2, 0, 2], [E3, 2, 2
+          +]]),                                                          
+      247 +    bar([[E4, 0, 1, 1], [A4, 1, 1, 4], [A4, 2, 1, 4], [B4, 3, 
+          +1, 5]], [[A2, 0, 2], [E3, 2, 2]]),                            
+      248 +    bar([[C5, 0, 1, 5], [C5, 1, 1, 5], [B4, 2, 2, 4]], [[F2, 0
+          +, 2], [C3, 2, 2]]),                                           
+      249 +    bar([[A4, 0, 1, 3], [C5, 1, 1, 5], [B4, 2, 1, 4], [Gs4, 3,
+          + 1, 2]], [[E3, 0, 2], [B2, 2, 2]]),                           
+      250 +    bar([[A4, 0, 4, 3]], [[A2, 0, 2], [E3, 2, 2]]),           
+      251 +  ],                                                          
+      252 +}                                                             
+      253 +                                                              
+      254 +const furElise: Song = {                                      
+      255 +  id: 'fur-elise',                                            
+      256 +  title: 'Für Elise (theme)',                                 
+      257 +  composer: 'L. van Beethoven',                               
+      258 +  grade: 3,                                                   
+      259 +  style: 'classical',                                         
+      260 +  keySignature: 'Am',                                         
+      261 +  timeSignature: [3, 8],                                      
+      262 +  tempoBpm: 66,                                               
+      263 +  sections: [                                                 
+      264 +    { label: 'First phrase', fromMeasure: 0, toMeasure: 4 },  
+      265 +    { label: 'Second phrase', fromMeasure: 5, toMeasure: 8 }, 
+      266 +  ],                                                          
+      267 +  measures: [                                                 
+      268 +    bar([[E5, 1, 0.25, 4], [Ds5, 1.25, 0.25, 3]], []),        
+      269 +    bar([[E5, 0, 0.25, 4], [Ds5, 0.25, 0.25, 3], [E5, 0.5, 0.2
+          +5], [B4, 0.75, 0.25, 1], [D5, 1, 0.25], [C5, 1.25, 0.25]], [])
+          +,                                                             
+      270 +    bar([[A4, 0, 0.5, 1], [C4, 0.75, 0.25, 1], [E4, 1, 0.25, 2
+          +], [A4, 1.25, 0.25, 5]], [[A2, 0, 0.25, 5], [E3, 0.25, 0.25, 2
+          +], [A3, 0.5, 0.25, 1]]),                                      
+      271 +    bar([[B4, 0, 0.5, 5], [E4, 0.75, 0.25, 1], [Gs4, 1, 0.25, 
+          +3], [B4, 1.25, 0.25, 5]], [[E2, 0, 0.25, 5], [E3, 0.25, 0.25, 
+          +2], [Gs3, 0.5, 0.25, 1]]),                                    
+      272 +    bar([[C5, 0, 0.5, 5], [E4, 0.75, 0.25, 1], [E5, 1, 0.25, 4
+          +], [Ds5, 1.25, 0.25, 3]], [[A2, 0, 0.25, 5], [E3, 0.25, 0.25, 
+          +2], [A3, 0.5, 0.25, 1]]),                                     
+      273 +    bar([[E5, 0, 0.25], [Ds5, 0.25, 0.25], [E5, 0.5, 0.25], [B
+          +4, 0.75, 0.25], [D5, 1, 0.25], [C5, 1.25, 0.25]], []),        
+      274 +    bar([[A4, 0, 0.5], [C4, 0.75, 0.25], [E4, 1, 0.25], [A4, 1
+          +.25, 0.25]], [[A2, 0, 0.25], [E3, 0.25, 0.25], [A3, 0.5, 0.25]
+          +]),                                                           
+      275 +    bar([[B4, 0, 0.5], [E4, 0.75, 0.25], [C5, 1, 0.25], [B4, 1
+          +.25, 0.25]], [[E2, 0, 0.25], [E3, 0.25, 0.25], [Gs3, 0.5, 0.25
+          +]]),                                                          
+      276 +    bar([[A4, 0, 1]], [[A2, 0, 0.25], [E3, 0.25, 0.25], [A3, 0
+          +.5, 0.25]]),                                                  
+      277 +  ],                                                          
+      278 +}                                                             
+      279 +                                                              
+      280 +/** Ragtime: straight 16ths, not swung. */                    
+      281 +const entertainerEasy: Song = (() => {                        
+      282 +  const figure = () =>                                        
+      283 +    bar(                                                      
+      284 +      [                                                       
+      285 +        [E4, 0, 0.25], [C5, 0.25, 0.75], [E4, 1, 0.25], [C5, 1
+          +.25, 0.75],                                                   
+      286 +        [E4, 2, 0.25], [C5, 2.25, 0.75], [C5, 3, 1],          
+      287 +      ],                                                      
+      288 +      oomPah(C3, [E3, G3, C4], G2),                           
+      289 +    )                                                         
+      290 +  const run = () =>                                           
+      291 +    bar(                                                      
+      292 +      [                                                       
+      293 +        [C5, 0, 0.25], [D5, 0.25, 0.25], [Ds5, 0.5, 0.25], [E5
+          +, 0.75, 0.25],                                                
+      294 +        [C5, 1, 0.25], [D5, 1.25, 0.25], [E5, 1.5, 0.5],      
+      295 +        [B4, 2, 0.25], [D5, 2.25, 0.75], [C5, 3, 1],          
+      296 +      ],                                                      
+      297 +      oomPah(G2, [F3, G3, B3], C3, [E3, G3, C4]),             
+      298 +    )                                                         
+      299 +  return {                                                    
+      300 +    id: 'the-entertainer-easy',                               
+      301 +    title: 'The Entertainer (easy)',                          
+      302 +    composer: 'S. Joplin',                                    
+      303 +    grade: 3,                                                 
+      304 +    style: 'jazz',                                            
+      305 +    keySignature: 'C',                                        
+      306 +    timeSignature: [4, 4],                                    
+      307 +    tempoBpm: 84,                                             
+      308 +    sections: [                                               
+      309 +      { label: 'A phrase', fromMeasure: 0, toMeasure: 3 },    
+      310 +      { label: 'A again & ending', fromMeasure: 4, toMeasure: 
+          +7 },                                                          
+      311 +    ],                                                        
+      312 +    measures: [                                               
+      313 +      bar([[D4, 3, 0.5, 1], [Ds4, 3.5, 0.5, 2]], []),         
+      314 +      figure(),                                               
+      315 +      run(),                                                  
+      316 +      figure(),                                               
+      317 +      run(),                                                  
+      318 +      figure(),                                               
+      319 +      bar(                                                    
+      320 +        [                                                     
+      321 +          [D5, 0, 0.5], [C5, 0.5, 0.5], [A4, 1, 0.5], [G4, 1.5
+          +, 0.5],                                                       
+      322 +          [E4, 2, 0.5], [G4, 2.5, 0.5], [A4, 3, 0.5], [B4, 3.5
+          +, 0.5],                                                       
+      323 +        ],                                                    
+      324 +        oomPah(F2, [F3, A3, C4], G2, [F3, G3, B3]),           
+      325 +      ),                                                      
+      326 +      bar([[C5, 0, 4]], oomPah(C3, [E3, G3, C4], G2, [E3, G3, 
+          +C4])),                                                        
+      327 +    ],                                                        
+      328 +  }                                                           
+      329 +})()                                                          
+      330 +                                                              
+      331 +const bachPrelude: Song = (() => {                            
+      332 +  const fig = (b1: number, b2: number, r1: number, r2: number,
+          + r3: number): SongMeasure => {                                
+      333 +    const rh: N[] = []                                        
+      334 +    for (const half of [0, 2]) {                              
+      335 +      rh.push(                                                
+      336 +        [r1, half + 0.5, 0.25], [r2, half + 0.75, 0.25], [r3, 
+          +half + 1, 0.25],                                              
+      337 +        [r1, half + 1.25, 0.25], [r2, half + 1.5, 0.25], [r3, 
+          +half + 1.75, 0.25],                                           
+      338 +      )                                                       
+      339 +    }                                                         
+      340 +    return bar(rh, [[b1, 0, 0.25], [b2, 0.25, 1.75], [b1, 2, 0
+          +.25], [b2, 2.25, 1.75]])                                      
+      341 +  }                                                           
+      342 +  return {                                                    
+      343 +    id: 'bach-prelude-c',                                     
+      344 +    title: 'Prelude in C (opening)',                          
+      345 +    composer: 'J. S. Bach (BWV 846)',                         
+      346 +    grade: 4,                                                 
+      347 +    style: 'classical',                                       
+      348 +    keySignature: 'C',                                        
+      349 +    timeSignature: [4, 4],                                    
+      350 +    tempoBpm: 69,                                             
+      351 +    sections: [                                               
+      352 +      { label: 'Bars 1–4', fromMeasure: 0, toMeasure: 3 },    
+      353 +      { label: 'Bars 5–8', fromMeasure: 4, toMeasure: 7 },    
+      354 +    ],                                                        
+      355 +    measures: [                                               
+      356 +      fig(C3, E3, G3, C4, E4),                                
+      357 +      fig(C3, D3, A3, D4, F4),                                
+      358 +      fig(B2, D3, G3, D4, F4),                                
+      359 +      fig(C3, E3, G3, C4, E4),                                
+      360 +      fig(C3, E3, A3, E4, A4),                                
+      361 +      fig(C3, D3, A3, D4, Fs4),                               
+      362 +      fig(B2, D3, G3, D4, G4),                                
+      363 +      fig(C3, E3, G3, C4, E4),                                
+      364 +    ],                                                        
+      365 +  }                                                           
+      366 +})()                                                          
+      367 +                                                              
+      368 +/** 12-bar jazz blues: swung riff over a walking quarter-note 
+          +bass. */                                                      
+      369 +const walkingBlues: Song = {                                  
+      370 +  id: 'jazz-blues-walking-g',                                 
+      371 +  title: 'Jazz Blues in G (walking bass)',                    
+      372 +  composer: 'Piano Tutor',                                    
+      373 +  grade: 4,                                                   
+      374 +  style: 'jazz',                                              
+      375 +  keySignature: 'G',                                          
+      376 +  timeSignature: [4, 4],                                      
+      377 +  tempoBpm: 112,                                              
+      378 +  swing: true,                                                
+      379 +  sections: [                                                 
+      380 +    { label: 'Bars 1–4', fromMeasure: 0, toMeasure: 3 },      
+      381 +    { label: 'Bars 5–8', fromMeasure: 4, toMeasure: 7 },      
+      382 +    { label: 'Turnaround', fromMeasure: 8, toMeasure: 11 },   
+      383 +  ],                                                          
+      384 +  measures: [                                                 
+      385 +    bar(                                                      
+      386 +      [[D4, 0, 0.5], [F4, 0.5, 0.5], [G4, 1, 0.5], [Bb4, 1.5, 
+          +0.5], [B4, 2, 1], [D5, 3, 1]],                                
+      387 +      [[G2, 0, 1], [A2, 1, 1], [B2, 2, 1], [D3, 3, 1]],       
+      388 +    ),                                                        
+      389 +    bar(                                                      
+      390 +      [[E4, 0, 0.5], [G4, 0.5, 0.5], [A4, 1, 0.5], [C5, 1.5, 0
+          +.5], [Bb4, 2, 2]],                                            
+      391 +      [[C3, 0, 1], [D3, 1, 1], [E3, 2, 1], [G3, 3, 1]],       
+      392 +    ),                                                        
+      393 +    bar(                                                      
+      394 +      [[D5, 0, 0.5], [B4, 0.5, 0.5], [Bb4, 1, 0.5], [G4, 1.5, 
+          +0.5], [F4, 2, 1], [D4, 3, 1]],                                
+      395 +      [[G2, 0, 1], [B2, 1, 1], [D3, 2, 1], [E3, 3, 1]],       
+      396 +    ),                                                        
+      397 +    bar(                                                      
+      398 +      [[D4, 3, 0.5], [Ds4, 3.5, 0.5]],                        
+      399 +      [[G3, 0, 1], [F3, 1, 1], [E3, 2, 1], [D3, 3, 1]],       
+      400 +    ),                                                        
+      401 +    bar(                                                      
+      402 +      [[E4, 0, 0.5], [G4, 0.5, 0.5], [A4, 1, 0.5], [C5, 1.5, 0
+          +.5], [Bb4, 2, 2]],                                            
+      403 +      [[C3, 0, 1], [E3, 1, 1], [G3, 2, 1], [E3, 3, 1]],       
+      404 +    ),                                                        
+      405 +    bar(                                                      
+      406 +      [[E4, 0, 0.5], [G4, 0.5, 0.5], [A4, 1, 0.5], [C5, 1.5, 0
+          +.5], [A4, 2, 1], [G4, 3, 1]],                                 
+      407 +      [[C3, 0, 1], [D3, 1, 1], [E3, 2, 1], [Fs3, 3, 1]],      
+      408 +    ),                                                        
+      409 +    bar(                                                      
+      410 +      [[D4, 0, 0.5], [F4, 0.5, 0.5], [G4, 1, 0.5], [Bb4, 1.5, 
+          +0.5], [B4, 2, 1], [D5, 3, 1]],                                
+      411 +      [[G3, 0, 1], [F3, 1, 1], [E3, 2, 1], [D3, 3, 1]],       
+      412 +    ),                                                        
+      413 +    bar(                                                      
+      414 +      [[B4, 0, 0.5], [G4, 0.5, 0.5], [F4, 1, 0.5], [D4, 1.5, 0
+          +.5], [F4, 2, 2]],                                             
+      415 +      [[G2, 0, 1], [A2, 1, 1], [B2, 2, 1], [Cs3, 3, 1]],      
+      416 +    ),                                                        
+      417 +    bar(                                                      
+      418 +      [[Fs4, 0, 0.5], [A4, 0.5, 0.5], [B4, 1, 0.5], [C5, 1.5, 
+          +0.5], [D5, 2, 2]],                                            
+      419 +      [[D3, 0, 1], [Fs3, 1, 1], [A3, 2, 1], [Fs3, 3, 1]],     
+      420 +    ),                                                        
+      421 +    bar(                                                      
+      422 +      [[C5, 0, 0.5], [A4, 0.5, 0.5], [G4, 1, 0.5], [E4, 1.5, 0
+          +.5], [G4, 2, 2]],                                             
+      423 +      [[C3, 0, 1], [E3, 1, 1], [G3, 2, 1], [E3, 3, 1]],       
+      424 +    ),                                                        
+      425 +    bar(                                                      
+      426 +      [[D4, 0, 0.5], [F4, 0.5, 0.5], [G4, 1, 2], [B4, 3, 0.5],
+          + [C5, 3.5, 0.5]],                                             
+      427 +      [[G2, 0, 1], [B2, 1, 1], [D3, 2, 1], [E3, 3, 1]],       
+      428 +    ),                                                        
+      429 +    bar(                                                      
+      430 +      [[A4, 0, 1], [C5, 1, 1], [A4, 2, 1], [Fs4, 3, 1]],      
+      431 +      [[D3, 0, 1], [E3, 1, 1], [Fs3, 2, 1], [A3, 3, 1]],      
+      432 +    ),                                                        
+      433 +  ],                                                          
+      434 +}                                                             
+      435 +                                                              
+      436 +const canonInD: Song = (() => {                               
+      437 +  const ground: [number, number][] = [[D3, A2], [B2, Fs2], [G2
+          +, D2], [G2, A2]]                                              
+      438 +  const groundBar = (i: number): N[] => [[ground[i % 4][0], 0,
+          + 2], [ground[i % 4][1], 2, 2]]                                
+      439 +  return {                                                    
+      440 +    id: 'canon-in-d',                                         
+      441 +    title: 'Canon in D (theme & variations)',                 
+      442 +    composer: 'J. Pachelbel',                                 
+      443 +    grade: 5,                                                 
+      444 +    style: 'classical',                                       
+      445 +    keySignature: 'D',                                        
+      446 +    timeSignature: [4, 4],                                    
+      447 +    tempoBpm: 76,                                             
+      448 +    sections: [                                               
+      449 +      { label: 'Ground & chords', fromMeasure: 0, toMeasure: 3
+          + },                                                           
+      450 +      { label: 'Quarter-note theme', fromMeasure: 4, toMeasure
+          +: 7 },                                                        
+      451 +      { label: 'Eighth-note variation', fromMeasure: 8, toMeas
+          +ure: 11 },                                                    
+      452 +    ],                                                        
+      453 +    measures: [                                               
+      454 +      bar([[Fs4, 0, 2], [A4, 0, 2], [Cs4, 2, 2], [E4, 2, 2]], 
+          +groundBar(0)),                                                
+      455 +      bar([[D4, 0, 2], [Fs4, 0, 2], [Cs4, 2, 2], [Fs4, 2, 2]],
+          + groundBar(1)),                                               
+      456 +      bar([[B3, 0, 2], [D4, 0, 2], [A3, 2, 2], [D4, 2, 2]], gr
+          +oundBar(2)),                                                  
+      457 +      bar([[B3, 0, 2], [D4, 0, 2], [A3, 2, 2], [Cs4, 2, 2]], g
+          +roundBar(3)),                                                 
+      458 +      bar([[Fs5, 0, 1, 5], [E5, 1, 1, 4], [D5, 2, 1, 3], [Cs5,
+          + 3, 1, 2]], groundBar(0)),                                    
+      459 +      bar([[B4, 0, 1, 1], [A4, 1, 1, 1], [B4, 2, 1, 2], [Cs5, 
+          +3, 1, 3]], groundBar(1)),                                     
+      460 +      bar([[D5, 0, 1, 4], [Cs5, 1, 1, 3], [B4, 2, 1, 2], [A4, 
+          +3, 1, 1]], groundBar(2)),                                     
+      461 +      bar([[G4, 0, 1, 5], [Fs4, 1, 1, 4], [G4, 2, 1, 5], [E4, 
+          +3, 1, 3]], groundBar(3)),                                     
+      462 +      bar(                                                    
+      463 +        [[D5, 0, 0.5], [E5, 0.5, 0.5], [Fs5, 1, 0.5], [G5, 1.5
+          +, 0.5], [A5, 2, 0.5], [E5, 2.5, 0.5], [Cs5, 3, 0.5], [E5, 3.5,
+          + 0.5]],                                                       
+      464 +        groundBar(0),                                         
+      465 +      ),                                                      
+      466 +      bar(                                                    
+      467 +        [[D5, 0, 0.5], [Cs5, 0.5, 0.5], [B4, 1, 0.5], [D5, 1.5
+          +, 0.5], [Cs5, 2, 0.5], [A4, 2.5, 0.5], [Fs4, 3, 0.5], [A4, 3.5
+          +, 0.5]],                                                      
+      468 +        groundBar(1),                                         
+      469 +      ),                                                      
+      470 +      bar(                                                    
+      471 +        [[B4, 0, 0.5], [A4, 0.5, 0.5], [G4, 1, 0.5], [B4, 1.5,
+          + 0.5], [A4, 2, 0.5], [Fs4, 2.5, 0.5], [D4, 3, 0.5], [Fs4, 3.5,
+          + 0.5]],                                                       
+      472 +        groundBar(2),                                         
+      473 +      ),                                                      
+      474 +      bar(                                                    
+      475 +        [[G4, 0, 0.5], [B4, 0.5, 0.5], [A4, 1, 0.5], [Cs5, 1.5
+          +, 0.5], [D5, 2, 2]],                                          
+      476 +        [[G2, 0, 1], [A2, 1, 1], [D3, 2, 2]],                 
+      477 +      ),                                                      
+      478 +    ],                                                        
+      479 +  }                                                           
+      480 +})()                                                          
+      481 +                                                              
+      482 +/** Swung lines over two-note LH shells — the ii–V–I in every 
+          +jazz tune. */                                                 
+      483 +const iiVIEtude: Song = {                                     
+      484 +  id: 'ii-v-i-etude',                                         
+      485 +  title: 'ii–V–I Étude (swing)',                              
+      486 +  composer: 'Piano Tutor',                                    
+      487 +  grade: 5,                                                   
+      488 +  style: 'jazz',                                              
+      489 +  keySignature: 'C',                                          
+      490 +  timeSignature: [4, 4],                                      
+      491 +  tempoBpm: 116,                                              
+      492 +  swing: true,                                                
+      493 +  sections: [                                                 
+      494 +    { label: 'Question', fromMeasure: 0, toMeasure: 3 },      
+      495 +    { label: 'Answer', fromMeasure: 4, toMeasure: 7 },        
+      496 +  ],                                                          
+      497 +  measures: [                                                 
+      498 +    bar(                                                      
+      499 +      [[D4, 0, 0.5], [F4, 0.5, 0.5], [A4, 1, 0.5], [C5, 1.5, 0
+          +.5], [B4, 2, 0.5], [A4, 2.5, 0.5], [F4, 3, 0.5], [A4, 3.5, 0.5
+          +]],                                                           
+      500 +      [[D3, 0, 4], [C4, 0, 4]],                               
+      501 +    ),                                                        
+      502 +    bar(                                                      
+      503 +      [[B4, 0, 0.5], [D5, 0.5, 0.5], [F5, 1, 0.5], [D5, 1.5, 0
+          +.5], [B4, 2, 0.5], [A4, 2.5, 0.5], [G4, 3, 1]],               
+      504 +      [[G2, 0, 4], [F3, 0, 4]],                               
+      505 +    ),                                                        
+      506 +    bar(                                                      
+      507 +      [[E4, 0, 0.5], [G4, 0.5, 0.5], [B4, 1, 0.5], [D5, 1.5, 0
+          +.5], [C5, 2, 2]],                                             
+      508 +      [[C3, 0, 4], [B3, 0, 4]],                               
+      509 +    ),                                                        
+      510 +    bar(                                                      
+      511 +      [[Cs5, 0, 0.5], [E5, 0.5, 0.5], [G5, 1, 0.5], [E5, 1.5, 
+          +0.5], [Cs5, 2, 0.5], [A4, 2.5, 0.5], [G4, 3, 0.5], [E4, 3.5, 0
+          +.5]],                                                         
+      512 +      [[A2, 0, 4], [G3, 0, 4]],                               
+      513 +    ),                                                        
+      514 +    bar(                                                      
+      515 +      [[D4, 0, 0.5], [E4, 0.5, 0.5], [F4, 1, 0.5], [A4, 1.5, 0
+          +.5], [C5, 2, 0.5], [A4, 2.5, 0.5], [F4, 3, 1]],               
+      516 +      [[D3, 0, 4], [C4, 0, 4]],                               
+      517 +    ),                                                        
+      518 +    bar(                                                      
+      519 +      [[B4, 0, 0.5], [C5, 0.5, 0.5], [D5, 1, 0.5], [F5, 1.5, 0
+          +.5], [E5, 2, 0.5], [D5, 2.5, 0.5], [B4, 3, 0.5], [G4, 3.5, 0.5
+          +]],                                                           
+      520 +      [[G2, 0, 4], [F3, 0, 4]],                               
+      521 +    ),                                                        
+      522 +    bar(                                                      
+      523 +      [[A4, 0, 0.5], [G4, 0.5, 0.5], [E4, 1, 0.5], [G4, 1.5, 0
+          +.5], [A4, 2, 2]],                                             
+      524 +      [[C3, 0, 4], [A3, 0, 4]],                               
+      525 +    ),                                                        
+      526 +    bar(                                                      
+      527 +      [[D5, 0, 0.5], [C5, 0.5, 0.5], [B4, 1, 0.5], [A4, 1.5, 0
+          +.5], [G4, 2, 0.5], [C5, 2.5, 1.5]],                           
+      528 +      [[D3, 0, 2], [C4, 0, 2], [G2, 2, 2], [F3, 2, 2]],       
+      529 +    ),                                                        
+      530 +  ],                                                          
+      531 +}                                                             
+      532 +                                                              
+      533 +const chopinPrelude: Song = (() => {                          
+      534 +  const pulse = (chord: number[]): N[] =>                     
+      535 +    Array.from({ length: 8 }, (_, i) => chord.map((m): N => [m
+          +, i * 0.5, 0.5])).flat()                                      
+      536 +  return {                                                    
+      537 +    id: 'chopin-prelude-e-minor',                             
+      538 +    title: 'Prelude in E minor, Op. 28 No. 4 (theme)',        
+      539 +    composer: 'F. Chopin',                                    
+      540 +    grade: 6,                                                 
+      541 +    style: 'classical',                                       
+      542 +    keySignature: 'Em',                                       
+      543 +    timeSignature: [4, 4],                                    
+      544 +    tempoBpm: 56,                                             
+      545 +    sections: [                                               
+      546 +      { label: 'First phrase', fromMeasure: 0, toMeasure: 3 },
+      547 +      { label: 'Second phrase', fromMeasure: 4, toMeasure: 7 }
+          +,                                                             
+      548 +    ],                                                        
+      549 +    measures: [                                               
+      550 +      bar([[B4, 0, 4, 5]], pulse([E3, G3, B3])),              
+      551 +      bar([[C5, 0, 1.5, 5], [B4, 1.5, 0.5, 4], [B4, 2, 2, 4]],
+          + pulse([E3, G3, C4])),                                        
+      552 +      bar([[B4, 0, 1.5, 4], [A4, 1.5, 0.5, 3], [A4, 2, 2, 3]],
+          + pulse([E3, A3, C4])),                                        
+      553 +      bar([[A4, 0, 4, 3]], pulse([Ds3, Fs3, B3])),            
+      554 +      bar([[G4, 0, 4, 2]], pulse([E3, G3, B3])),              
+      555 +      bar([[A4, 0, 1.5, 3], [G4, 1.5, 0.5, 2], [G4, 2, 2, 2]],
+          + pulse([E3, G3, C4])),                                        
+      556 +      bar([[G4, 0, 1.5, 2], [Fs4, 1.5, 0.5, 1], [Fs4, 2, 2, 1]
+          +], pulse([Ds3, Fs3, A3])),                                    
+      557 +      bar([[E4, 0, 4, 1]], pulse([E3, G3, B3])),              
+      558 +    ],                                                        
+      559 +  }                                                           
+      560 +})()                                                          
+      561 +                                                              
+      562 +/** The grade-1 tune again, now with stride left hand and harm
+          +onised melody. */                                             
+      563 +const saintsStride: Song = {                                  
+      564 +  id: 'when-the-saints-stride',                               
+      565 +  title: 'When the Saints (stride)',                          
+      566 +  composer: 'Traditional',                                    
+      567 +  grade: 6,                                                   
+      568 +  style: 'jazz',                                              
+      569 +  keySignature: 'C',                                          
+      570 +  timeSignature: [4, 4],                                      
+      571 +  tempoBpm: 120,                                              
+      572 +  swing: true,                                                
+      573 +  sections: [                                                 
+      574 +    { label: 'Call', fromMeasure: 0, toMeasure: 3 },          
+      575 +    { label: 'Call again', fromMeasure: 4, toMeasure: 7 },    
+      576 +    { label: 'That number', fromMeasure: 8, toMeasure: 11 },  
+      577 +    { label: 'Marching home', fromMeasure: 12, toMeasure: 15 }
+          +,                                                             
+      578 +  ],                                                          
+      579 +  measures: [                                                 
+      580 +    bar([[C4, 1, 1], [E4, 2, 1], [F4, 3, 1]], oomPah(C3, [E3, 
+          +G3, B3], G2)),                                                
+      581 +    bar([[E4, 0, 4], [G4, 0, 4]], oomPah(C3, [E3, G3, B3], G2)
+          +),                                                            
+      582 +    bar([[C4, 1, 1], [E4, 2, 1], [F4, 3, 1]], oomPah(C3, [E3, 
+          +G3, B3], G2)),                                                
+      583 +    bar([[E4, 0, 4], [G4, 0, 4]], oomPah(C3, [E3, G3, B3], G2)
+          +),                                                            
+      584 +    bar([[C4, 1, 1], [E4, 2, 1], [F4, 3, 1]], oomPah(C3, [E3, 
+          +G3, B3], G2)),                                                
+      585 +    bar([[E4, 0, 2], [G4, 0, 2], [C4, 2, 2], [E4, 2, 2]], oomP
+          +ah(C3, [E3, G3, B3], G2)),                                    
+      586 +    bar([[C4, 0, 2], [E4, 2, 2]], oomPah(C3, [E3, G3, B3], G2)
+          +),                                                            
+      587 +    bar([[D4, 0, 4]], oomPah(G2, [F3, G3, B3], D3)),          
+      588 +    bar([[E4, 0, 1], [E4, 1, 1], [D4, 2, 1], [C4, 3, 1]], oomP
+          +ah(C3, [E3, G3, B3], G2)),                                    
+      589 +    bar([[C4, 0, 2], [E4, 2, 2]], oomPah(C3, [E3, G3, Bb3], G2
+          +)),                                                           
+      590 +    bar([[G4, 0, 2], [G4, 2, 1], [F4, 3, 1]], oomPah(F2, [F3, 
+          +A3, C4], C3)),                                                
+      591 +    bar([[E4, 0, 4]], oomPah(C3, [E3, G3, B3], G2)),          
+      592 +    bar([[C4, 1, 1], [E4, 2, 1], [F4, 3, 1]], oomPah(C3, [E3, 
+          +G3, B3], G2)),                                                
+      593 +    bar([[E4, 0, 2], [G4, 0, 2], [C4, 2, 2], [E4, 2, 2]], oomP
+          +ah(C3, [E3, G3, B3], G2)),                                    
+      594 +    bar([[C4, 0, 1], [E4, 1, 1], [D4, 2, 2]], oomPah(G2, [F3, 
+          +G3, B3], D3)),                                                
+      595 +    bar([[C4, 0, 4], [E4, 0, 4], [G4, 0, 4]], [[C3, 0, 1], [E3
+          +, 1, 1], [G3, 1, 1], [C2, 2, 2]]),                            
+      596 +  ],                                                          
+      597 +}                                                             
+      598 +                                                              
+      599 +const mozartK545: Song = (() => {                             
+      600 +  /** Alberti eighths: low–high–mid–high, twice per bar. */   
+      601 +  const alberti = (low: number, mid: number, high: number): N[
+          +] =>                                                          
+      602 +    [low, high, mid, high, low, high, mid, high].map((m, i): N
+          + => [m, i * 0.5, 0.5])                                        
+      603 +  return {                                                    
+      604 +    id: 'mozart-k545',                                        
+      605 +    title: 'Sonata in C, K. 545 (opening)',                   
+      606 +    composer: 'W. A. Mozart',                                 
+      607 +    grade: 7,                                                 
+      608 +    style: 'classical',                                       
+      609 +    keySignature: 'C',                                        
+      610 +    timeSignature: [4, 4],                                    
+      611 +    tempoBpm: 116,                                            
+      612 +    sections: [                                               
+      613 +      { label: 'Theme', fromMeasure: 0, toMeasure: 3 },       
+      614 +      { label: 'Runs & cadence', fromMeasure: 4, toMeasure: 7 
+          +},                                                            
+      615 +    ],                                                        
+      616 +    measures: [                                               
+      617 +      bar([[C5, 0, 2, 1], [E5, 2, 1, 3], [G5, 3, 1, 5]], alber
+          +ti(C4, E4, G4)),                                              
+      618 +      bar([[B4, 0, 1.5, 4], [C5, 1.5, 0.25, 5], [D5, 1.75, 0.2
+          +5], [C5, 2, 2]], alberti(D4, F4, G4)),                        
+      619 +      bar([[A5, 0, 1, 5], [G5, 1, 0.25], [F5, 1.25, 0.25], [E5
+          +, 1.5, 0.25], [D5, 1.75, 0.25], [E5, 2, 2]], alberti(F3, A3, C
+          +4)),                                                          
+      620 +      bar([[B4, 0, 0.5], [C5, 0.5, 0.5], [D5, 1, 1], [G4, 2, 2
+          +]], alberti(G3, B3, D4)),                                     
+      621 +      bar(                                                    
+      622 +        [                                                     
+      623 +          [C6, 0, 0.25], [B5, 0.25, 0.25], [A5, 0.5, 0.25], [G
+          +5, 0.75, 0.25],                                               
+      624 +          [F5, 1, 0.25], [E5, 1.25, 0.25], [D5, 1.5, 0.25], [C
+          +5, 1.75, 0.25],                                               
+      625 +          [B4, 2, 0.25], [A4, 2.25, 0.25], [G4, 2.5, 0.25], [F
+          +4, 2.75, 0.25],                                               
+      626 +          [E4, 3, 0.25], [F4, 3.25, 0.25], [G4, 3.5, 0.25], [B
+          +4, 3.75, 0.25],                                               
+      627 +        ],                                                    
+      628 +        [[C3, 0, 2], [G2, 2, 2]],                             
+      629 +      ),                                                      
+      630 +      bar(                                                    
+      631 +        [                                                     
+      632 +          [G4, 0, 0.25], [A4, 0.25, 0.25], [B4, 0.5, 0.25], [C
+          +5, 0.75, 0.25],                                               
+      633 +          [D5, 1, 0.25], [E5, 1.25, 0.25], [Fs5, 1.5, 0.25], [
+          +G5, 1.75, 0.25],                                              
+      634 +          [A5, 2, 1], [G5, 3, 1],                             
+      635 +        ],                                                    
+      636 +        [[D3, 0, 2], [G2, 2, 2]],                             
+      637 +      ),                                                      
+      638 +      bar(                                                    
+      639 +        [                                                     
+      640 +          [G5, 0, 0.25], [Fs5, 0.25, 0.25], [E5, 0.5, 0.25], [
+          +D5, 0.75, 0.25],                                              
+      641 +          [C5, 1, 0.25], [B4, 1.25, 0.25], [A4, 1.5, 0.25], [G
+          +4, 1.75, 0.25],                                               
+      642 +          [D5, 2, 0.5], [B4, 2.5, 0.5], [C5, 3, 0.5], [A4, 3.5
+          +, 0.5],                                                       
+      643 +        ],                                                    
+      644 +        [[G3, 0, 2], [D3, 2, 2]],                             
+      645 +      ),                                                      
+      646 +      bar([[G4, 0, 4], [B4, 0, 4]], [[G2, 0, 4], [D3, 0, 4]]),
+      647 +    ],                                                        
+      648 +  }                                                           
+      649 +})()                                                          
+      650 +                                                              
+      651 +/** The Entertainer again at full ragtime difficulty: octaves 
+          ++ stride. */                                                  
+      652 +const entertainerStride: Song = (() => {                      
+      653 +  const figure = () =>                                        
+      654 +    bar(                                                      
+      655 +      [                                                       
+      656 +        [E4, 0, 0.25], [E5, 0, 0.25], [C5, 0.25, 0.75], [C6, 0
+          +.25, 0.75],                                                   
+      657 +        [E4, 1, 0.25], [E5, 1, 0.25], [C5, 1.25, 0.75], [C6, 1
+          +.25, 0.75],                                                   
+      658 +        [E4, 2, 0.25], [E5, 2, 0.25], [C5, 2.25, 0.75], [C6, 2
+          +.25, 0.75],                                                   
+      659 +        [C5, 3, 1], [C6, 3, 1],                               
+      660 +      ],                                                      
+      661 +      oomPah(C3, [E3, G3, C4], G2),                           
+      662 +    )                                                         
+      663 +  const run = () =>                                           
+      664 +    bar(                                                      
+      665 +      [                                                       
+      666 +        [C5, 0, 0.25], [D5, 0.25, 0.25], [Ds5, 0.5, 0.25], [E5
+          +, 0.75, 0.25],                                                
+      667 +        [C5, 1, 0.25], [D5, 1.25, 0.25], [E5, 1.5, 0.5],      
+      668 +        [B4, 2, 0.25], [D5, 2.25, 0.75], [C5, 3, 1], [C6, 3, 1
+          +],                                                            
+      669 +      ],                                                      
+      670 +      oomPah(G2, [F3, G3, B3], C3, [E3, G3, C4]),             
+      671 +    )                                                         
+      672 +  return {                                                    
+      673 +    id: 'the-entertainer-stride',                             
+      674 +    title: 'The Entertainer (ragtime octaves)',               
+      675 +    composer: 'S. Joplin',                                    
+      676 +    grade: 7,                                                 
+      677 +    style: 'jazz',                                            
+      678 +    keySignature: 'C',                                        
+      679 +    timeSignature: [4, 4],                                    
+      680 +    tempoBpm: 92,                                             
+      681 +    sections: [                                               
+      682 +      { label: 'A phrase', fromMeasure: 0, toMeasure: 3 },    
+      683 +      { label: 'A again & ending', fromMeasure: 4, toMeasure: 
+          +7 },                                                          
+      684 +    ],                                                        
+      685 +    measures: [                                               
+      686 +      bar([[D4, 3, 0.5], [D5, 3, 0.5], [Ds4, 3.5, 0.5], [Ds5, 
+          +3.5, 0.5]], []),                                              
+      687 +      figure(),                                               
+      688 +      run(),                                                  
+      689 +      figure(),                                               
+      690 +      run(),                                                  
+      691 +      figure(),                                               
+      692 +      bar(                                                    
+      693 +        [                                                     
+      694 +          [F4, 0, 0.5], [D5, 0, 0.5], [E4, 0.5, 0.5], [C5, 0.5
+          +, 0.5],                                                       
+      695 +          [C4, 1, 0.5], [A4, 1, 0.5], [B3, 1.5, 0.5], [G4, 1.5
+          +, 0.5],                                                       
+      696 +          [C4, 2, 0.5], [E4, 2, 0.5], [B3, 2.5, 0.5], [G4, 2.5
+          +, 0.5],                                                       
+      697 +          [C4, 3, 0.5], [A4, 3, 0.5], [D4, 3.5, 0.5], [B4, 3.5
+          +, 0.5],                                                       
+      698 +        ],                                                    
+      699 +        [[F2, 0, 1], [F3, 1, 1], [A3, 1, 1], [G2, 2, 1], [F3, 
+          +3, 1], [G3, 3, 1]],                                           
+      700 +      ),                                                      
+      701 +      bar([[C4, 0, 4], [E4, 0, 4], [G4, 0, 4], [C5, 0, 4]], [[
+          +C2, 0, 4], [C3, 0, 4]]),                                      
+      702 +    ],                                                        
+      703 +  }                                                           
+      704 +})()                                                          
+      705 +                                                              
+      706 +export const SONG_CATALOG: Song[] = [                         
+      707 +  odeToJoy,                                                   
+      708 +  twinkle,                                                    
+      709 +  mary,                                                       
+      710 +  jingleBells,                                                
+      711 +  saints,                                                     
+      712 +  stJames,                                                    
+      713 +  minuetInG,                                                  
+      714 +  bluesShells,                                                
+      715 +  furElise,                                                   
+      716 +  entertainerEasy,                                            
+      717 +  bachPrelude,                                                
+      718 +  walkingBlues,                                               
+      719 +  canonInD,                                                   
+      720 +  iiVIEtude,                                                  
+      721 +  chopinPrelude,                                              
+      722 +  saintsStride,                                               
+      723 +  mozartK545,                                                 
+      724 +  entertainerStride,                                          
+      725 +]                                                             
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Now run the tests and type check:
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ The original file never defined E3. Adding it:
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 1 line, removed 1 line
+      22  const C5 = 72, D5 = 74, E5 = 76, Fs5 = 78, G5 = 79
+      23  const F2 = 41
+      24  const C2 = 36, D2 = 38, E2 = 40, Fs2 = 42
+      25 -const Cs3 = 49, Ds3 = 51, Fs3 = 54, Gs3 = 56                   
+      25 +const Cs3 = 49, Ds3 = 51, E3 = 52, Fs3 = 54, Gs3 = 56          
+      26  const Cs4 = 61, Ds4 = 63, Gs4 = 68
+      27  const Cs5 = 73, Ds5 = 75, F5 = 77, A5 = 81, B5 = 83
+      28  const C6 = 84
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All validation tests pass. Now the full suite and type check:
+
+  Searched for 1 pattern, read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/tests/notation.test.ts)
+  ⎿  Added 2 lines
+      18  import { getChord } from '../lib/theory/chords'
+      19  import { scaleFingerings } from '../lib/data/scaleFingerings'
+      20  import { chordFingering } from '../lib/data/chordFingerings'
+      21 +import { SONG_CATALOG } from '../lib/data/songs/catalog'       
+      22 +import { songSystems } from '../lib/notation/songScore'        
+      23  
+      24  describe('vex keys', () => {
+      25    it('converts note names', () => {
+
+⏺ Update(src/tests/notation.test.ts)
+  ⎿  Added 10 lines
+      150      expect(container.querySelector('svg')).toBeTruthy()
+      151    })
+      152  
+      153 +  it('renders every catalog song (all key/time signatures) wit
+          +hout throwing', () => {                                       
+      154 +    const container = document.createElement('div')           
+      155 +    for (const song of SONG_CATALOG) {                        
+      156 +      for (const system of songSystems(song, { hands: 'both' }
+          +)) {                                                          
+      157 +        renderGrandScore(container, system.model)             
+      158 +        expect(container.querySelector('svg'), `${song.id} @${
+          +system.fromMeasure}`).toBeTruthy()                            
+      159 +      }                                                       
+      160 +    }                                                         
+      161 +  })                                                          
+      162 +                                                              
+      163    it('renders dotted and 16th durations with a time signature'
+           , () => {
+      164      const container = document.createElement('div')
+      165      renderScore(container, {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ No verifier skills — I'll cold-start: launch the Vite dev server and drive the
+  Songs screen in a headless browser.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Write(/private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df-aa10-43b2-
+       b428-c015b0a2f08f/scratchpad/drive-songs.mjs)
+  ⎿  Wrote 51 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df-aa10-43b2
+        -b428-c015b0a2f08f/scratchpad/drive-songs.mjs)
+  ⎿  Added 1 line, removed 1 line (ctrl+o to expand)
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ All 11 new songs open and render with zero console errors. Let me visually
+  inspect the notation screenshots:
+
+  Read 3 files (ctrl+o to expand)
+⏺ Write(/private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df-aa10-43b2-
+       b428-c015b0a2f08f/scratchpad/probe-songs.mjs)
+  ⎿  Wrote 44 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+  ⎿  You've hit your session limit · resets 3:40pm (Europe/London)
+     /upgrade or /usage-credits to finish what you’re working on.
+
+✻ Cogitated for 24m 51s
+
+❯ continue                                                                      
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/continue-velvet-lantern.md · /plan to edit
+     Wrap up: graded sheet music (Grades 1–7, jazz + classical)
+
+     Context
+
+     The requested feature — "Add in more sheet music, at grades up to Grade 7,
+     with some jazz and
+     classical at each level" — is already implemented and verified in the
+     working tree
+     (uncommitted). This plan covers only the remaining wrap-up.
+
+     What was done (already in the working tree)
+
+     - src/lib/data/songs/types.ts — grade widened to 1 | 2 | 3 | 4 | 5 | 6 | 7.
+     - src/screens/Songs.svelte — grade list extended to 1–7.
+     - src/lib/data/songs/catalog.ts — 11 new hand-authored arrangements added
+     (18 songs total),
+     so every grade now has at least one classical and one jazz piece:
+       - G2 jazz: St. James Infirmary (Am, swing)
+       - G3: Für Elise theme (Am, 3/8) · The Entertainer easy (ragtime)
+       - G4: Bach Prelude in C BWV 846 opening · Jazz Blues in G (walking bass,
+     original)
+       - G5: Pachelbel Canon in D (theme & variations) · ii–V–I Étude (swing,
+     original)
+       - G6: Chopin Prelude Op. 28 No. 4 theme (Em) · When the Saints (stride)
+       - G7: Mozart K. 545 opening · The Entertainer (ragtime octaves)
+       - New helpers: oomPah stride LH builder; per-song
+     figure/run/alberti/ground builders.
+     All pieces respect the engine's constraints: onsets/durations on the 16th
+     grid, RH strictly
+     above LH per bar, durations representable without ties.
+     - src/tests/notation.test.ts — new jsdom smoke test rendering every catalog
+     song through
+     VexFlow (covers new Am/Em key signatures and 3/8, 2-beat systems).
+
+     Verification already performed
+
+     - npm test: 196/196 pass (catalog validation: range, measure fill, hand
+     separation, sections).
+     - npm run check: 0 errors.
+     - Headless Chromium against npm run dev (port 5199), scripts in the session
+     scratchpad:
+       - Songs list shows Grade 1–7 headings, all 18 tiles with correct style
+     icons.
+       - All 11 new songs open and render SVG systems; zero console/page errors.
+       - Screenshots inspected: Für Elise (3/8, Am, fingerings), Entertainer
+     stride (octaves +
+     oom-pah), Mozart K. 545 (runs + Alberti) all render correctly with working
+     next-note
+     cursor and keyboard highlights.
+       - Probes: section switching (47 → 21 steps), LH-only filter (9 steps, 2
+     systems), RH-only on
+     a section (26 steps), Demo playback via Tone.js — all clean, no errors.
+
+     Remaining steps
+
+     1. Stop the background Vite dev server on port 5199 (started for
+     verification).
+     2. Deliver the final verification report summarizing the above (verdict:
+     PASS).
+
+     No further code changes needed. Nothing is committed — leave committing to
+     the user
+     (per project instructions, no Claude attribution in commit messages if they
+     ask later).
+
+     Verification
+
+     Already done end-to-end (see above); re-runnable via npm test, npm run 
+     check, and
+     node scratchpad/drive-songs.mjs / probe-songs.mjs against a dev server.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Songs screen with grades 1–7, plus Für Elise (3/8) and the grade-7 Entertainer
+  rendering
+
+  ›      /private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df-a (145.4K
+  [image]10-43b2-b428-c015b0a2f08f/scratchpad/songs-list.png            B)
+
+  ›      /private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df-a (120.3K
+  [image]10-43b2-b428-c015b0a2f08f/scratchpad/songs-furelise.png        B)
+
+  › [image/private/tmp/claude-501/-Users-steli-src-piano-tutor/15dd34df- 
+          a10-43b2-b428-c015b0a2f08f/scratchpad/songs-stride.png        (99.6KB)
+
+⏺ Done. The catalog now spans grades 1–7 with jazz and classical at every level,
+  all verified end-to-end in the running app.
+
+  Verification: graded song catalog extended to Grade 7 (jazz + classical per 
+  grade)
+
+  Verdict: PASS
+
+  Claim: 11 new hand-authored arrangements in src/lib/data/songs/catalog.ts (18
+  songs total), grade type widened to 1–7 in types.ts, grade list extended in
+  Songs.svelte, plus a new render smoke test. Uncommitted working-tree change, 4
+  files.
+
+  Method: Cold start — npm run dev on port 5199, driven headless with the repo's
+  own Playwright via two scratchpad scripts (list sweep, per-song open, probes
+  + screenshots).
+
+  Steps
+
+  1. ✅ Opened #/songs → headings Grade 1 through Grade 7 all present; all 18
+  tiles listed with correct style icons (🎷 jazz at every grade, 🎼 classical at
+  every grade)
+  2. ✅ Opened each of the 11 new songs → every one rendered its SVG systems
+  (3–5 per song); zero console or page errors across the whole run
+  3. ✅ Inspected screenshots: Für Elise shows 3/8 meter, A-minor spelling with
+  D♯ accidentals, fingerings, and the orange next-note cursor; Entertainer
+  (Grade 7) shows RH octaves over stride LH with the correct two-key keyboard
+  highlight; Mozart K. 545 shows the 16th-note runs and Alberti bass
+  4. 🔍 Section switching on Für Elise → step count correctly dropped 47 → 21
+  ("Second phrase")
+  5. 🔍 Hands filter → LH-only Für Elise re-rendered (9 steps, 2 systems);
+  RH-only on a stride section gave 26 steps — both clean
+  6. 🔍 Clicked Demo on the swing étude (Tone.js playback in headless Chromium)
+  → played without errors, player stayed responsive
+
+  Findings
+
+  - The Mozart Alberti left hand sits at C4–G4 (its authentic register), so in
+  bass clef it rides high on ledger lines — correct but visually busy. Moving
+  the LH down an octave would read easier at the cost of fidelity; left as is.
+  - The pieces are short excerpts/arrangements (8–16 bars) by necessity: the
+  engine has no ties or triplets, and a repo test requires the right hand to sit
+  strictly above the left in every bar — the arrangements were written within
+  those constraints (e.g. Moonlight Sonata was rejected as a Grade 7 pick
+  because of its triplets).
+  - Two "leveled pairs" fell out naturally and are a nice touch: When the Saints
+  at Grade 1 → stride version at Grade 6, and The Entertainer easy at Grade 3 →
+  ragtime-octaves at Grade 7.
+  - Two originals ("Jazz Blues in G", "ii–V–I Étude") follow the existing
+  bluesShells composer-"Piano Tutor" precedent where I couldn't source a
+  public-domain tune I could transcribe faithfully.
+
+  npm test (196 passing, including the catalog validators and the new all-songs
+  VexFlow smoke test) and npm run check (0 errors) are both green. The dev
+  server is stopped, and nothing is committed — the changes are in your working
+  tree ready for review.
+
+✻ Sautéed for 1m 33s
+
+❯ commit this                                                                   
+
+  Committed 36c5277 (ctrl+o to expand)
+
+⏺ Committed as 36c5277 on main — 4 files, 531 insertions. I staged only the
+  files from this change; the untracked chats/2026-07-03-131443-hi.txt was left
+  alone (and per the project instructions, no Claude attribution in the
+  message).
+
+✻ Baked for 25s
+
+※ recap: Added 11 graded songs (jazz and classical at every grade 1-7) to the piano tutor, verified in the running app with tests passing, and committed as 36c5277 on main. Nothing pending; ready for your next request.

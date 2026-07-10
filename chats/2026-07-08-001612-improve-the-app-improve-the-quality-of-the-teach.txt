@@ -1,0 +1,3108 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.203
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+ ▎ Extended: Fable 5 is included in your weekly limit
+ ▎ Through July 12, you can use up to 50% of your weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Run /model and select Fable to use it. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ improve the app. improve the quality of the teaching, the user interface      
+  (keeping it simple). Also need to add some teaching and guidance on a lot of  
+  the terms that are used - this could be with hint or hover tooltips where     
+  they appear. Really focus on the user flows and the user experience           
+
+⏺ I'll explore the codebase to understand the current screens, user flows, and
+  where teaching/terminology gaps exist, then design an improvement plan.
+
+⏺ 2 background agents launched (↓ to manage)
+   ├ Explore screens and user flows
+   └ Explore teaching content and terminology
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ These are saved transcripts of prior sessions. Let me grab just the user's
+  requests from each to understand recent priorities.
+
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+⏺ Both exploration agents are running. I'll continue once they report back.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Both exploration agents are still working — I'll be re-invoked automatically
+  when each finishes, then move to the design phase.
+
+✻ Brewed for 2m 12s
+
+⏺ Agent "Explore screens and user flows" finished · 2m 23s
+
+⏺ The user-flows exploration is done — key findings: no onboarding, no return
+  path from guide deep-links, thin next-step guidance after completion, sparse
+  tooltips, raw data IDs used as labels, and duplicated CSS patterns. Waiting on
+  the teaching-content agent before designing the plan.
+
+✻ Crunched for 7s
+
+⏺ Agent "Explore teaching content and terminology" finished · 2m 39s
+
+⏺ Both explorations are complete. The picture: the guide has excellent
+  explanations but they're siloed there; quizzes give no "why"; ~60 jargon terms
+  appear with no definitions; completion screens are dead ends; no onboarding;
+  and there's CSS/pattern duplication. Now I'll have a Plan agent design the
+  implementation.
+
+⏺ Plan(Design UX/teaching improvement plan)
+  ⎿  Done (30 tool uses · 112.0k tokens · 7m 42s)
+  (ctrl+o to expand)
+
+⏺ The design plan is thorough. Let me verify its load-bearing claims against the
+  actual files before finalizing.
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+⏺ All verified: per-kind Question interfaces, the three QuizCard call sites,
+  stage ids, the raw-ID labels, and the overflow: hidden clipping risk. Writing
+  the final plan now.
+
+⏺ Updated plan
+  ⎿  /plan to preview  ⎿  User rejected Claude's plan:
+     ╭─────────────────────────────────────────────────────────────────────────╮
+     │ Improve teaching quality, terminology tooltips, and user flows          │
+     │                                                                         │
+     │ Context                                                                 │
+     │                                                                         │
+     │ The app is content-rich but assumes musical literacy. Exploration       │
+     │ found:                                                                  │
+     │ - ~60 unglossed terms (arpeggio, inversion, cadence, half-diminished,   │
+     │ ii–V–I, syncopation, …) appear as raw UI labels and in prose with no    │
+     │ tooltip/glossary system anywhere. Scales/Chords libraries even render   │
+     │ raw data IDs as button labels (ScalesLibrary.svelte:96 {t.id},          │
+     │ ChordsLibrary.svelte:180 {q.id}).                                       │
+     │ - Quiz feedback is binary — QuizCard.svelte:45-49 shows only "Correct!" │
+     │ / "It was X." with no why. The guide's excellent theory prose is        │
+     │ siloed in guide.ts and never surfaces in the activities.                │
+     │ - Flow dead-ends: guide deep-links have no return path; lesson/song     │
+     │ completion offers only "again"; no first-run onboarding; good technique │
+     │ tips hidden in a collapsed <details>.                                   │
+     │ - UI drift: .seg/.complete CSS duplicated across ~5 components; dead    │
+     │ POLY_AVAILABLE lock code in Practice.svelte:10.                         │
+     │                                                                         │
+     │ Constraints: guide stays static, no progress tracking (established in a │
+     │ prior session); keep the UI simple (no libraries); pure logic stays     │
+     │ vitest-testable; no new voice-facing vocabulary.                        │
+     │                                                                         │
+     │ Phase 1 — Glossary + tooltips (explicit ask)                            │
+     │                                                                         │
+     │ 1. NEW src/lib/data/glossary.ts (pure):                                 │
+     │   - GlossaryEntry { id, term, short, aliases? } — short is a 1–2        │
+     │ sentence beginner definition (≤ ~220 chars).                            │
+     │   - IDs for chord qualities / scale types must be exactly the           │
+     │ ChordQualityId/ScaleTypeId union strings so libraries can look them up  │
+     │ directly.                                                               │
+     │   - ~50 entries: intervals/semitone/octave, staff/clef/ledger line, key │
+     │ & time signature, tempo/BPM/bar, note values/dotted/syncopation/swing,  │
+     │ all scale types + chord qualities, triad/inversion/arpeggio/broken      │
+     │ chord, cadence kinds, tonic/subdominant/dominant, ii–V–I/guide          │
+     │ tones/shell voicing/comping/walking bass, circle of fifths, relative    │
+     │ minor, five-finger position, Hanon, contrary motion, chromatic, ABRSM   │
+     │ grade, sight-reading, modes.                                            │
+     │   - annotateGlossary(text): TextSegment[] — pure annotator:             │
+     │ case-insensitive word-boundary match on term+aliases,                   │
+     │ longest-match-first, first occurrence only, cap ~4 terms per string.    │
+     │ 2. NEW src/components/Term.svelte (~70 lines): inline <button           │
+     │ class="term"> with dotted underline; CSS-only tooltip                   │
+     │ (position:absolute; bottom:100%, max-width 260px) shown on              │
+     │ :hover/:focus-visible/click-toggle (Escape/blur closes); role="tooltip" │
+     │ + aria-describedby. Unknown term → plain text, dev warn.                │
+     │ Self-contained styles.                                                  │
+     │   - Fix: remove overflow: hidden at GuideScreen.svelte:141 (would clip  │
+     │ tooltips; safe — stage head has no bleeding background).                │
+     │ 3. NEW src/components/GlossText.svelte: {#each annotateGlossary(text)}  │
+     │ → <Term> or plain text.                                                 │
+     │ 4. Apply GlossText to prose spots: LessonPlayer.svelte:273              │
+     │ (description) + tips list, Practice.svelte:157 (METHOD_BLURBS),         │
+     │ Quizzes.svelte:298 (mode desc), GuideScreen.svelte overview + theory    │
+     │ body, Scales/Chords hint paragraphs. Do not wrap quiz answer options    │
+     │ (leaks answers).                                                        │
+     │ 5. Library labels: use lookupTerm(id).term (capitalized display name)   │
+     │ for scale-type/chord-quality buttons; show lookupTerm(selectedId).short │
+     │ as a hint line in the card — defines "half-diminished" at the moment    │
+     │ it's selected. No standalone /glossary page (keep simple).              │
+     │ 6. NEW src/tests/glossary.test.ts: every SCALE_TYPES/CHORD_QUALITIES id │
+     │ has an entry (import real registries, same pattern as guide.test.ts);   │
+     │ annotator behavior (word boundaries, longest match, cap, round-trip);   │
+     │ short length bounds.                                                    │
+     │                                                                         │
+     │ Phase 2 — Quiz "why" explanations (explicit ask)                        │
+     │                                                                         │
+     │ 7. Add explanation: string to each option-based Question interface      │
+     │ (echo mode skipped):                                                    │
+     │   - src/lib/ear/quiz.ts: exported INTERVAL_EXPLANATIONS (semitone count │
+     │ + song mnemonic), CHORD_QUALITY_EXPLANATIONS (recipe + character),      │
+     │ SCALE_TYPE_EXPLANATIONS, CADENCE_EXPLANATIONS.                          │
+     │   - src/lib/theory/quiz.ts: reuse the ear tables (precedent: it already │
+     │ imports INTERVAL_LABELS); key-signature explanation computed via a      │
+     │ small testable sigAccidentals() helper (sharp/flat order + "last sharp  │
+     │ is a semitone below the key"); chord-function explanation computed ("in │
+     │ C major the 5th degree is G…"); note-naming uses per-clef mnemonics     │
+     │ (Every Good Boy Does Fine / FACE) — cheap and still teaches.            │
+     │   - src/lib/quiz/rhythmQuiz.ts: explanation = label + existing authored │
+     │ hint from rhythms.ts.                                                   │
+     │ 8. Display: optional explanation prop on QuizCard.svelte +              │
+     │ RhythmQuizCard.svelte, rendered under the verdict after reveal (shown   │
+     │ on correct answers too); pass it at the three call sites in             │
+     │ Quizzes.svelte (~330, ~346, ~370).                                      │
+     │ 9. Tests: extend earQuiz.test.ts/theoryQuiz.test.ts (seeded-RNG pattern │
+     │ exists) — every question has non-empty explanation; interval            │
+     │ explanation matches semitone distance; key-signature explanation lists  │
+     │ the exact accidentals; test sigAccidentals directly.                    │
+     │                                                                         │
+     │ Phase 3 — User flows                                                    │
+     │                                                                         │
+     │ 10. Back-to-guide: guideHref() in guide.ts appends from=guide; NEW      │
+     │ src/components/BackToGuide.svelte reads currentParams().from at mount,  │
+     │ renders "← Back to guide" link; drop into Practice, Quizzes,            │
+     │ RhythmTrainer, Songs, ScalesLibrary, ChordsLibrary. Check guide.test.ts │
+     │ param assertions.                                                       │
+     │ 11. Guide accordion state without persistence: move the open record to  │
+     │ module-level $state in a <script module> block in GuideScreen.svelte    │
+     │ (survives in-SPA navigation, gone on reload — honors "guide persists    │
+     │ nothing"). Add ?stage=stage-N deep-link handling (stage ids             │
+     │ stage-1…stage-5 exist at guide.ts:147,231,323,418,516; showStage()      │
+     │ already does most of it).                                               │
+     │ 12. Completion next-steps:                                              │
+     │   - LessonPlayer.svelte:300-314 last segment: keep "Practice again",    │
+     │ add "← All lessons" (existing onexit) + new optional nextLesson?:       │
+     │ {title, onopen} prop; Practice.svelte computes the next lesson in the   │
+     │ same method.                                                            │
+     │   - SongPlayer.svelte:197-210: add "← All songs" (onexit); "Next:       │
+     │ {section} →" when a following section exists; "Try both hands" when     │
+     │ hands !== 'both'. All from existing props/state.                        │
+     │ 13. First-run welcome panel on Home.svelte: dismissible card above the  │
+     │ grid gated by localStorage 'piano-tutor.welcomed' — three points (you   │
+     │ need a piano; the app listens via mic — allow access when asked, MIDI   │
+     │ works too; start with the Learning Guide) + [Open the Guide] / [Got     │
+     │ it]. localStorage flags are the app's existing pattern; this is not     │
+     │ guide progress.                                                         │
+     │                                                                         │
+     │ Phase 4 — Teaching surfacing                                            │
+     │                                                                         │
+     │ 14. LessonPlayer.svelte:341: <details> → <details open> so the good     │
+     │ technique tips show by default.                                         │
+     │ 15. Guide-stage chips on Practice methods: static METHOD_GUIDE_STAGE    │
+     │ map → <a href="#/guide?stage=stage-N">Guide →</a> next to each method   │
+     │ blurb; integrity-assert mapped ids exist in GUIDE_STAGES. (First scope  │
+     │ cut if trimming.)                                                       │
+     │                                                                         │
+     │ Phase 5 — UI consolidation                                              │
+     │                                                                         │
+     │ 16. Move .seg/.seg.active/.complete/.ghost into src/app.css (alongside  │
+     │ existing .card/.controls/button.primary); delete scoped duplicates in   │
+     │ Practice, Quizzes, RhythmTrainer, LessonPlayer, SongPlayer              │
+     │ (svelte-check flags unused selectors).                                  │
+     │ 17. Delete dead POLY_AVAILABLE/lock code in Practice.svelte:10,160-170. │
+     │ 18. Leave as-is: MicButton vs InputPicker split, /ear alias,            │
+     │ quiz-vs-sightread leveling models, Tuner naming (already consistent).   │
+     │                                                                         │
+     │ Verification                                                            │
+     │                                                                         │
+     │ - npm test after phases 1, 2, 3 (glossary tests, quiz explanation       │
+     │ tests, guide link tests all green); npm run check throughout.           │
+     │ - Manual: npm run dev →                                                 │
+     │   - hover + Tab-focus + mobile-emulated tap on a term in the guide and  │
+     │ in a lesson description; check no clipping in guide stages;             │
+     │   - select "half-diminished" in Chords and "harmonic minor" in Scales — │
+     │ proper labels + definition line;                                        │
+     │   - answer one question in each of the 11 quiz modes — explanation      │
+     │ reads well for right and wrong answers;                                 │
+     │   - follow a guide chip → "← Back to guide" returns with the stage      │
+     │ still open;                                                             │
+     │   - finish a lesson segment and a song section — next-step buttons      │
+     │ work;                                                                   │
+     │   - clear localStorage → welcome panel appears once, dismisses forever. │
+     ╰─────────────────────────────────────────────────────────────────────────╯
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ Saving the UX preference to memory so future work keeps drill-downs
+  URL-backed.
+
+  Recalled 1 memory, wrote 3 memories (ctrl+o to expand)
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/improve-the-app-improve-linked-beacon.md · 
+     /plan to edit
+     Improve teaching quality, terminology tooltips, and user flows
+
+     Context
+
+     The app is content-rich but assumes musical literacy. Exploration found:
+     - ~60 unglossed terms (arpeggio, inversion, cadence, half-diminished,
+     ii–V–I, syncopation, …) appear as raw UI labels and in prose with no
+     tooltip/glossary system anywhere. Scales/Chords libraries even render raw
+     data IDs as button labels (ScalesLibrary.svelte:96 {t.id},
+     ChordsLibrary.svelte:180 {q.id}).
+     - Quiz feedback is binary — QuizCard.svelte:45-49 shows only "Correct!" /
+     "It was X." with no why. The guide's excellent theory prose is siloed in
+     guide.ts and never surfaces in the activities.
+     - Flow dead-ends: guide deep-links have no return path; lesson/song
+     completion offers only "again"; no first-run onboarding; good technique
+     tips hidden in a collapsed <details>.
+     - UI drift: .seg/.complete CSS duplicated across ~5 components; dead
+     POLY_AVAILABLE lock code in Practice.svelte:10.
+
+     Constraints: guide stays static, no progress tracking (established in a
+     prior session); keep the UI simple (no libraries); pure logic stays
+     vitest-testable; no new voice-facing vocabulary.
+
+     Phase 1 — Glossary + tooltips (explicit ask)
+
+     1. NEW src/lib/data/glossary.ts (pure):
+       - GlossaryEntry { id, term, short, aliases? } — short is a 1–2 sentence
+     beginner definition (≤ ~220 chars).
+       - IDs for chord qualities / scale types must be exactly the
+     ChordQualityId/ScaleTypeId union strings so libraries can look them up
+     directly.
+       - ~50 entries: intervals/semitone/octave, staff/clef/ledger line, key &
+     time signature, tempo/BPM/bar, note values/dotted/syncopation/swing, all
+     scale types + chord qualities, triad/inversion/arpeggio/broken chord,
+     cadence kinds, tonic/subdominant/dominant, ii–V–I/guide tones/shell
+     voicing/comping/walking bass, circle of fifths, relative minor, five-finger
+     position, Hanon, contrary motion, chromatic, ABRSM grade, sight-reading,
+     modes.
+       - annotateGlossary(text): TextSegment[] — pure annotator:
+     case-insensitive word-boundary match on term+aliases, longest-match-first,
+     first occurrence only, cap ~4 terms per string.
+     2. NEW src/components/Term.svelte (~70 lines): inline <button class="term">
+     with dotted underline; CSS-only tooltip (position:absolute; bottom:100%,
+     max-width 260px) shown on :hover/:focus-visible/click-toggle (Escape/blur
+     closes); role="tooltip" + aria-describedby. Unknown term → plain text, dev
+     warn. Self-contained styles.
+       - Fix: remove overflow: hidden at GuideScreen.svelte:141 (would clip
+     tooltips; safe — stage head has no bleeding background).
+     3. NEW src/components/GlossText.svelte: {#each annotateGlossary(text)} →
+     <Term> or plain text.
+     4. Apply GlossText to prose spots: LessonPlayer.svelte:273 (description) +
+     tips list, Practice.svelte:157 (METHOD_BLURBS), Quizzes.svelte:298 (mode
+     desc), GuideScreen.svelte overview + theory body, Scales/Chords hint
+     paragraphs. Do not wrap quiz answer options (leaks answers).
+     5. Library labels: use lookupTerm(id).term (capitalized display name) for
+     scale-type/chord-quality buttons; show lookupTerm(selectedId).short as a
+     hint line in the card — defines "half-diminished" at the moment it's
+     selected. No standalone /glossary page (keep simple).
+     6. NEW src/tests/glossary.test.ts: every SCALE_TYPES/CHORD_QUALITIES id has
+     an entry (import real registries, same pattern as guide.test.ts);
+     annotator behavior (word boundaries, longest match, cap, round-trip); short
+     length bounds.
+
+     Phase 2 — Quiz "why" explanations (explicit ask)
+
+     7. Add explanation: string to each option-based Question interface (echo
+     mode skipped):
+       - src/lib/ear/quiz.ts: exported INTERVAL_EXPLANATIONS (semitone count +
+     song mnemonic), CHORD_QUALITY_EXPLANATIONS (recipe + character),
+     SCALE_TYPE_EXPLANATIONS, CADENCE_EXPLANATIONS.
+       - src/lib/theory/quiz.ts: reuse the ear tables (precedent: it already
+     imports INTERVAL_LABELS); key-signature explanation computed via a small
+     testable sigAccidentals() helper (sharp/flat order + "last sharp is a
+     semitone below the key"); chord-function explanation computed ("in C major
+     the 5th degree is G…"); note-naming uses per-clef mnemonics (Every Good Boy
+     Does Fine / FACE) — cheap and still teaches.
+       - src/lib/quiz/rhythmQuiz.ts: explanation = label + existing authored 
+     hint from rhythms.ts.
+     8. Display: optional explanation prop on QuizCard.svelte +
+     RhythmQuizCard.svelte, rendered under the verdict after reveal (shown on
+     correct answers too); pass it at the three call sites in Quizzes.svelte
+     (~330, ~346, ~370).
+     9. Tests: extend earQuiz.test.ts/theoryQuiz.test.ts (seeded-RNG pattern
+     exists) — every question has non-empty explanation; interval explanation
+     matches semitone distance; key-signature explanation lists the exact
+     accidentals; test sigAccidentals directly.
+
+     Phase 3 — User flows
+
+     Browser back fix (URL-backed drill-downs). Today every screen reads
+     currentParams() once at mount and holds selection in local $state
+     (Practice.svelte:55-60,18, Songs.svelte:10-13, Quizzes.svelte:85-97), and
+     nothing calls navigate() after mount. Consequences: opening a lesson/song
+     pushes no history entry (back skips the list and leaves the screen
+     entirely), and back/forward between param variants of the same route
+     changes the URL but not the UI.
+
+     9a. Router: add replace?: boolean to navigate() in src/router.svelte.ts
+     (uses location.replace('#'+hash)) for URL updates that shouldn't create
+     history entries.
+     9b. Practice: drive catalog-lesson selection from the URL reactively —
+     const params = $derived(currentParams()), selected lesson derived from
+     params.lesson. Tile click → navigate('/practice', {lesson: id, 
+     ...(params.from && {from: params.from})}); "← All lessons" / voice exit →
+     navigate('/practice'). Sight-reading: "Sight-read at level N" →
+     navigate('/practice', {sight: String(level)}) with the generated melody
+     kept in state and regenerated when the sight param (re)appears; "🎲 New
+     melody" regenerates in place with no navigation. Voice handlers switch from
+     setting selected to calling navigate. {#key selected.id} already handles
+     remount. Now: back from an open lesson returns to the lesson list; back
+     from a guide-linked lesson returns to the guide.
+     9c. Songs: same — catalog selection derived from params.song; tile click
+     navigates; "← All songs" → navigate('/songs'). User-imported songs that
+     aren't in the catalog keep local-state selection (not addressable by id).
+     9d. Quizzes: reflect mode (and level) into the URL with replace: true
+     whenever they change, and derive them reactively from params —
+     refresh/back-into-the-screen restores the mode without polluting history
+     with every mode toggle.
+     9e. Scales/Chords/Rhythm: leave once-at-mount reads (single-level screens;
+     back already behaves). Optionally mirror the current selection via replace
+     for refresh-safety — do it only if trivial.
+     - Test: extend src/tests/routing.test.ts (or wherever buildHash/parseRoute
+     are covered) for the replace path; manual back/forward walk in
+     Verification.
+
+     10. Back-to-guide: guideHref() in guide.ts appends from=guide; NEW
+     src/components/BackToGuide.svelte reads currentParams().from at mount,
+     renders "← Back to guide" link; drop into Practice, Quizzes, RhythmTrainer,
+     Songs, ScalesLibrary, ChordsLibrary. Check guide.test.ts param assertions.
+     11. Guide accordion state without persistence: move the open record to
+     module-level $state in a <script module> block in GuideScreen.svelte
+     (survives in-SPA navigation, gone on reload — honors "guide persists
+     nothing"). Add ?stage=stage-N deep-link handling (stage ids stage-1…stage-5
+     exist at guide.ts:147,231,323,418,516; showStage() already does most of
+     it).
+     12. Completion next-steps:
+       - LessonPlayer.svelte:300-314 last segment: keep "Practice again", add "←
+     All lessons" (existing onexit) + new optional nextLesson?: {title, onopen}
+     prop; Practice.svelte computes the next lesson in the same method.
+       - SongPlayer.svelte:197-210: add "← All songs" (onexit); "Next: {section}
+     →" when a following section exists; "Try both hands" when hands !== 
+     'both'. All from existing props/state.
+     13. First-run welcome panel on Home.svelte: dismissible card above the grid
+     gated by localStorage 'piano-tutor.welcomed' — three points (you need a
+     piano; the app listens via mic — allow access when asked, MIDI works too;
+     start with the Learning Guide) + [Open the Guide] / [Got it]. localStorage
+     flags are the app's existing pattern; this is not guide progress.
+
+     Phase 4 — Teaching surfacing
+
+     14. LessonPlayer.svelte:341: <details> → <details open> so the good
+     technique tips show by default.
+     15. Guide-stage chips on Practice methods: static METHOD_GUIDE_STAGE map →
+     <a href="#/guide?stage=stage-N">Guide →</a> next to each method blurb;
+     integrity-assert mapped ids exist in GUIDE_STAGES. (First scope cut if 
+     trimming.)
+
+     Phase 5 — UI consolidation
+
+     16. Move .seg/.seg.active/.complete/.ghost into src/app.css (alongside
+     existing .card/.controls/button.primary); delete scoped duplicates in
+     Practice, Quizzes, RhythmTrainer, LessonPlayer, SongPlayer (svelte-check
+     flags unused selectors).
+     17. Delete dead POLY_AVAILABLE/lock code in Practice.svelte:10,160-170.
+     18. Leave as-is: MicButton vs InputPicker split, /ear alias,
+     quiz-vs-sightread leveling models, Tuner naming (already consistent).
+
+     Verification
+
+     - npm test after phases 1, 2, 3 (glossary tests, quiz explanation tests,
+     guide link tests all green); npm run check throughout.
+     - Manual: npm run dev →
+       - hover + Tab-focus + mobile-emulated tap on a term in the guide and in a
+     lesson description; check no clipping in guide stages;
+       - select "half-diminished" in Chords and "harmonic minor" in Scales —
+     proper labels + definition line;
+       - answer one question in each of the 11 quiz modes — explanation reads
+     well for right and wrong answers;
+       - follow a guide chip → "← Back to guide" returns with the stage still
+     open;
+       - browser back/forward walk: Home → Practice → open a lesson → back lands
+     on the lesson list → back lands on Home; guide chip → lesson → back
+     returns to the guide; refresh mid-quiz keeps the mode;
+       - finish a lesson segment and a song section — next-step buttons work;
+       - clear localStorage → welcome panel appears once, dismisses forever.
+  Searched for 1 pattern, read 3 files (ctrl+o to expand)
+
+⏺ Write(src/lib/data/glossary.ts)
+  ⎿  Wrote 633 lines to src/lib/data/glossary.ts
+       1 /**
+         ssText.svelte).
+       3  *
+          ScaleTypeId /
+         them up
+       6  * directly ('major' covers both the scale and the chord sense).
+       8  * annotateGlossary() is the pure auto-annotator used by GlossTe
+         xt: it marks
+         st, first
+         ssary.test.ts.
+     … +747 lines (ctrl+o to expand)
+
+⏺ Now the test file. Let me check the existing test conventions first.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(src/tests/glossary.test.ts)
+  ⎿  Wrote 103 lines to src/tests/glossary.test.ts
+       1 import { describe, expect, it } from 'vitest'
+         ata/glossary'
+       3 import { CHORD_QUALITIES } from '../lib/theory/chords'
+       4 import { SCALE_TYPES } from '../lib/theory/scales'
+       6 /**
+       7  * Integrity + behavior tests for the beginner glossary: every s
+       8  * chord quality shown in the library screens must have a defini
+         tion, and the
+       9  * pure prose annotator must mark terms without ever altering th
+      10  */
+     … +114 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(src/components/Term.svelte)
+  ⎿  Wrote 80 lines to src/components/Term.svelte
+       1 <script lang="ts" module>
+       2   let nextTipId = 0
+       3 </script>
+       5 <script lang="ts">
+       6   import { lookupTerm } from '../lib/data/glossary'
+       7 
+       8   /**
+       9    * Inline glossary term with a tooltip definition: dotted unde
+      10    * on hover/keyboard focus, tap-to-toggle on touch. Unknown id
+         s render as
+     … +76 lines (ctrl+o to expand)
+
+⏺ Write(src/components/GlossText.svelte)
+  ⎿  Wrote 14 lines to src/components/GlossText.svelte
+      1 <script lang="ts">
+      2   import { annotateGlossary } from '../lib/data/glossary'
+      3   import Term from './Term.svelte'
+      4 
+      5   /**
+        see
+      7    * annotateGlossary) render as <Term> tooltips, the rest as pla
+        in text.
+      8    */
+      9   let { text }: { text: string } = $props()
+     … +6 lines (ctrl+o to expand)
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Removed 1 line
+      138      border-radius: 12px;
+      139      background: #fff;
+      140      margin-top: 16px;
+      141 -    overflow: hidden;                                         
+      141    }
+      142    .stage-head {
+      143      display: flex;
+
+⏺ Now applying GlossText across screens, starting with the guide.
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2 +  import GlossText from '../components/GlossText.svelte'        
+      3    import { GUIDE_STAGES, guideHref, type GuideLink, type GuideSt
+         age } from '../lib/data/guide'
+      4    import { registerVoiceCommands } from '../lib/voice/voice.svel
+         te'
+      5  
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line, removed 1 line
+      69  
+      70        {#if open[stage.id]}
+      71          <div class="stage-body">
+      72 -          <p class="overview">{stage.overview}</p>             
+      72 +          <p class="overview"><GlossText text={stage.overview} 
+         +/></p>                                                         
+      73  
+      74            <h3>You're working towards</h3>
+      75            <ul>
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line, removed 1 line
+      93            {#each stage.theory as section (section.title)}
+      94              <div class="theory">
+      95                <h3>{section.title}</h3>
+      96 -              <p>{section.body}</p>                            
+      96 +              <p><GlossText text={section.body} /></p>         
+      97                {#if section.links.length}
+      98                  <div class="chips">
+      99                    {#each section.links as link (link.label)}
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/components/LessonPlayer.svelte)  ⎿  Added 1 line
+      1  <script lang="ts">
+      2 +  import GlossText from './GlossText.svelte'                    
+      3    import InputPicker from './InputPicker.svelte'
+      4    import PianoKeyboard from './PianoKeyboard.svelte'
+      5    import SheetMusic from './SheetMusic.svelte'
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 1 line, removed 1 line
+      271      {/if}
+      272    </div>
+      273  
+      274 -  <p class="hint">{lesson.description}</p>                    
+      274 +  <p class="hint"><GlossText text={lesson.description} /></p> 
+      275  
+      276    <div class="controls-row">
+      277      {#each lesson.segments as seg, i (seg.label)}
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 2 lines, removed 2 lines
+      339    {/if}
+      340  
+      341    {#if lesson.tips.length}
+      342 -    <details>                                                 
+      342 +    <details open>                                            
+      343        <summary>Practice tips</summary>
+      344        <ul>
+      345          {#each lesson.tips as tip (tip)}
+      346 -          <li>{tip}</li>                                      
+      346 +          <li><GlossText text={tip} /></li>                   
+      347          {/each}
+      348        </ul>
+      349      </details>
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2 +  import GlossText from '../components/GlossText.svelte'        
+      3    import LessonPlayer from '../components/LessonPlayer.svelte'
+      4    import { allLessons, type Lesson } from '../lib/data/lessons'
+      5    import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP 
+         } from '../lib/practice/progress.svelte'
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      155  
+      156      {#each methods.filter((m) => visibleLessons.some((l) => l.
+           method === m)) as method (method)}
+      157        <h2 class="method">{method}</h2>
+      158 -      <p class="hint">{METHOD_BLURBS[method]}</p>             
+      158 +      <p class="hint"><GlossText text={METHOD_BLURBS[method]} 
+          +/></p>                                                        
+      159        <div class="lesson-grid">
+      160          {#each visibleLessons.filter((l) => l.method === metho
+           d) as lesson (lesson.id)}
+      161            {@const locked = lesson.detectionMode === 'poly' && 
+           !POLY_AVAILABLE}
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      174      {/each}
+      175  
+      176      <h2 class="method">Sight-reading</h2>
+      177 -    <p class="hint">{METHOD_BLURBS['Sight-reading']}</p>      
+      177 +    <p class="hint"><GlossText text={METHOD_BLURBS['Sight-read
+          +ing']} /></p>                                                 
+      178      <p class="hint">
+      179        {STREAK_TO_LEVEL_UP} clean reads in a row level you up. 
+           Current streak:
+      180        {getProgress(SIGHT_ACTIVITY).streak}/{STREAK_TO_LEVEL_UP
+           }.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2    import EchoPlayer from '../components/EchoPlayer.svelte'
+      3 +  import GlossText from '../components/GlossText.svelte'        
+      4    import QuizCard from '../components/QuizCard.svelte'
+      5    import RhythmQuizCard from '../components/RhythmQuizCard.svelt
+         e'
+      6    import SheetMusic from '../components/SheetMusic.svelte'
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      296    </div>
+      297  
+      298    <div class="card">
+      299 -    <p class="hint">{modeDef.desc}</p>                        
+      299 +    <p class="hint"><GlossText text={modeDef.desc} /></p>     
+      300      <p class="score">
+      301        Question {Math.min(answered + 1, roundSize)} / {roundSiz
+           e} · {correct} correct
+      302      </p>
+
+⏺ Now the library screens — proper labels and selected-item definitions.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 2 lines
+       1  <script lang="ts">
+       2    import { Note } from 'tonal'
+       3 +  import GlossText from '../components/GlossText.svelte'       
+       4    import PianoKeyboard from '../components/PianoKeyboard.svelte
+          '
+       5    import SheetMusic from '../components/SheetMusic.svelte'
+       6    import { playNote, playSequence } from '../lib/audio/playback
+          '
+       7 +  import { lookupTerm } from '../lib/data/glossary'            
+       8    import { scaleFingerings } from '../lib/data/scaleFingerings'
+       9    import { scoreFromScale } from '../lib/notation/vexScore'
+      10    import { SCALE_TYPES, getScale } from '../lib/theory/scales'
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 3 lines, removed 1 line
+       95      <div class="control-group">
+       96        <span class="control-label">Type</span>
+       97        {#each SCALE_TYPES as t (t.id)}
+       98 -        <button class:active={typeId === t.id} onclick={() => 
+          -selectType(t.id)}>{t.id}</button>                             
+       98 +        <button class:active={typeId === t.id} onclick={() => 
+          +selectType(t.id)}>                                            
+       99 +          {lookupTerm(t.id)?.term ?? t.id}                    
+      100 +        </button>                                             
+      101        {/each}
+      102      </div>
+      103      <div class="control-group">
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 3 lines
+      120          {playing ? 'Playing…' : '▶ Play'}
+      121        </button>
+      122      </div>
+      123 +    {#if lookupTerm(typeId)}                                  
+      124 +      <p class="hint">{lookupTerm(typeId)!.short}</p>         
+      125 +    {/if}                                                     
+      126      <p class="hint">
+      127        Notes: {scale.notes.join(' – ')} · Fingering shown {hand
+            === 'R' ? 'above' : 'below'} the staff
+      128        ({hand === 'R' ? 'right' : 'left'} hand, one octave up a
+           nd down)
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 3 lines, removed 3 lines
+      136        onkeyclick={(m) => playNote(m)}
+      137      />
+      138      <p class="hint">
+      139 -      Green keys are the scale ({scale.notes.join(' ')}); numb
+          -ers show                                                      
+      140 -      which finger plays each key on the way up. Thumb crossin
+          -gs happen after finger 3 (and after                           
+      141 -      finger 4 in some keys).                                 
+      139 +      <GlossText                                              
+      140 +        text={`Green keys are the scale (${scale.notes.join(' 
+          +')}); numbers show which finger plays each key on the way up. 
+          +Thumb crossings happen after finger 3 (and after finger 4 in s
+          +ome keys).`}                                                  
+      141 +      />                                                      
+      142      </p>
+      143    </div>
+      144  </section>
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2    import { Chord, Note } from 'tonal'
+      3 +  import GlossText from '../components/GlossText.svelte'        
+      4    import MicButton from '../components/MicButton.svelte'
+      5    import PianoKeyboard from '../components/PianoKeyboard.svelte'
+      6    import SheetMusic from '../components/SheetMusic.svelte'
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 1 line
+       9    import { onPolyEvent, startPolyDetection, stopPolyDetection }
+           from '../lib/audio/polyPitch.svelte'
+      10    import { playChord, playNote } from '../lib/audio/playback'
+      11    import { chordFingering } from '../lib/data/chordFingerings'
+      12 +  import { lookupTerm } from '../lib/data/glossary'            
+      13    import { scoreFromChord, scoreFromSteps, type ScoreModel } fr
+          om '../lib/notation/vexScore'
+      14    import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFo
+          r } from '../lib/theory/chords'
+      15    import { SHELL_QUALITIES, shellVoicing } from '../lib/theory/
+          voicings'
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      179      <div class="control-group">
+      180        <span class="control-label">Quality</span>
+      181        {#each CHORD_QUALITIES as q (q.id)}
+      182 -        <button class:active={quality === q.id} onclick={() =>
+          - selectQuality(q.id)}>{q.id}</button>                         
+      182 +        <button class:active={quality === q.id} onclick={() =>
+          + selectQuality(q.id)}>                                        
+      183 +          {lookupTerm(q.id)?.term ?? q.id}                    
+      184 +        </button>                                             
+      185        {/each}
+      186      </div>
+      187      <div class="control-group">
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 6 lines, removed 3 lines
+      217      </div>
+      218      {#if shell}
+      219        <p class="hint">
+      220 -        Notes: {shell.midis.map((m) => Note.pitchClass(Note.fr
+          -omMidi(m))).join(' – ')} · Left hand,                         
+      221 -        fingers 5 and 1. Jazz players sketch the harmony with 
+          -just these two notes — the other hand                         
+      222 -        is free for melody.                                   
+      220 +        <GlossText                                            
+      221 +          text={`Notes: ${shell.midis.map((m) => Note.pitchCla
+          +ss(Note.fromMidi(m))).join(' – ')} · Left hand, fingers 5 and 
+          +1. Jazz players sketch the harmony with just these two notes i
+          +n a shell voicing — the other hand is free for melody.`}      
+      222 +        />                                                    
+      223        </p>
+      224      {:else}
+      225 +      {#if lookupTerm(quality)}                               
+      226 +        <p class="hint">{lookupTerm(quality)!.short}</p>      
+      227 +      {/if}                                                   
+      228        <p class="hint">
+      229          Notes: {chord.noteNames.map((n) => Note.pitchClass(n))
+           .join(' – ')} · Fingers
+      230          ({hand === 'R' ? 'right' : 'left'} hand, bottom to top
+           ):
+
+⏺ Type-check what we have so far.
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ Two warnings in Term.svelte — the props should be read reactively. Fixing with
+  $derived.
+
+⏺ Update(src/components/Term.svelte)
+  ⎿  Added 4 lines, removed 2 lines
+      12     */
+      13    let { term, label }: { term: string; label?: string } = $prop
+          s()
+      14  
+      15 -  const entry = lookupTerm(term)                               
+      16 -  if (!entry && import.meta.env.DEV) console.warn(`[glossary] u
+         -nknown term id: ${term}`)                                      
+      15 +  const entry = $derived(lookupTerm(term))                     
+      16 +  $effect(() => {                                              
+      17 +    if (!entry && import.meta.env.DEV) console.warn(`[glossary]
+         + unknown term id: ${term}`)                                    
+      18 +  })                                                           
+      19  
+      20    const tipId = `gloss-tip-${++nextTipId}`
+      21    let open = $state(false)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Clean — 516 tests pass. Moving to quiz explanations.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now I'll add the explanation tables to ear/quiz.ts, then read theory/quiz.ts
+  in full.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now adding explanation tables and fields to ear/quiz.ts.
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 3 lines
+      14    midis: [number, number]
+      15    answer: string
+      16    options: string[]
+      17 +  /** Why: shown after the reveal so a wrong answer still teach
+         +es. */                                                         
+      18 +  explanation: string                                          
+      19  }
+      20  
+      21  export interface ChordQuestion {
+     ...
+      23    midis: number[]
+      24    answer: string
+      25    options: string[]
+      26 +  explanation: string                                          
+      27  }
+      28  
+      29  export interface EchoQuestion {
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 20 lines
+      49    12: 'Octave',
+      50  }
+      51  
+      52 +/**                                                            
+      53 + * Post-answer teaching lines, keyed by semitones. Each names t
+         +he semitone                                                    
+      54 + * count plus a song hook — the standard way to learn intervals
+         + by ear.                                                       
+      55 + */                                                            
+      56 +export const INTERVAL_EXPLANATIONS: Record<number, string> = { 
+      57 +  0: 'A unison is the same note twice — 0 semitones apart. Noth
+         +ing moves.',                                                   
+      58 +  1: 'A minor 2nd is 1 semitone — the smallest step, tense and 
+         +creeping: the "Jaws" theme.',                                  
+      59 +  2: 'A major 2nd is 2 semitones — a plain whole step: the star
+         +t of "Happy Birthday" (hap-py).',                              
+      60 +  3: 'A minor 3rd is 3 semitones — soft and melancholy: the ope
+         +ning of "Greensleeves" (a-las).',                              
+      61 +  4: 'A major 3rd is 4 semitones — bright and open: "Oh, When t
+         +he Saints" (oh, when).',                                       
+      62 +  5: 'A perfect 4th is 5 semitones — sturdy and ceremonial: "He
+         +re Comes the Bride" (here comes).',                            
+      63 +  6: 'A tritone is 6 semitones — the famously unstable one: "Th
+         +e Simpsons" (the SIMP-sons).',                                 
+      64 +  7: 'A perfect 5th is 7 semitones — hollow and strong: "Twinkl
+         +e, Twinkle" (twin-kle twin-kle) or the "Star Wars" leap.',     
+      65 +  8: 'A minor 6th is 8 semitones — bittersweet and yearning: th
+         +e theme from "Love Story" (whe-re).',                          
+      66 +  9: 'A major 6th is 9 semitones — warm and lifting: "My Bonnie
+         + Lies Over the Ocean" (my bon-nie).',                          
+      67 +  10: 'A minor 7th is 10 semitones — wide and unresolved: "Some
+         +where" from West Side Story (there\'s a).',                    
+      68 +  11: 'A major 7th is 11 semitones — one shy of the octave, dis
+         +sonant and reaching: the big leap in "Take On Me".',           
+      69 +  12: 'An octave is 12 semitones — the same note, higher: "Some
+         +where Over the Rainbow" (some-where).',                        
+      70 +}                                                              
+      71 +                                                               
+      72  /** Semitone sets per level — wider and more confusable as leve
+          ls rise. */
+      73  export const INTERVAL_LEVELS: number[][] = [
+      74    [0, 2, 4, 7, 12],
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 17 lines
+      108    'major 6th': 'Major 6th',
+      109  }
+      110  
+      111 +/** Recipe + how it sounds — shared with the reading quizzes i
+          +n theory/quiz.ts. */                                          
+      112 +export const CHORD_QUALITY_EXPLANATIONS: Record<ChordQualityId
+          +, string> = {                                                 
+      113 +  major: 'Major stacks a major 3rd then a minor 3rd (4+3 semit
+          +ones) — bright, stable, "happy".',                            
+      114 +  minor: 'Minor lowers the middle note: minor 3rd then major 3
+          +rd (3+4) — darker and sadder than major.',                    
+      115 +  diminished: 'Diminished is two minor 3rds (3+3) — cramped an
+          +d tense; it wants to resolve somewhere.',                     
+      116 +  augmented: 'Augmented is two major 3rds (4+4) — dreamlike an
+          +d unsettled, neither major nor minor.',                       
+      117 +  'dominant 7th':                                             
+      118 +    'A dominant 7th is a major triad plus a flat 7th — bright 
+          +but restless; listen for the pull back home, down a 5th.',    
+      119 +  'major 7th': 'A major 7th is a major triad plus a major 7th 
+          +— soft, warm and jazzy, no pull anywhere.',                   
+      120 +  'minor 7th': 'A minor 7th is a minor triad plus a flat 7th —
+          + mellow and smooth, the gentlest of the 7ths.',               
+      121 +  'half-diminished':                                          
+      122 +    'Half-diminished is a diminished triad plus a flat 7th (m7
+          +♭5) — suspenseful, darker than a minor 7th but softer than dim
+          +inished.',                                                    
+      123 +  'diminished 7th':                                           
+      124 +    'A diminished 7th stacks minor 3rds all the way up — maxim
+          +um tension, the classic silent-movie "drama" chord.',         
+      125 +  'major 6th': 'A major 6th is a major triad plus the 6th scal
+          +e note — sweet and settled, a vintage-jazz ending colour.',   
+      126 +}                                                             
+      127 +                                                              
+      128  /** Five-finger positions for echo phrases: label → root midi.
+            */
+      129  export const ECHO_POSITIONS: Record<string, number> = {
+      130    'C position': 60,
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 7 lines, removed 1 line
+      171    const root = 55 + Math.floor(rng() * 13)
+      172    const midis: [number, number] = [root, up ? root + semitones
+            : root - semitones]
+      173    const answer = INTERVAL_LABELS[semitones]
+      174 -  return { kind: 'interval', midis, answer, options: makeOptio
+          -ns(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng) }      
+      174 +  return {                                                    
+      175 +    kind: 'interval',                                         
+      176 +    midis,                                                    
+      177 +    answer,                                                   
+      178 +    options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), a
+          +nswer, 4, rng),                                               
+      179 +    explanation: INTERVAL_EXPLANATIONS[semitones],            
+      180 +  }                                                           
+      181  }
+      182  
+      183  const QUIZ_ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G',
+            'Ab', 'A', 'Bb', 'B']
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 1 line
+      192      midis: getChord(root, quality, 0).midi,
+      193      answer,
+      194      options: makeOptions(set.map((q) => CHORD_LABELS[q]), answ
+           er, 4, rng),
+      195 +    explanation: CHORD_QUALITY_EXPLANATIONS[quality],         
+      196    }
+      197  }
+      198  
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 1 line
+      207    midis: number[]
+      208    answer: string
+      209    options: string[]
+      210 +  explanation: string                                         
+      211  }
+      212  
+      213  const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 13 lines
+      220    mixolydian: 'Mixolydian',
+      221  }
+      222  
+      223 +/** What to listen for, per scale type. */                    
+      224 +export const SCALE_TYPE_EXPLANATIONS: Record<ScaleTypeId, stri
+          +ng> = {                                                       
+      225 +  major: 'Major is the plain do-re-mi ladder — bright and sett
+          +led, no surprises on the way up.',                            
+      226 +  'natural minor': 'Natural minor lowers the 3rd, 6th and 7th 
+          +— sad and folky, with a soft ending step.',                   
+      227 +  'harmonic minor':                                           
+      228 +    'Harmonic minor raises the 7th, leaving an exotic extra-wi
+          +de gap near the top — listen for that "snake-charmer" leap.', 
+      229 +  blues: 'The blues scale has only six notes with crushed "blu
+          +e" notes inside — it swaggers rather than climbs.',           
+      230 +  'major pentatonic':                                         
+      231 +    'Major pentatonic is five notes with no semitones at all —
+          + open and folky, nothing clashes.',                           
+      232 +  dorian: 'Dorian sounds minor but with a brighter, raised 6th
+          + — think "Scarborough Fair".',                                
+      233 +  mixolydian: 'Mixolydian sounds major until the lowered 7th n
+          +ear the top — bluesy, never quite finishing.',                
+      234 +}                                                             
+      235 +                                                              
+      236  /** Roots every scale type supports (kept to low-accidental ke
+           ys the library covers). */
+      237  const SCALE_QUIZ_ROOTS = ['C', 'G', 'F']
+      238  
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 1 line
+      253      midis: getScale(root, type).midi,
+      254      answer,
+      255      options: makeOptions(set.map((t) => SCALE_TYPE_LABELS[t]),
+            answer, 4, rng),
+      256 +    explanation: SCALE_TYPE_EXPLANATIONS[type],               
+      257    }
+      258  }
+      259  
+
+⏺ API Error: Server error mid-response. The response above may be 
+  incomplete.
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 12 lines, removed 1 line
+      265    chords: number[][]
+      266    answer: string
+      267    options: string[]
+      268 +  explanation: string                                         
+      269  }
+      270  
+      270 -type CadenceId = 'authentic' | 'plagal' | 'half' | 'deceptive'
+      271 +export type CadenceId = 'authentic' | 'plagal' | 'half' | 'dec
+          +eptive'                                                       
+      272  
+      273  const CADENCE_LABELS: Record<CadenceId, string> = {
+      274    authentic: 'Perfect (V → I)',
+     ...
+      277    deceptive: 'Deceptive (V → vi)',
+      278  }
+      279  
+      280 +export const CADENCE_EXPLANATIONS: Record<CadenceId, string> =
+          + {                                                            
+      281 +  authentic:                                                  
+      282 +    'Perfect (V → I): the tension chord falls home to the toni
+          +c — music\'s full stop. The bass drops a 5th and everything se
+          +ttles.',                                                      
+      283 +  plagal:                                                     
+      284 +    'Plagal (IV → I): the gentle "Amen" ending of hymns — it r
+          +elaxes home without the strong pull of a V chord.',           
+      285 +  half: 'Half (ends on V): the phrase stops ON the tension cho
+          +rd — a question mark. It sounds unfinished because it is.',   
+      286 +  deceptive:                                                  
+      287 +    'Deceptive (V → vi): sets up a full stop, then sidesteps t
+          +o the minor vi chord — the "surprise" that keeps the music goi
+          +ng.',                                                         
+      288 +}                                                             
+      289 +                                                              
+      290  export const CADENCE_LEVELS: CadenceId[][] = [
+      291    ['authentic', 'plagal'],
+      292    ['authentic', 'plagal', 'half'],
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 1 line
+      325      chords: cadenceChords(tonic, cadence),
+      326      answer,
+      327      options: makeOptions(set.map((c) => CADENCE_LABELS[c]), an
+           swer, 4, rng),
+      328 +    explanation: CADENCE_EXPLANATIONS[cadence],               
+      329    }
+      330  }
+      331  
+
+⏺ Now theory/quiz.ts — explanations for the five reading modes.
+
+⏺ Update(src/lib/theory/quiz.ts)  ⎿  Added 7 lines, removed 1 line
+       1  import { Note } from 'tonal'
+       2  import { getChord } from './chords'
+       3 -import { INTERVAL_LABELS, INTERVAL_LEVELS, type Rng } from '../
+         -ear/quiz'                                                      
+       3 +import {                                                       
+       4 +  CHORD_QUALITY_EXPLANATIONS,                                  
+       5 +  INTERVAL_EXPLANATIONS,                                       
+       6 +  INTERVAL_LABELS,                                             
+       7 +  INTERVAL_LEVELS,                                             
+       8 +  type Rng,                                                    
+       9 +} from '../ear/quiz'                                           
+      10  import type { ChordQualityId } from './types'
+      11  
+      12  /**
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 8 lines
+      43    clef: 'treble' | 'bass'
+      44    answer: string
+      45    options: string[]
+      46 +  /** Why: shown after the reveal so a wrong answer still teach
+         +es. */                                                         
+      47 +  explanation: string                                          
+      48  }
+      49  
+      50 +const CLEF_MNEMONICS: Record<'treble' | 'bass', string> = {    
+      51 +  treble:                                                      
+      52 +    'Treble staff, bottom to top: the lines are E-G-B-D-F ("Eve
+         +ry Good Boy Does Fine") and the spaces spell F-A-C-E.',        
+      53 +  bass: 'Bass staff, bottom to top: the lines are G-B-D-F-A ("G
+         +ood Boys Do Fine Always") and the spaces are A-C-E-G ("All Cows
+         + Eat Grass").',                                                
+      54 +}                                                              
+      55 +                                                               
+      56  /** [clef, low midi, high midi, accidentals allowed] per level.
+           */
+      57  export const NOTE_NAMING_LEVELS: { clefs: ('treble' | 'bass')[]
+          ; range: [number, number]; accidentals: boolean }[] = [
+      58    { clefs: ['treble'], range: [60, 79], accidentals: false }, /
+          / C4–G5, in-staff treble
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 8 lines, removed 1 line
+      78    const pool = def.accidentals
+      79      ? [answer, ...LETTERS.flatMap((l) => [l, `${l}♯`, `${l}♭`])
+          ]
+      80      : LETTERS
+      81 -  return { kind: 'note-naming', midi, clef, answer, options: ma
+         -keOptions(pool, answer, 4, rng) }                              
+      81 +  return {                                                     
+      82 +    kind: 'note-naming',                                       
+      83 +    midi,                                                      
+      84 +    clef,                                                      
+      85 +    answer,                                                    
+      86 +    options: makeOptions(pool, answer, 4, rng),                
+      87 +    explanation: `This is ${answer}. ${CLEF_MNEMONICS[clef]}`, 
+      88 +  }                                                            
+      89  }
+      90  
+      91  // --- key signature identification ---
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 15 lines
+       97    prompt: string
+       98    answer: string
+       99    options: string[]
+      100 +  explanation: string                                         
+      101  }
+      102  
+      103 +const SHARP_ORDER = ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯', 'B♯']
+      104 +const FLAT_ORDER = ['B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭', 'F♭'] 
+      105 +const SHARP_COUNTS: Record<string, number> = { C: 0, G: 1, D: 
+          +2, A: 3, E: 4, B: 5, 'F#': 6 }                                
+      106 +const FLAT_COUNTS: Record<string, number> = { F: 1, Bb: 2, Eb:
+          + 3, Ab: 4, Db: 5 }                                            
+      107 +                                                              
+      108 +/** The accidentals a major key's signature carries, in signat
+          +ure order. */                                                 
+      109 +export function sigAccidentals(major: string): { kind: 'sharps
+          +' | 'flats' | 'none'; names: string[] } {                     
+      110 +  const sharps = SHARP_COUNTS[major]                          
+      111 +  if (sharps !== undefined) {                                 
+      112 +    return sharps === 0 ? { kind: 'none', names: [] } : { kind
+          +: 'sharps', names: SHARP_ORDER.slice(0, sharps) }             
+      113 +  }                                                           
+      114 +  return { kind: 'flats', names: FLAT_ORDER.slice(0, FLAT_COUN
+          +TS[major]) }                                                  
+      115 +}                                                             
+      116 +                                                              
+      117  /** Majors ordered by accidental count; minors mirror them at 
+           level 4. */
+      118  export const KEY_SIGNATURE_LEVELS: string[][] = [
+      119    ['C', 'G', 'D', 'F', 'Bb'],
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 20 lines
+      135    const label = (m: string) =>
+      136      (asMinor ? `${RELATIVE_MINOR[m]} minor` : `${m} major`).re
+           place('#', '♯').replace('b', '♭')
+      137    const answer = label(major)
+      138 +  const majorLabel = `${major} major`.replace('#', '♯').replac
+          +e('b', '♭')                                                   
+      139 +  const acc = sigAccidentals(major)                           
+      140 +  let explanation: string                                     
+      141 +  if (acc.kind === 'none') {                                  
+      142 +    explanation = `${majorLabel} has no sharps or flats — all 
+          +white keys.`                                                  
+      143 +  } else if (acc.kind === 'sharps') {                         
+      144 +    explanation =                                             
+      145 +      `${majorLabel} has ${acc.names.length} sharp${acc.names.
+          +length === 1 ? '' : 's'}: ${acc.names.join(', ')}. ` +        
+      146 +      'Tip: the last sharp sits one semitone below the key nam
+          +e.'                                                           
+      147 +  } else {                                                    
+      148 +    explanation =                                             
+      149 +      `${majorLabel} has ${acc.names.length} flat${acc.names.l
+          +ength === 1 ? '' : 's'}: ${acc.names.join(', ')}. ` +         
+      150 +      (acc.names.length === 1                                 
+      151 +        ? 'F major\'s single flat is the one to memorize.'    
+      152 +        : 'Tip: the second-to-last flat names the key.')      
+      153 +  }                                                           
+      154 +  if (asMinor) {                                              
+      155 +    explanation += ` ${answer} shares this signature — the rel
+          +ative minor, three semitones below ${majorLabel}.`            
+      156 +  }                                                           
+      157    return {
+      158      kind: 'key-signature',
+      159      keySignature: major,
+      160      prompt: asMinor ? 'Which minor key has this key signature?
+           ' : 'Which major key has this key signature?',
+      161      answer,
+      162      options: makeOptions(set.map(label), answer, 4, rng),
+      163 +    explanation,                                              
+      164    }
+      165  }
+      166  
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      172    midis: [number, number]
+      173    answer: string
+      174    options: string[]
+      175 +  explanation: string                                         
+      176  }
+      177  
+      178  export function makeIntervalStaffQuestion(level: number, rng: 
+           Rng = Math.random): IntervalStaffQuestion {
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      188      midis: [root, root + semitones],
+      189      answer,
+      190      options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), a
+           nswer, 4, rng),
+      191 +    explanation: `On the staff, count letter names from the bo
+          +ttom note up, inclusive — line-space-line — to get the number.
+          + ${INTERVAL_EXPLANATIONS[semitones]}`,                        
+      192    }
+      193  }
+      194  
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      200    prompt: string
+      201    answer: string
+      202    options: string[]
+      203 +  explanation: string                                         
+      204  }
+      205  
+      206  export const CHORD_SPELLING_LEVELS: ChordQualityId[][] = [
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      230      prompt: `Which notes spell ${chord.symbol}?`,
+      231      answer,
+      232      options: makeOptions(pool, answer, 4, rng),
+      233 +    explanation: `${chord.symbol} = ${answer}. ${CHORD_QUALITY
+          +_EXPLANATIONS[quality]}`,                                     
+      234    }
+      235  }
+      236  
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      241    prompt: string
+      242    answer: string
+      243    options: string[]
+      244 +  explanation: string                                         
+      245  }
+      246  
+      247  const FUNCTION_KEYS_BY_LEVEL: string[][] = [
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 5 lines
+      272      `${Note.pitchClass(Note.transpose(key, intervalName(s)))} 
+           ${q}`
+      273    const answer = chordName(semis, quality)
+      274    const pool = degrees.map(([, s, q]) => chordName(s, q))
+      275 +  const degreeNumber = { 0: 1, 2: 2, 5: 4, 7: 5, 9: 6 }[semis]
+      276 +  const rootName = Note.pitchClass(Note.transpose(key, interva
+          +lName(semis)))                                                
+      277    return {
+      278      kind: 'chord-function',
+      279      prompt: `In the key of ${key} major, which chord is ${nume
+           ral}?`,
+      280      answer,
+      281      options: makeOptions(pool, answer, 4, rng),
+      282 +    explanation:                                              
+      283 +      `${numeral} means "the triad built on scale degree ${deg
+          +reeNumber}" — in ${key} major that root is ${rootName}. ` +   
+      284 +      'Upper-case numerals are major chords, lower-case are mi
+          +nor.',                                                        
+      285    }
+      286  }
+      287  
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/lib/quiz/rhythmQuiz.ts)
+  ⎿  Added 2 lines
+      12    answer: RhythmPattern
+      13    /** Candidate notations (contains the answer exactly once). *
+          /
+      14    options: RhythmPattern[]
+      15 +  /** Why: the pattern's name plus its authored counting hint. 
+         +*/                                                             
+      16 +  explanation: string                                          
+      17  }
+      18  
+      19  export const RHYTHM_DICTATION_LEVELS = [1, 2, 3, 4] as const
+
+⏺ Update(src/lib/quiz/rhythmQuiz.ts)
+  ⎿  Added 2 lines, removed 1 line
+      36    const shuffled = shuffle(pool, rng)
+      37    const answer = shuffled[0]
+      38    const options = shuffle(shuffled.slice(0, Math.min(3, shuffle
+          d.length)), rng)
+      39 -  return { kind: 'rhythm-dictation', answer, options }         
+      39 +  const explanation = `"${answer.label}".${answer.hint ? ` ${an
+         +swer.hint}` : ''}`                                             
+      40 +  return { kind: 'rhythm-dictation', answer, options, explanati
+         +on }                                                           
+      41  }
+
+⏺ Update(src/components/QuizCard.svelte)
+  ⎿  Added 3 lines
+      11      playing = false,
+      12      onselect,
+      13      onreplay,
+      14 +    explanation,                                               
+      15    }: {
+      16      options: string[]
+      17      answer: string
+     ...
+      19      playing?: boolean
+      20      onselect: (option: string) => void
+      21      onreplay?: () => void
+      22 +    /** Shown after the reveal (right or wrong) — the "why" beh
+         +ind the answer. */                                             
+      23 +    explanation?: string                                       
+      24    } = $props()
+      25  
+      26    const revealed = $derived(selected !== null)
+
+⏺ Update(src/components/QuizCard.svelte)
+  ⎿  Added 3 lines
+      49      <p class="verdict" class:good={selected === answer}>
+      50        {selected === answer ? 'Correct!' : `It was ${answer}.`}
+      51      </p>
+      52 +    {#if explanation}                                          
+      53 +      <p class="why">{explanation}</p>                         
+      54 +    {/if}                                                      
+      55    {/if}
+      56  </div>
+      57  
+
+⏺ Update(src/components/QuizCard.svelte)
+  ⎿  Added 7 lines
+      102    .verdict.good {
+      103      color: #166534;
+      104    }
+      105 +  .why {                                                      
+      106 +    margin: -6px 0 0;                                         
+      107 +    color: #64748b;                                           
+      108 +    font-size: 13px;                                          
+      109 +    line-height: 1.55;                                        
+      110 +    max-width: 560px;                                         
+      111 +  }                                                           
+      112  </style>
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/components/RhythmQuizCard.svelte)
+  ⎿  Added 3 lines
+      14      playing = false,
+      15      onselect,
+      16      onreplay,
+      17 +    explanation,                                               
+      18    }: {
+      19      options: RhythmPattern[]
+      20      answerId: string
+     ...
+      22      playing?: boolean
+      23      onselect: (patternId: string) => void
+      24      onreplay: () => void
+      25 +    /** Shown after the reveal (right or wrong) — the "why" beh
+         +ind the answer. */                                             
+      26 +    explanation?: string                                       
+      27    } = $props()
+      28  
+      29    const revealed = $derived(selected !== null)
+
+⏺ Update(src/components/RhythmQuizCard.svelte)
+  ⎿  Added 3 lines
+      62      <p class="verdict" class:good={selected === answerId}>
+      63        {selected === answerId ? 'Correct!' : 'Not that one — the
+           green line is what you heard.'}
+      64      </p>
+      65 +    {#if explanation}                                          
+      66 +      <p class="why">{explanation}</p>                         
+      67 +    {/if}                                                      
+      68    {/if}
+      69  </div>
+      70  
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ Update(src/components/RhythmQuizCard.svelte)
+  ⎿  Added 7 lines
+      112    .verdict.good {
+      113      color: #166534;
+      114    }
+      115 +  .why {                                                      
+      116 +    margin: -6px 0 0;                                         
+      117 +    color: #64748b;                                           
+      118 +    font-size: 13px;                                          
+      119 +    line-height: 1.55;                                        
+      120 +    max-width: 560px;                                         
+      121 +  }                                                           
+      122  </style>
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      335              {playing}
+      336              onselect={choose}
+      337              onreplay={play}
+      338 +            explanation={question.explanation}                
+      339            />
+      340          {/if}
+      341          {#if selected !== null}
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      352              {playing}
+      353              onselect={choose}
+      354              onreplay={play}
+      355 +            explanation={question.explanation}                
+      356            />
+      357          {/if}
+      358          {#if selected !== null}
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      375            answer={question.answer}
+      376            {selected}
+      377            onselect={choose}
+      378 +          explanation={question.explanation}                  
+      379          />
+      380          {#if selected !== null}
+      381            <button class="primary next" onclick={next}>Next →</
+           button>
+
+⏺ Now extend the quiz tests.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/theoryQuiz.test.ts)
+  ⎿  Added 1 line
+      11    makeIntervalStaffQuestion,
+      12    makeKeySignatureQuestion,
+      13    makeNoteNamingQuestion,
+      14 +  sigAccidentals,                                              
+      15  } from '../lib/theory/quiz'
+      16  import { makeRhythmDictationQuestion } from '../lib/quiz/rhythm
+          Quiz'
+      17  import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
+
+⏺ Update(src/tests/theoryQuiz.test.ts)
+  ⎿  Added 63 lines
+      204    })
+      205  })
+      206  
+      207 +describe('sigAccidentals', () => {                            
+      208 +  it('lists the exact accidentals per major key', () => {     
+      209 +    expect(sigAccidentals('C')).toEqual({ kind: 'none', names:
+          + [] })                                                        
+      210 +    expect(sigAccidentals('G')).toEqual({ kind: 'sharps', name
+          +s: ['F♯'] })                                                  
+      211 +    expect(sigAccidentals('D')).toEqual({ kind: 'sharps', name
+          +s: ['F♯', 'C♯'] })                                            
+      212 +    expect(sigAccidentals('F#')).toEqual({ kind: 'sharps', nam
+          +es: ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯'] })                   
+      213 +    expect(sigAccidentals('F')).toEqual({ kind: 'flats', names
+          +: ['B♭'] })                                                   
+      214 +    expect(sigAccidentals('Db')).toEqual({ kind: 'flats', name
+          +s: ['B♭', 'E♭', 'A♭', 'D♭', 'G♭'] })                          
+      215 +  })                                                          
+      216 +})                                                            
+      217 +                                                              
+      218 +describe('question explanations', () => {                     
+      219 +  it('every option-based question carries a non-empty explanat
+          +ion', () => {                                                 
+      220 +    for (const seed of seeds) {                               
+      221 +      const rng = () => seededRng(seed)                       
+      222 +      expect(makeNoteNamingQuestion(4, rng()).explanation.leng
+          +th).toBeGreaterThan(20)                                       
+      223 +      expect(makeKeySignatureQuestion(3, rng()).explanation.le
+          +ngth).toBeGreaterThan(20)                                     
+      224 +      expect(makeIntervalStaffQuestion(4, rng()).explanation.l
+          +ength).toBeGreaterThan(20)                                    
+      225 +      expect(makeChordSpellingQuestion(3, rng()).explanation.l
+          +ength).toBeGreaterThan(20)                                    
+      226 +      expect(makeChordFunctionQuestion(3, rng()).explanation.l
+          +ength).toBeGreaterThan(20)                                    
+      227 +      expect(makeRhythmDictationQuestion(2, rng()).explanation
+          +.length).toBeGreaterThan(5)                                   
+      228 +    }                                                         
+      229 +  })                                                          
+      230 +                                                              
+      231 +  it('key-signature explanation lists the exact accidentals of
+          + the rendered signature', () => {                             
+      232 +    for (const level of [1, 2, 3, 4]) {                       
+      233 +      for (const seed of seeds) {                             
+      234 +        const q = makeKeySignatureQuestion(level, seededRng(se
+          +ed))                                                          
+      235 +        const acc = sigAccidentals(q.keySignature)            
+      236 +        if (acc.kind === 'none') {                            
+      237 +          expect(q.explanation).toContain('no sharps or flats'
+          +)                                                             
+      238 +        } else {                                              
+      239 +          expect(q.explanation).toContain(`${acc.names.length}
+          + ${acc.kind.slice(0, -1)}${acc.names.length === 1 ? '' : 's'}`
+          +)                                                             
+      240 +          expect(q.explanation).toContain(acc.names.join(', ')
+          +)                                                             
+      241 +        }                                                     
+      242 +      }                                                       
+      243 +    }                                                         
+      244 +  })                                                          
+      245 +                                                              
+      246 +  it('note-naming explanation names the answer and the right c
+          +lef mnemonic', () => {                                        
+      247 +    for (const seed of seeds) {                               
+      248 +      const q = makeNoteNamingQuestion(2, seededRng(seed))    
+      249 +      expect(q.explanation).toContain(q.answer)               
+      250 +      expect(q.explanation).toContain(q.clef === 'treble' ? 'E
+          +very Good Boy' : 'All Cows Eat Grass')                        
+      251 +    }                                                         
+      252 +  })                                                          
+      253 +                                                              
+      254 +  it('chord-function explanation names the answer chord root',
+          + () => {                                                      
+      255 +    for (const seed of seeds) {                               
+      256 +      const q = makeChordFunctionQuestion(3, seededRng(seed)) 
+      257 +      const root = q.answer.split(' ')[0]                     
+      258 +      expect(q.explanation).toContain(`that root is ${root}`) 
+      259 +    }                                                         
+      260 +  })                                                          
+      261 +                                                              
+      262 +  it('rhythm-dictation explanation quotes the answer pattern l
+          +abel', () => {                                                
+      263 +    for (const seed of seeds) {                               
+      264 +      const q = makeRhythmDictationQuestion(3, seededRng(seed)
+          +)                                                             
+      265 +      expect(q.explanation).toContain(q.answer.label)         
+      266 +    }                                                         
+      267 +  })                                                          
+      268 +})                                                            
+      269 +                                                              
+      270  describe('quiz mode registry', () => {
+      271    it('level counts match the generator level tables', () => {
+      272      expect(QUIZ_LEVEL_COUNTS['note-naming']).toBe(NOTE_NAMING_
+           LEVELS.length)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/earQuiz.test.ts)
+  ⎿  Added 2 lines
+       3    CADENCE_LEVELS,
+       4    ECHO_LEVELS,
+       5    ECHO_POSITIONS,
+       6 +  INTERVAL_EXPLANATIONS,                                       
+       7 +  INTERVAL_LABELS,                                             
+       8    INTERVAL_LEVELS,
+       9    SCALE_TYPE_LEVELS,
+      10    makeCadenceQuestion,
+
+⏺ Update(src/tests/earQuiz.test.ts)
+  ⎿  Added 31 lines
+      60    it('is deterministic under a fixed seed', () => {
+      61      expect(makeIntervalQuestion(3, seededRng(7))).toEqual(makeI
+          ntervalQuestion(3, seededRng(7)))
+      62    })
+      63 +                                                               
+      64 +  it('explanation matches the played interval and names its sem
+         +itone count', () => {                                          
+      65 +    expect(Object.keys(INTERVAL_EXPLANATIONS).sort()).toEqual(O
+         +bject.keys(INTERVAL_LABELS).sort())                            
+      66 +    for (const level of [1, 2, 3, 4]) {                        
+      67 +      for (const seed of seeds) {                              
+      68 +        const q = makeIntervalQuestion(level, seededRng(seed)) 
+      69 +        const semitones = Math.abs(q.midis[1] - q.midis[0])    
+      70 +        expect(q.explanation).toBe(INTERVAL_EXPLANATIONS[semito
+         +nes])                                                          
+      71 +        expect(q.explanation).toContain(`${semitones} semitone`
+         +)                                                              
+      72 +      }                                                        
+      73 +    }                                                          
+      74 +  })                                                           
+      75  })
+      76  
+      77 +describe('question explanations', () => {                      
+      78 +  it('every option-based ear question carries a non-empty expla
+         +nation', () => {                                               
+      79 +    for (const seed of seeds) {                                
+      80 +      expect(makeIntervalQuestion(4, seededRng(seed)).explanati
+         +on.length).toBeGreaterThan(20)                                 
+      81 +      expect(makeChordQuestion(4, seededRng(seed)).explanation.
+         +length).toBeGreaterThan(20)                                    
+      82 +      expect(makeScaleTypeQuestion(4, seededRng(seed)).explanat
+         +ion.length).toBeGreaterThan(20)                                
+      83 +      expect(makeCadenceQuestion(3, seededRng(seed)).explanatio
+         +n.length).toBeGreaterThan(20)                                  
+      84 +    }                                                          
+      85 +  })                                                           
+      86 +                                                               
+      87 +  it('cadence explanation restates the answer label', () => {  
+      88 +    for (const seed of seeds) {                                
+      89 +      const q = makeCadenceQuestion(3, seededRng(seed))        
+      90 +      // Both the answer and its explanation lead with the same
+         + cadence name.                                                 
+      91 +      expect(q.explanation.startsWith(q.answer.split(' ')[0])).
+         +toBe(true)                                                     
+      92 +    }                                                          
+      93 +  })                                                           
+      94 +})                                                             
+      95 +                                                               
+      96  describe('makeChordQuestion', () => {
+      97    it('answer is in options and options come from the level set'
+          , () => {
+      98      for (const level of [1, 2, 3]) {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All quiz tests pass. Moving to the browser-back fix.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/router.svelte.ts)
+  ⎿  Added 12 lines, removed 2 lines
+      21    return current.params
+      22  }
+      23  
+      24 -export function navigate(to: string, params?: Record<string, st
+         -ring>): void {                                                 
+      25 -  window.location.hash = buildHash(to, params)                 
+      24 +export function navigate(to: string, params?: Record<string, st
+         +ring>, opts?: { replace?: boolean }): void {                   
+      25 +  const hash = buildHash(to, params)                           
+      26 +  if (opts?.replace) {                                         
+      27 +    // Same-document fragment replace: no reload, fires hashcha
+         +nge, and —                                                     
+      28 +    // unlike assigning location.hash — adds no history entry, 
+         +so control                                                     
+      29 +    // tweaks (quiz mode, level) don't pollute the back button.
+      30 +    const url = new URL(window.location.href)                  
+      31 +    url.hash = hash                                            
+      32 +    window.location.replace(url.href)                          
+      33 +  } else {                                                     
+      34 +    window.location.hash = hash                                
+      35 +  }                                                            
+      36  }
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Now rewiring Practice.svelte to URL-driven selection.
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+       6    import { makeSightReading, SIGHT_LEVELS, type SightLevel } fr
+          om '../lib/sightread/generator'
+       7    import { matchLesson } from '../lib/voice/parser'
+       8    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+       9 -  import { currentParams } from '../router.svelte'             
+       9 +  import { currentParams, navigate } from '../router.svelte'   
+      10  
+      11    const POLY_AVAILABLE = true
+      12    const SIGHT_ACTIVITY = 'sight-reading'
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 47 lines, removed 3 lines
+      16    const methods = [...new Set(lessons.map((l) => l.method))]
+      17    const keys = ['All', ...new Set(lessons.map((l) => l.keySigna
+          ture.replace(/m$/, '')))]
+      18  
+      19 -  let selected = $state<Lesson | null>(null)                   
+      19    let keyFilter = $state('All')
+      20    let sightLevel = $state(Math.min(MAX_SIGHT_LEVEL, getProgress
+          (SIGHT_ACTIVITY).level) as SightLevel)
+      21    // Seeding from the persisted level once is intended; newMelo
+          dy() regenerates.
+     ...
+      23    let sightReading = $state(makeSightReading(sightLevel))
+      24    let sightMessage = $state('')
+      25  
+      26 +  // Selection lives in the URL so the browser back button step
+         +s                                                              
+      27 +  // open lesson → lesson list → previous screen, and guide dee
+         +p links                                                        
+      28 +  // just work. The generated sight-reading melody itself stays
+         + in state                                                      
+      29 +  // (it has no stable id); ?sight=<level> marks it open.      
+      30 +  const params = $derived(currentParams())                     
+      31 +  const selected = $derived.by((): Lesson | null => {          
+      32 +    if (params.lesson) return lessons.find((l) => l.id === para
+         +ms.lesson) ?? null                                             
+      33 +    if (params.sight && /^[1-5]$/.test(params.sight)) return si
+         +ghtReading                                                     
+      34 +    return null                                                
+      35 +  })                                                           
+      36 +                                                               
+      37 +  /** Preserve the guide breadcrumb (?from=guide) across in-scr
+         +een navigation. */                                             
+      38 +  const withFrom = (extra?: Record<string, string>) =>         
+      39 +    params.from ? { ...extra, from: params.from } : extra      
+      40 +                                                               
+      41 +  function openLesson(lesson: Lesson) {                        
+      42 +    navigate('/practice', withFrom({ lesson: lesson.id }))     
+      43 +  }                                                            
+      44 +                                                               
+      45 +  function exitLesson() {                                      
+      46 +    navigate('/practice', withFrom())                          
+      47 +  }                                                            
+      48 +                                                               
+      49 +  /** Open the sight-reading player with a fresh melody at `lev
+         +el`. */                                                        
+      50 +  function openSight(level = sightLevel) {                     
+      51 +    sightLevel = level                                         
+      52 +    sightReading = makeSightReading(level)                     
+      53 +    navigate('/practice', withFrom({ sight: String(level) }))  
+      54 +  }                                                            
+      55 +                                                               
+      56 +  /** Regenerate in place while the player is open — no history
+         + entry. */                                                     
+      57    function newMelody(level = sightLevel) {
+      58      sightLevel = level
+      59      sightReading = makeSightReading(level)
+      30 -    selected = sightReading                                    
+      60 +    if (params.sight !== String(level)) navigate('/practice', w
+         +ithFrom({ sight: String(level) }), { replace: true })          
+      61    }
+      62  
+      63    function chooseSightLevel(level: SightLevel) {
+      64      setLevel(SIGHT_ACTIVITY, level)
+      65      sightMessage = ''
+      36 -    newMelody(level)                                           
+      66 +    openSight(level)                                           
+      67    }
+      68  
+      69 +  // A guide link (?sight=N) must produce a melody at that leve
+         +l without                                                      
+      70 +  // touching the persisted sight-reading level; also covers ba
+         +ck/forward                                                     
+      71 +  // between different ?sight= entries.                        
+      72 +  $effect(() => {                                              
+      73 +    const s = params.sight                                     
+      74 +    if (s && /^[1-5]$/.test(s)) {                              
+      75 +      const level = Number(s) as SightLevel                    
+      76 +      if (level !== sightLevel) {                              
+      77 +        sightLevel = level                                     
+      78 +        sightReading = makeSightReading(level)                 
+      79 +      }                                                        
+      80 +    }                                                          
+      81 +  })                                                           
+      82 +                                                               
+      83    function onSightComplete({ mistakes }: { mistakes: number }) 
+          {
+      84      const { leveledUp, progress } = recordRun(SIGHT_ACTIVITY, m
+          istakes === 0, MAX_SIGHT_LEVEL)
+      85      if (leveledUp) {
+
+⏺ Update(src/screens/Practice.svelte)  ⎿  Removed 12 lines
+       92      }
+       93    }
+       94  
+       95 -  const makeSightReadingLesson = () => makeSightReading(sightL
+          -evel)                                                         
+       96 -                                                              
+       97 -  // Deep links from the learning guide, read once at mount. ?
+          -sight= goes                                                   
+       98 -  // through newMelody (not chooseSightLevel) on purpose: a gu
+          -ide link must                                                 
+       99 -  // never touch the persisted sight-reading level.           
+      100 -  {                                                           
+      101 -    const params = currentParams()                            
+      102 -    const linked = params.lesson && lessons.find((l) => l.id =
+          -== params.lesson)                                             
+      103 -    if (linked) selected = linked                             
+      104 -    else if (params.sight && /^[1-5]$/.test(params.sight)) new
+          -Melody(Number(params.sight) as SightLevel)                    
+      105 -  }                                                           
+      106 -                                                              
+       95    const visibleLessons = $derived(
+       96      keyFilter === 'All' ? lessons : lessons.filter((l) => l.ke
+           ySignature.replace(/m$/, '') === keyFilter),
+       97    )
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 4 lines, removed 6 lines
+      126        handle(intent) {
+      127          if (intent.kind === 'open-lesson') {
+      128            if (/sight ?reading/.test(intent.query)) {
+      129 -            sightReading = makeSightReadingLesson()           
+      130 -            selected = sightReading                           
+      129 +            openSight()                                       
+      130              return { say: 'Sight reading — a fresh melody.' }
+      131            }
+      132            const id = matchLesson(intent.query, lessons)
+      133            const lesson = lessons.find((l) => l.id === id)
+      134            if (!lesson) return { say: "I couldn't find that les
+           son." }
+      136 -          selected = lesson                                   
+      135 +          openLesson(lesson)                                  
+      136            return { say: lesson.title }
+      137          }
+      138          if (intent.kind === 'lesson' && intent.action === 'new
+           -melody') {
+      140 -          sightReading = makeSightReadingLesson()             
+      141 -          selected = sightReading                             
+      139 +          selected?.method === 'Sight-reading' ? newMelody() :
+          + openSight()                                                  
+      140            return { say: 'New melody.' }
+      141          }
+      142          if (intent.kind === 'lesson' && intent.action === 'exi
+           t') {
+      145 -          selected = null                                     
+      143 +          exitLesson()                                        
+      144            return { say: '' }
+      145          }
+      146          return null
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      156      {#key selected.id}
+      157        <LessonPlayer
+      158          lesson={selected}
+      159 -        onexit={() => (selected = null)}                      
+      159 +        onexit={exitLesson}                                   
+      160          oncomplete={selected.method === 'Sight-reading' ? onSi
+           ghtComplete : undefined}
+      161        />
+      162      {/key}
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      192            <button
+      193              class="lesson-tile"
+      194              disabled={locked}
+      195 -            onclick={() => (selected = lesson)}               
+      195 +            onclick={() => openLesson(lesson)}                
+      196              title={locked ? 'Needs chord detection — coming so
+           on' : ''}
+      197            >
+      198              <strong>{lesson.title}</strong>
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      217        {/each}
+      218      </div>
+      219      <div class="lesson-grid">
+      220 -      <button class="lesson-tile" onclick={() => newMelody()}>
+      220 +      <button class="lesson-tile" onclick={() => openSight()}>
+      221          <strong>Sight-read at level {sightLevel}</strong>
+      222          <span>a new melody every time</span>
+      223        </button>
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 2 lines, removed 1 line
+      136            return { say: lesson.title }
+      137          }
+      138          if (intent.kind === 'lesson' && intent.action === 'new
+           -melody') {
+      139 -          selected?.method === 'Sight-reading' ? newMelody() :
+          - openSight()                                                  
+      139 +          if (selected?.method === 'Sight-reading') newMelody(
+          +)                                                             
+      140 +          else openSight()                                    
+      141            return { say: 'New melody.' }
+      142          }
+      143          if (intent.kind === 'lesson' && intent.action === 'exi
+           t') {
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Songs is simpler — user imports are persisted with stable ids, so both
+  catalogs can be URL-addressed.
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 17 lines, removed 7 lines
+       5    import { parseMidiFile } from '../lib/songs/midiImport'
+       6    import { parseMusicXml } from '../lib/songs/musicxml'
+       7    import { addUserSong, removeUserSong, userSongs } from '../li
+          b/songs/userSongs.svelte'
+       8 -  import { currentParams } from '../router.svelte'             
+       8 +  import { currentParams, navigate } from '../router.svelte'   
+       9  
+      10 -  let selected = $state<Song | null>(null)                     
+      11 -  // Deep link from the learning guide, read once at mount.    
+      12 -  {                                                            
+      13 -    const linked = SONG_CATALOG.find((s) => s.id === currentPar
+         -ams().song)                                                    
+      14 -    if (linked) selected = linked                              
+      15 -  }                                                            
+      10 +  // Selection lives in the URL (?song=id) so the browser back 
+         +button steps                                                   
+      11 +  // open song → song list → previous screen. User imports pers
+         +ist with                                                       
+      12 +  // stable ids, so they are addressable too.                  
+      13 +  const params = $derived(currentParams())                     
+      14 +  const selected = $derived.by((): Song | null => {            
+      15 +    if (!params.song) return null                              
+      16 +    return SONG_CATALOG.find((s) => s.id === params.song) ?? us
+         +erSongs.all.find((s) => s.id === params.song) ?? null          
+      17 +  })                                                           
+      18 +                                                               
+      19 +  /** Preserve the guide breadcrumb (?from=guide) across in-scr
+         +een navigation. */                                             
+      20 +  const withFrom = (extra?: Record<string, string>) =>         
+      21 +    params.from ? { ...extra, from: params.from } : extra      
+      22 +                                                               
+      23 +  const openSong = (song: Song) => navigate('/songs', withFrom(
+         +{ song: song.id }))                                            
+      24 +  const exitSong = () => navigate('/songs', withFrom())        
+      25 +                                                               
+      26    let importError = $state('')
+      27    let fileInput: HTMLInputElement | undefined = $state()
+      28  
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      53          throw new Error('Unsupported file type — use .mid, .mid
+          i, .xml or .musicxml.')
+      54        }
+      55        addUserSong(song)
+      56 -      selected = song                                          
+      56 +      openSong(song)                                           
+      57      } catch (err) {
+      58        importError = err instanceof Error ? err.message : String
+          (err)
+      59      } finally {
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      67  
+      68    {#if selected}
+      69      {#key selected.id}
+      70 -      <SongPlayer song={selected} onexit={() => (selected = nul
+         -l)} />                                                         
+      70 +      <SongPlayer song={selected} onexit={exitSong} />         
+      71      {/key}
+      72    {:else}
+      73      <p class="hint">
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      81          <h2 class="grade-h">Grade {grade}</h2>
+      82          <div class="song-grid">
+      83            {#each songs as song (song.id)}
+      84 -            <button class="song-tile" onclick={() => (selected 
+         -= song)}>                                                      
+      84 +            <button class="song-tile" onclick={() => openSong(s
+         +ong)}>                                                         
+      85                <strong>{STYLE_ICONS[song.style]} {song.title}</s
+          trong>
+      86                <span>{song.composer} · {song.measures.length} ba
+          rs{song.swing ? ' · swing' : ''}</span>
+      87              </button>
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      112        <div class="song-grid">
+      113          {#each userSongs.all as song (song.id)}
+      114            <div class="song-tile imported">
+      115 -            <button class="tile-main" onclick={() => (selected
+          - = song)}>                                                    
+      115 +            <button class="tile-main" onclick={() => openSong(
+          +song)}>                                                       
+      116                <strong>{song.title}</strong>
+      117                <span>{song.composer} · {song.measures.length} b
+           ars</span>
+      118              </button>
+
+⏺ Now Quizzes — reflect mode/level in the URL with replace.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      34    import { midiToVexKey, type ScoreModel } from '../lib/notatio
+          n/vexScore'
+      35    import { addRecord } from '../lib/practice/history.svelte'
+      36    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      37 -  import { currentParams } from '../router.svelte'             
+      37 +  import { currentParams, navigate } from '../router.svelte'   
+      38  
+      39    type Question =
+      40      | IntervalQuestion
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 34 lines, removed 8 lines
+       86    let mode = $state<QuizModeId>('intervals')
+       87    let level = $state(1)
+       88  
+       89 -  // Deep link from the learning guide, read once at mount.   
+       90 -  {                                                           
+       91 -    const params = currentParams()                            
+       92 -    const linkedMode = ALL_MODES.some((m) => m.id === params.m
+          -ode) ? (params.mode as QuizModeId) : 'intervals'              
+       93 -    mode = linkedMode                                         
+       89 +  // Mode and level are mirrored in the URL (?mode=&level=) wi
+          +th replace                                                    
+       90 +  // navigation: refresh and back-into-the-screen restore them
+          +, but toggling                                                
+       91 +  // modes never stacks history entries. The $effect below als
+          +o applies                                                     
+       92 +  // guide deep links and back/forward param changes.         
+       93 +  const routeParams = $derived(currentParams())               
+       94 +                                                              
+       95 +  function fromParams(params: Readonly<Record<string, string>>
+          +): { mode: QuizModeId; level: number } | null {               
+       96 +    if (!ALL_MODES.some((m) => m.id === params.mode)) return n
+          +ull                                                           
+       97 +    const linkedMode = params.mode as QuizModeId              
+       98      const linkedLevel = Number(params.level)
+       95 -    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && l
+          -inkedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]) {                
+       96 -      level = linkedLevel                                     
+       97 -    }                                                         
+       99 +    const validLevel =                                        
+      100 +      Number.isInteger(linkedLevel) && linkedLevel >= 1 && lin
+          +kedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]                     
+      101 +    return { mode: linkedMode, level: validLevel ? linkedLevel
+          + : 1 }                                                        
+      102    }
+      103  
+      104 +  // svelte-ignore state_referenced_locally — initial deep lin
+          +k, applied before first render                                
+      105 +  const initial = fromParams(currentParams())                 
+      106 +  if (initial) {                                              
+      107 +    mode = initial.mode                                       
+      108 +    level = initial.level                                     
+      109 +  }                                                           
+      110 +                                                              
+      111 +  function reflectRoute() {                                   
+      112 +    const params: Record<string, string> = { mode, level: Stri
+          +ng(level) }                                                   
+      113 +    if (routeParams.from) params.from = routeParams.from      
+      114 +    navigate('/quizzes', params, { replace: true })           
+      115 +  }                                                           
+      116 +                                                              
+      117 +  $effect(() => {                                             
+      118 +    const linked = fromParams(routeParams)                    
+      119 +    if (linked && (linked.mode !== mode || linked.level !== le
+          +vel)) {                                                       
+      120 +      mode = linked.mode                                      
+      121 +      level = linked.level                                    
+      122 +      resetRound()                                            
+      123 +    }                                                         
+      124 +  })                                                          
+      125 +                                                              
+      126    const modeDef = $derived(ALL_MODES.find((m) => m.id === mode
+           )!)
+      127    const maxLevel = $derived(QUIZ_LEVEL_COUNTS[mode])
+      128    const roundSize = $derived(mode === 'echo' ? 5 : 10)
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      166      mode = m
+      167      level = 1
+      168      resetRound()
+      169 +    reflectRoute()                                            
+      170    }
+      171  
+      172    function setLevel(l: number) {
+      173      level = l
+      174      resetRound()
+      175 +    reflectRoute()                                            
+      176    }
+      177  
+      178    async function play() {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      101      return { mode: linkedMode, level: validLevel ? linkedLevel
+            : 1 }
+      102    }
+      103  
+      104 -  // svelte-ignore state_referenced_locally — initial deep lin
+          -k, applied before first render                                
+      104 +  // Initial deep link, applied before the first render.      
+      105    const initial = fromParams(currentParams())
+      106    if (initial) {
+      107      mode = initial.mode
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ Navigation rewiring is clean. Now the guide return path.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 27 lines, removed 9 lines
+      52    moveOnWhen: string[]
+      53  }
+      54  
+      55 -/** Hash href for a guide link, e.g. '#/practice?lesson=scale-C
+         --major'. */                                                    
+      55 +/**                                                            
+      56 + * Hash href for a guide link, e.g. '#/practice?lesson=scale-C-
+         +major&from=guide'.                                             
+      57 + * Every link carries from=guide so target screens can offer a 
+         +way back.                                                      
+      58 + */                                                            
+      59  export function guideHref(link: GuideLink): string {
+      60 +  const from = { from: 'guide' }                               
+      61    switch (link.kind) {
+      62      case 'lesson':
+      59 -      return '#' + buildHash('/practice', { lesson: link.lesson
+         -Id })                                                          
+      63 +      return '#' + buildHash('/practice', { lesson: link.lesson
+         +Id, ...from })                                                 
+      64      case 'song':
+      61 -      return '#' + buildHash('/songs', { song: link.songId })  
+      65 +      return '#' + buildHash('/songs', { song: link.songId, ...
+         +from })                                                        
+      66      case 'quiz':
+      63 -      return '#' + buildHash('/quizzes', { mode: link.mode, lev
+         -el: String(link.level) })                                      
+      67 +      return '#' + buildHash('/quizzes', { mode: link.mode, lev
+         +el: String(link.level), ...from })                             
+      68      case 'rhythm':
+      65 -      return '#' + buildHash('/rhythm', { level: String(link.le
+         -vel) })                                                        
+      69 +      return '#' + buildHash('/rhythm', { level: String(link.le
+         +vel), ...from })                                               
+      70      case 'sight':
+      67 -      return '#' + buildHash('/practice', { sight: String(link.
+         -level) })                                                      
+      71 +      return '#' + buildHash('/practice', { sight: String(link.
+         +level), ...from })                                             
+      72      case 'scale':
+      69 -      return '#' + buildHash('/scales', { root: link.root, type
+         -: link.type })                                                 
+      73 +      return '#' + buildHash('/scales', { root: link.root, type
+         +: link.type, ...from })                                        
+      74      case 'chord':
+      71 -      return '#' + buildHash('/chords', { root: link.root, qual
+         -ity: link.quality })                                           
+      75 +      return '#' + buildHash('/chords', { root: link.root, qual
+         +ity: link.quality, ...from })                                  
+      76      case 'route':
+      73 -      return '#' + link.route                                  
+      77 +      return '#' + buildHash(...splitRoute(link.route))        
+      78    }
+      79  }
+      80  
+      81 +/** '/quizzes?mode=echo' → ['/quizzes', {mode: 'echo', from: 'g
+         +uide'}] */                                                     
+      82 +function splitRoute(route: string): [string, Record<string, str
+         +ing>] {                                                        
+      83 +  const qIndex = route.indexOf('?')                            
+      84 +  const path = qIndex === -1 ? route : route.slice(0, qIndex)  
+      85 +  const params: Record<string, string> = { from: 'guide' }     
+      86 +  if (qIndex !== -1) {                                         
+      87 +    for (const pair of route.slice(qIndex + 1).split('&')) {   
+      88 +      const [k, v = ''] = pair.split('=')                      
+      89 +      if (k) params[decodeURIComponent(k)] = decodeURIComponent
+         +(v)                                                            
+      90 +    }                                                          
+      91 +  }                                                            
+      92 +  return [path, params]                                        
+      93 +}                                                              
+      94 +                                                               
+      95  const lesson = (lessonId: string, label: string): GuideLink => 
+          ({ kind: 'lesson', lessonId, label })
+      96  const song = (songId: string, label: string): GuideLink => ({ k
+          ind: 'song', songId, label })
+      97  const quiz = (mode: QuizModeId, level: number, label: string): 
+          GuideLink => ({ kind: 'quiz', mode, level, label })
+
+⏺ Write(src/components/BackToGuide.svelte)
+  ⎿  Wrote 30 lines to src/components/BackToGuide.svelte
+       1 <script lang="ts">
+       2   import { currentParams } from '../router.svelte'
+       3 
+       5    * Breadcrumb back to the learning guide, shown only when the 
+         user arrived
+       6    * via a guide deep link (?from=guide). Plain hash link — brow
+         ser back works
+       7    * the same way.
+       9   const fromGuide = $derived(currentParams().from === 'guide')
+      10 </script>
+     … +22 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now the guide accordion module state and ?stage= deep link.
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 17 lines, removed 5 lines
+       1 +<script lang="ts" module>                                      
+       2 +  import { GUIDE_STAGES } from '../lib/data/guide'             
+       3 +                                                               
+       4 +  // Which stages are expanded. Module-level so following a gui
+         +de link and                                                    
+       5 +  // coming back keeps your place for the rest of the visit — b
+         +ut nothing is                                                  
+       6 +  // ever persisted (the guide tracks no progress by design; a 
+         +reload resets).                                                
+       7 +  let open = $state<Record<string, boolean>>({ [GUIDE_STAGES[0]
+         +.id]: true })                                                  
+       8 +</script>                                                      
+       9 +                                                               
+      10  <script lang="ts">
+      11    import GlossText from '../components/GlossText.svelte'
+       3 -  import { GUIDE_STAGES, guideHref, type GuideLink, type GuideS
+         -tage } from '../lib/data/guide'                                
+      12 +  import { guideHref, type GuideLink, type GuideStage } from '.
+         +./lib/data/guide'                                              
+      13    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      14 +  import { currentParams } from '../router.svelte'             
+      15  
+       6 -  // Which stages are expanded. Transient by design — the guide
+         - never                                                         
+       7 -  // persists anything (no progress tracking).                 
+       8 -  let open = $state<Record<string, boolean>>({ [GUIDE_STAGES[0]
+         -.id]: true })                                                  
+       9 -                                                               
+      16    function toggle(id: string) {
+      17      open[id] = !open[id]
+      18    }
+     ...
+      25      return true
+      26    }
+      27  
+      28 +  // Deep link (#/guide?stage=stage-3): open and scroll to that
+         + stage.                                                        
+      29 +  {                                                            
+      30 +    const linked = GUIDE_STAGES.findIndex((s) => s.id === curre
+         +ntParams().stage)                                              
+      31 +    if (linked !== -1) setTimeout(() => showStage(linked + 1), 
+         +0)                                                             
+      32 +  }                                                            
+      33 +                                                               
+      34    const LINK_GROUPS: { key: 'technique' | 'repertoire' | 'ear' 
+          | 'rhythm' | 'sight'; label: string }[] = [
+      35      { key: 'technique', label: 'Technique' },
+      36      { key: 'repertoire', label: 'Pieces' },
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 3 lines
+      18      lesson,
+      19      onexit,
+      20      oncomplete,
+      21 +    nextLesson,                                                
+      22    }: {
+      23      lesson: Lesson
+      24      onexit?: () => void
+      25      oncomplete?: (info: { mistakes: number }) => void
+      26 +    /** Offered after the final segment: the natural next lesso
+         +n to open. */                                                  
+      27 +    nextLesson?: { title: string; onopen: () => void }         
+      28    } = $props()
+      29  
+      30    let segIndex = $state(0)
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 6 lines
+      314          </button>
+      315        {:else}
+      316          <button class="primary" onclick={() => restartSegment(
+           0)}>Practice again</button>
+      317 +        {#if nextLesson}                                      
+      318 +          <button class="primary" onclick={nextLesson.onopen}>
+          +Next: {nextLesson.title} →</button>                           
+      319 +        {/if}                                                 
+      320 +        {#if onexit}                                          
+      321 +          <button class="ghost" onclick={onexit}>← All lessons
+          +</button>                                                     
+      322 +        {/if}                                                 
+      323        {/if}
+      324      </div>
+      325    {:else}
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 9 lines
+       93      }
+       94    }
+       95  
+       96 +  // The natural follow-up offered on the completion card: the
+          + next lesson                                                  
+       97 +  // of the same method (sight-reading regenerates instead).  
+       98 +  const nextLesson = $derived.by(() => {                      
+       99 +    if (!selected || selected.method === 'Sight-reading') retu
+          +rn undefined                                                  
+      100 +    const sameMethod = lessons.filter((l) => l.method === sele
+          +cted.method)                                                  
+      101 +    const next = sameMethod[sameMethod.findIndex((l) => l.id =
+          +== selected.id) + 1]                                          
+      102 +    return next ? { title: next.title, onopen: () => openLesso
+          +n(next) } : undefined                                         
+      103 +  })                                                          
+      104 +                                                              
+      105    const visibleLessons = $derived(
+      106      keyFilter === 'All' ? lessons : lessons.filter((l) => l.ke
+           ySignature.replace(/m$/, '') === keyFilter),
+      107    )
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line
+      170          lesson={selected}
+      171          onexit={exitLesson}
+      172          oncomplete={selected.method === 'Sight-reading' ? onSi
+           ghtComplete : undefined}
+      173 +        {nextLesson}                                          
+      174        />
+      175      {/key}
+      176      {#if selected.method === 'Sight-reading'}
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 7 lines
+      120    }
+      121  
+      122    const needsChords = $derived(steps.some((s) => s.midis.lengt
+           h > 1))
+      123 +                                                              
+      124 +  // Next-step suggestions for the completion card: the follow
+          +ing section                                                   
+      125 +  // (when practising by section), then hands-together (when o
+          +n one hand).                                                  
+      126 +  const nextSection = $derived.by(() => {                     
+      127 +    const idx = song.sections.findIndex((s) => s.fromMeasure =
+          +== fromMeasure && s.toMeasure === toMeasure)                  
+      128 +    return idx !== -1 ? song.sections[idx + 1] : undefined    
+      129 +  })                                                          
+      130  </script>
+      131  
+      132  <div class="card">
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 20 lines
+      214        >
+      215          Play it again
+      216        </button>
+      217 +      {#if nextSection}                                       
+      218 +        <button class="primary" onclick={() => selectSection(n
+          +extSection.fromMeasure, nextSection.toMeasure)}>              
+      219 +          Next: {nextSection.label} →                         
+      220 +        </button>                                             
+      221 +      {/if}                                                   
+      222 +      {#if hands !== 'both'}                                  
+      223 +        <button                                               
+      224 +          class="primary"                                     
+      225 +          onclick={() => {                                    
+      226 +            hands = 'both'                                    
+      227 +            resetKey++                                        
+      228 +            version++                                         
+      229 +          }}                                                  
+      230 +        >                                                     
+      231 +          Try hands together                                  
+      232 +        </button>                                             
+      233 +      {/if}                                                   
+      234 +      {#if onexit}                                            
+      235 +        <button class="ghost" onclick={onexit}>← All songs</bu
+          +tton>                                                         
+      236 +      {/if}                                                   
+      237      </div>
+      238    {:else}
+      239      <p class="hint">
+
+⏺ Now the first-run welcome panel on Home.
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 10 lines
+       4  
+       5    const recent = $derived(practiceHistory.records.slice(0, 6))
+       6  
+       7 +  // One-time welcome for first-run users (a UI flag, not progr
+         +ess tracking).                                                 
+       8 +  const WELCOMED_KEY = 'piano-tutor.welcomed'                  
+       9 +  let welcomed = $state(localStorage.getItem(WELCOMED_KEY) === 
+         +'1')                                                           
+      10 +                                                               
+      11 +  function dismissWelcome(openGuide: boolean) {                
+      12 +    localStorage.setItem(WELCOMED_KEY, '1')                    
+      13 +    welcomed = true                                            
+      14 +    if (openGuide) navigate('/guide')                          
+      15 +  }                                                            
+      16 +                                                               
+      17    const sections: { route: string; title: string; desc: string;
+           highlight?: boolean }[] = [
+      18      {
+      19        route: '/guide',
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 22 lines
+      70      A practice companion for your piano. Plug in a MIDI keyboar
+          d for instant, accurate feedback —
+      71      or use no gear at all and let it listen through your microp
+          hone.
+      72    </p>
+      73 +                                                               
+      74 +  {#if !welcomed}                                              
+      75 +    <div class="welcome">                                      
+      76 +      <h2>Welcome — here's how this works</h2>                 
+      77 +      <ol>                                                     
+      78 +        <li><strong>Sit at your piano.</strong> Any acoustic or
+         + electric piano works — no cables needed.</li>                 
+      79 +        <li>                                                   
+      80 +          <strong>The app listens through your microphone.</str
+         +ong> When you press "Start listening" in a                     
+      81 +          lesson, allow microphone access — everything runs on 
+         +your device. Wrong notes flash red, and the                    
+      82 +          score always waits for you. A MIDI keyboard also work
+         +s and is even more accurate.                                   
+      83 +        </li>                                                  
+      84 +        <li>                                                   
+      85 +          <strong>Not sure where to start?</strong> The Learnin
+         +g Guide is a staged path from your first                       
+      86 +          notes to intermediate playing.                       
+      87 +        </li>                                                  
+      88 +      </ol>                                                    
+      89 +      <div class="welcome-actions">                            
+      90 +        <button class="primary" onclick={() => dismissWelcome(t
+         +rue)}>Open the Learning Guide</button>                         
+      91 +        <button class="ghost" onclick={() => dismissWelcome(fal
+         +se)}>Got it</button>                                           
+      92 +      </div>                                                   
+      93 +    </div>                                                     
+      94 +  {/if}                                                        
+      95    <div class="grid">
+      96      {#each sections as s (s.route)}
+      97        <button class="tile" class:highlight={s.highlight} onclic
+          k={() => navigate(s.route)}>
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 27 lines
+      125  </section>
+      126  
+      127  <style>
+      128 +  .welcome {                                                  
+      129 +    margin-top: 16px;                                         
+      130 +    padding: 18px 20px;                                       
+      131 +    border: 1px solid #93c5fd;                                
+      132 +    border-radius: 12px;                                      
+      133 +    background: #eff6ff;                                      
+      134 +  }                                                           
+      135 +  .welcome h2 {                                               
+      136 +    margin: 0 0 10px;                                         
+      137 +    font-size: 17px;                                          
+      138 +    color: #1d4ed8;                                           
+      139 +  }                                                           
+      140 +  .welcome ol {                                               
+      141 +    margin: 0;                                                
+      142 +    padding-left: 20px;                                       
+      143 +    font-size: 14px;                                          
+      144 +    line-height: 1.6;                                         
+      145 +    color: #334155;                                           
+      146 +  }                                                           
+      147 +  .welcome li + li {                                          
+      148 +    margin-top: 6px;                                          
+      149 +  }                                                           
+      150 +  .welcome-actions {                                          
+      151 +    display: flex;                                            
+      152 +    gap: 10px;                                                
+      153 +    margin-top: 14px;                                         
+      154 +  }                                                           
+      155    .grid {
+      156      display: grid;
+      157      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr
+           ));
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ No shared .ghost/.seg/.complete yet — doing the CSS consolidation now since
+  the welcome panel needs .ghost.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Update(src/app.css)
+  ⎿  Added 44 lines
+      112    font-size: 13px;
+      113    color: #64748b;
+      114  }
+      115 +                                                              
+      116 +/* Quiet text-link button (e.g. "← All lessons"). */          
+      117 +button.ghost {                                                
+      118 +  border: none;                                               
+      119 +  background: none;                                           
+      120 +  color: #1d4ed8;                                             
+      121 +  cursor: pointer;                                            
+      122 +  font-size: 14px;                                            
+      123 +}                                                             
+      124 +                                                              
+      125 +/* Segmented pick-one buttons (lesson segments, quiz modes, le
+          +vels…). */                                                    
+      126 +.seg {                                                        
+      127 +  padding: 6px 12px;                                          
+      128 +  border: 1px solid #e2e8f0;                                  
+      129 +  border-radius: 8px;                                         
+      130 +  background: #fff;                                           
+      131 +  cursor: pointer;                                            
+      132 +  font-size: 13px;                                            
+      133 +  color: #334155;                                             
+      134 +}                                                             
+      135 +                                                              
+      136 +.seg.active {                                                 
+      137 +  background: #1d4ed8;                                        
+      138 +  border-color: #1d4ed8;                                      
+      139 +  color: #fff;                                                
+      140 +}                                                             
+      141 +                                                              
+      142 +.seg.small {                                                  
+      143 +  padding: 4px 10px;                                          
+      144 +}                                                             
+      145 +                                                              
+      146 +/* Green completion banner shown when a segment/round/passage 
+          +is done. */                                                   
+      147 +.complete {                                                   
+      148 +  display: flex;                                              
+      149 +  align-items: center;                                        
+      150 +  gap: 12px;                                                  
+      151 +  flex-wrap: wrap;                                            
+      152 +  padding: 12px;                                              
+      153 +  background: #f0fdf4;                                        
+      154 +  border: 1px solid #bbf7d0;                                  
+      155 +  border-radius: 8px;                                         
+      156 +  font-weight: 600;                                           
+      157 +  color: #166534;                                             
+      158 +}                                                             
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now removing the dead POLY_AVAILABLE lock code and adding the guide-stage
+  chips to Practice.
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Removed 1 line
+       9    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      10    import { currentParams, navigate } from '../router.svelte'
+      11  
+      12 -  const POLY_AVAILABLE = true                                  
+      12    const SIGHT_ACTIVITY = 'sight-reading'
+      13    const MAX_SIGHT_LEVEL = 5
+      14  
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 11 lines, removed 10 lines
+      196      </label>
+      197  
+      198      {#each methods.filter((m) => visibleLessons.some((l) => l.
+           method === m)) as method (method)}
+      199 -      <h2 class="method">{method}</h2>                        
+      199 +      <h2 class="method">                                     
+      200 +        {method}                                              
+      201 +        {#if METHOD_GUIDE_STAGE[method]}                      
+      202 +          <a class="guide-chip" href={`#/guide?stage=${METHOD_
+          +GUIDE_STAGE[method]}`}>Guide →</a>                            
+      203 +        {/if}                                                 
+      204 +      </h2>                                                   
+      205        <p class="hint"><GlossText text={METHOD_BLURBS[method]} 
+           /></p>
+      206        <div class="lesson-grid">
+      207          {#each visibleLessons.filter((l) => l.method === metho
+           d) as lesson (lesson.id)}
+      203 -          {@const locked = lesson.detectionMode === 'poly' && 
+          -!POLY_AVAILABLE}                                              
+      204 -          <button                                             
+      205 -            class="lesson-tile"                               
+      206 -            disabled={locked}                                 
+      207 -            onclick={() => openLesson(lesson)}                
+      208 -            title={locked ? 'Needs chord detection — coming so
+          -on' : ''}                                                     
+      209 -          >                                                   
+      208 +          <button class="lesson-tile" onclick={() => openLesso
+          +n(lesson)}>                                                   
+      209              <strong>{lesson.title}</strong>
+      210              <span>{lesson.segments.length} part{lesson.segment
+           s.length > 1 ? 's' : ''} · ♩= {lesson.tempoBpm}</span>
+      212 -            {#if locked}<span class="lock">🔒 needs chord dete
+          -ction</span>{/if}                                             
+      211            </button>
+      212          {/each}
+      213        </div>
+      214      {/each}
+      215  
+      218 -    <h2 class="method">Sight-reading</h2>                     
+      216 +    <h2 class="method">                                       
+      217 +      Sight-reading                                           
+      218 +      <a class="guide-chip" href={`#/guide?stage=${METHOD_GUID
+          +E_STAGE['Sight-reading']}`}>Guide →</a>                       
+      219 +    </h2>                                                     
+      220      <p class="hint"><GlossText text={METHOD_BLURBS['Sight-read
+           ing']} /></p>
+      221      <p class="hint">
+      222        {STREAK_TO_LEVEL_UP} clean reads in a row level you up. 
+           Current streak:
+
+  Searched for 4 patterns (ctrl+o to expand)
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 15 lines
+      128        'Short random melodies you have never seen — trains read
+           ing the staff instead of memorizing.',
+      129    }
+      130  
+      131 +  // Where each method is introduced in the learning guide (st
+          +age ids are                                                   
+      132 +  // integrity-tested against GUIDE_STAGES in src/tests/guide.
+          +test.ts).                                                     
+      133 +  const METHOD_GUIDE_STAGE: Record<string, string> = {        
+      134 +    'Five-finger positions': 'stage-1',                       
+      135 +    Hanon: 'stage-1',                                         
+      136 +    'Scale routine': 'stage-2',                               
+      137 +    Arpeggios: 'stage-2',                                     
+      138 +    'Cadence drills': 'stage-2',                              
+      139 +    'Broken chords': 'stage-3',                               
+      140 +    'Chromatic scale': 'stage-4',                             
+      141 +    'Contrary motion': 'stage-4',                             
+      142 +    'Jazz & blues': 'stage-5',                                
+      143 +    'Sight-reading': 'stage-1',                               
+      144 +  }                                                           
+      145 +                                                              
+      146    $effect(() =>
+      147      registerVoiceCommands({
+      148        name: 'Practice',
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 15 lines, removed 7 lines
+      306      cursor: pointer;
+      307      font-size: 14px;
+      308    }
+      309 -  .lesson-tile:hover:not(:disabled) {                         
+      309 +  .lesson-tile:hover {                                        
+      310      border-color: #1d4ed8;
+      311    }
+      312 -  .lesson-tile:disabled {                                     
+      313 -    opacity: 0.55;                                            
+      314 -    cursor: default;                                          
+      315 -  }                                                           
+      312    .lesson-tile span {
+      313      color: #64748b;
+      314      font-size: 12px;
+      315    }
+      320 -  .lock {                                                     
+      321 -    color: #b45309 !important;                                
+      316 +  .guide-chip {                                               
+      317 +    margin-left: 8px;                                         
+      318 +    padding: 2px 10px;                                        
+      319 +    border: 1px solid #dbeafe;                                
+      320 +    border-radius: 999px;                                     
+      321 +    background: #eff6ff;                                      
+      322 +    color: #1d4ed8;                                           
+      323 +    font-size: 12px;                                          
+      324 +    font-weight: 600;                                         
+      325 +    text-decoration: none;                                    
+      326 +    vertical-align: middle;                                   
+      327    }
+      328 +  .guide-chip:hover {                                         
+      329 +    background: #dbeafe;                                      
+      330 +  }                                                           
+      331  </style>
+
+⏺ The stage map should live in guide.ts so tests can validate it — moving it.
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Removed 14 lines
+      128        'Short random melodies you have never seen — trains read
+           ing the staff instead of memorizing.',
+      129    }
+      130  
+      131 -  // Where each method is introduced in the learning guide (st
+          -age ids are                                                   
+      132 -  // integrity-tested against GUIDE_STAGES in src/tests/guide.
+          -test.ts).                                                     
+      133 -  const METHOD_GUIDE_STAGE: Record<string, string> = {        
+      134 -    'Five-finger positions': 'stage-1',                       
+      135 -    Hanon: 'stage-1',                                         
+      136 -    'Scale routine': 'stage-2',                               
+      137 -    Arpeggios: 'stage-2',                                     
+      138 -    'Cadence drills': 'stage-2',                              
+      139 -    'Broken chords': 'stage-3',                               
+      140 -    'Chromatic scale': 'stage-4',                             
+      141 -    'Contrary motion': 'stage-4',                             
+      142 -    'Jazz & blues': 'stage-5',                                
+      143 -    'Sight-reading': 'stage-1',                               
+      144 -  }                                                           
+      131  
+      132    $effect(() =>
+      133      registerVoiceCommands({
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line
+      2    import BackToGuide from '../components/BackToGuide.svelte'
+      3    import GlossText from '../components/GlossText.svelte'
+      4    import LessonPlayer from '../components/LessonPlayer.svelte'
+      5 +  import { METHOD_GUIDE_STAGE } from '../lib/data/guide'        
+      6    import { allLessons, type Lesson } from '../lib/data/lessons'
+      7    import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP 
+         } from '../lib/practice/progress.svelte'
+      8    import { makeSightReading, SIGHT_LEVELS, type SightLevel } fro
+         m '../lib/sightread/generator'
+
+⏺ Update(src/lib/data/guide.ts)  ⎿  Added 18 lines
+       92    return [path, params]
+       93  }
+       94  
+       95 +/**                                                           
+       96 + * Where each practice method is introduced in the guide — the
+          + Practice screen                                              
+       97 + * renders these as "Guide →" chips. Stage ids are integrity-t
+          +ested against                                                 
+       98 + * GUIDE_STAGES (and method names against the lesson registry)
+          + in guide.test.ts.                                            
+       99 + */                                                           
+      100 +export const METHOD_GUIDE_STAGE: Record<string, string> = {   
+      101 +  'Five-finger positions': 'stage-1',                         
+      102 +  Hanon: 'stage-1',                                           
+      103 +  'Sight-reading': 'stage-1',                                 
+      104 +  'Scale routine': 'stage-2',                                 
+      105 +  Arpeggios: 'stage-2',                                       
+      106 +  'Cadence drills': 'stage-2',                                
+      107 +  'Broken chords': 'stage-3',                                 
+      108 +  'Chromatic scale': 'stage-4',                               
+      109 +  'Contrary motion': 'stage-4',                               
+      110 +  'Jazz & blues': 'stage-5',                                  
+      111 +}                                                             
+      112 +                                                              
+      113  const lesson = (lessonId: string, label: string): GuideLink =>
+            ({ kind: 'lesson', lessonId, label })
+      114  const song = (songId: string, label: string): GuideLink => ({ 
+           kind: 'song', songId, label })
+      115  const quiz = (mode: QuizModeId, level: number, label: string):
+            GuideLink => ({ kind: 'quiz', mode, level, label })
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/guide.test.ts)
+  ⎿  Added 24 lines
+      113        expect(KNOWN_ROUTES.has(path), `${stageId}: ${href} → ${
+           path}`).toBe(true)
+      114      }
+      115    })
+      116 +                                                              
+      117 +  it('every href carries from=guide so target screens can offe
+          +r a way back', () => {                                        
+      118 +    for (const { stageId, link } of allLinks) {               
+      119 +      const { params } = parseRoute(guideHref(link))          
+      120 +      expect(params.from, `${stageId}: ${guideHref(link)}`).to
+          +Be('guide')                                                   
+      121 +    }                                                         
+      122 +  })                                                          
+      123  })
+      124  
+      125 +describe('method → guide-stage chips', () => {                
+      126 +  const stageIds = new Set(GUIDE_STAGES.map((s) => s.id))     
+      127 +                                                              
+      128 +  it('every mapped stage id exists', () => {                  
+      129 +    for (const [method, stageId] of Object.entries(METHOD_GUID
+          +E_STAGE)) {                                                   
+      130 +      expect(stageIds.has(stageId), `${method} → ${stageId}`).
+          +toBe(true)                                                    
+      131 +    }                                                         
+      132 +  })                                                          
+      133 +                                                              
+      134 +  it('every lesson method (plus sight-reading) has a mapping',
+          + () => {                                                      
+      135 +    const methods = new Set([...allLessons().map((l) => l.meth
+          +od), 'Sight-reading'])                                        
+      136 +    for (const method of methods) {                           
+      137 +      expect(METHOD_GUIDE_STAGE[method], `method '${method}' m
+          +issing from METHOD_GUIDE_STAGE`).toBeDefined()                
+      138 +    }                                                         
+      139 +  })                                                          
+      140 +})                                                            
+      141 +                                                              
+      142  describe('guide stage content', () => {
+      143    it('has unique stage ids and non-empty prose', () => {
+      144      const ids = GUIDE_STAGES.map((s) => s.id)
+
+⏺ Update(src/tests/guide.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import { describe, expect, it } from 'vitest'
+      2 -import { GUIDE_STAGES, guideHref, type GuideLink } from '../lib/
+        -data/guide'                                                     
+      2 +import { GUIDE_STAGES, METHOD_GUIDE_STAGE, guideHref, type Guide
+        +Link } from '../lib/data/guide'                                 
+      3  import { allLessons } from '../lib/data/lessons'
+      4  import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
+      5  import { SONG_CATALOG } from '../lib/data/songs/catalog'
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ A generated docs/GUIDE.md needs regenerating after the href change.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All 528 tests pass. Now let me verify the changes end-to-end in the real app.
+
+  Made 4 scratchpad edits +147 -2, read 1 file, listed 1 directory, ran 10 shell commands (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All done and verified end-to-end. Everything the plan called for is
+  implemented: 528 unit tests pass (27 files), npm run check is clean, the
+  production build succeeds, and a Playwright run against the real dev server
+  passed all 27 interactive checks, including the browser-back walks you asked
+  about.
+
+  What changed
+
+  Terminology tooltips (new glossary system)
+  - src/lib/data/glossary.ts — ~85 beginner definitions (every scale type and
+  chord quality, plus intervals, cadences, notation, rhythm, jazz and technique
+  terms) with a pure, tested auto-annotator.
+  - Term.svelte + GlossText.svelte — dotted-underline terms with a
+  hover/focus/tap tooltip, no libraries. Applied to guide prose, lesson
+  descriptions and tips, practice method blurbs, quiz mode descriptions, and
+  library hints.
+  - Scales/Chords libraries now show proper labels ("Half-diminished" instead of
+  the raw half-diminished id) and a one-line definition of whatever
+  type/quality is selected — so picking "augmented" teaches you what it is on
+  the spot.
+
+  Quiz feedback now teaches
+  Every option-based quiz question (10 of 11 modes) carries an explanation shown
+  after you answer, right or wrong: intervals get semitone counts plus song
+  mnemonics ("perfect 5th — the Twinkle, Twinkle leap"), key signatures list
+  their exact sharps/flats with the reading trick, note-naming gives the clef
+  mnemonic, cadences and chord qualities explain what to listen for, rhythm
+  dictation reuses the authored counting hints. All computed in the pure
+  generators and covered by new seeded tests.
+
+  Browser back fixed — this was the biggest structural change. Opening a lesson,
+  song, or sight-reading melody now navigates (?lesson=, ?song=, ?sight=), and
+  screens derive selection reactively from the URL instead of reading params
+  once at mount. Back now steps open item → list → previous screen, verified
+  in-browser. Quiz mode/level mirror into the URL with a new navigate(..., 
+  {replace: true}) option so refresh keeps your place without polluting history.
+
+  Flows and onboarding
+  - Guide links carry from=guide; target screens show "← Back to the learning
+  guide", and the guide keeps your open stage while you detour (in-memory only —
+  nothing persisted, per the no-tracking rule). #/guide?stage=stage-N deep
+  links work, and Practice methods have "Guide →" chips back to the stage that
+  introduces them (integrity-tested).
+  - Lesson completion now offers "Next: <lesson> →" (same method) and "← All
+  lessons"; song completion offers the next section, "Try hands together", and
+  "← All songs".
+  - First-run welcome card on Home (piano needed → mic listens locally → start
+  with the Guide), dismissed once via localStorage.
+  - Practice tips are visible by default (<details open>), the dead
+  POLY_AVAILABLE lock code is gone, and the duplicated .seg/.complete/.ghost CSS
+  across five components now lives once in app.css.
+
+  One thing worth a quick manual look when you next run the app: tooltip
+  placement near the right viewport edge on a narrow window — it's capped at
+  min(260px, 78vw) but deliberately simple (no flip logic). Nothing is committed
+  yet — say the word and I'll commit.
+
+✻ Baked for 53m 28s
+
+※ recap: Improving the piano app's teaching and UX: glossary tooltips, quiz explanations, browser-back fix, guide breadcrumbs, and onboarding are all implemented and verified (528 tests, smoke checks pass). Next action: commit the changes when you're ready. (disable recaps in /config)
+
+❯ Add those tooptips for when those definitions appear elsewhere in the app. Is 
+  this a good idea? Such as on the chords page, there are the names of each     
+  chord quality                                                                 
+
+⏺ Good question — the honest answer is "yes, with one caveat." A hover tooltip
+  on a selector button is a preview: on desktop you can hover "augmented" or
+  "half-diminished" before committing, which is genuinely useful. The caveat is
+  touch: tapping a button selects it, so a tap can never show the tooltip —
+  which is exactly why the definition line for the selected item (added last
+  round) needs to stay. The two together cover both inputs. The one place
+  tooltips stay forbidden is quiz answer options, where a definition would leak
+  the answer.
+
+  The cheapest way to do this on existing buttons (without wrapping them in
+  another component) is a tiny CSS-only data-tip attribute style in app.css. Let
+  me implement it across the spots where term names appear as controls.
+
+⏺ Update(src/app.css)
+  ⎿  Added 30 lines
+      113    color: #64748b;
+      114  }
+      115  
+      116 +/* Hover/focus tooltip for controls whose label is a musical t
+          +erm (scale                                                    
+      117 +   types, chord qualities, quiz modes…). Desktop-only preview 
+          +by design:                                                    
+      118 +   on touch, tapping selects — the screens show the selected i
+          +tem's                                                         
+      119 +   definition inline instead. Visual twin of Term.svelte's too
+          +ltip. */                                                      
+      120 +[data-tip] {                                                  
+      121 +  position: relative;                                         
+      122 +}                                                             
+      123 +                                                              
+      124 +[data-tip]:hover::after,                                      
+      125 +[data-tip]:focus-visible::after {                             
+      126 +  content: attr(data-tip);                                    
+      127 +  position: absolute;                                         
+      128 +  bottom: calc(100% + 6px);                                   
+      129 +  left: 0;                                                    
+      130 +  z-index: 30;                                                
+      131 +  width: max-content;                                         
+      132 +  max-width: min(260px, 78vw);                                
+      133 +  padding: 8px 12px;                                          
+      134 +  border-radius: 8px;                                         
+      135 +  background: #1e293b;                                        
+      136 +  color: #f1f5f9;                                             
+      137 +  font-size: 13px;                                            
+      138 +  font-weight: 400;                                           
+      139 +  line-height: 1.5;                                           
+      140 +  text-align: left;                                           
+      141 +  white-space: normal;                                        
+      142 +  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);              
+      143 +  pointer-events: none;                                       
+      144 +}                                                             
+      145 +                                                              
+      146  /* Quiet text-link button (e.g. "← All lessons"). */
+      147  button.ghost {
+      148    border: none;
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 5 lines, removed 1 line
+      181      <div class="control-group">
+      182        <span class="control-label">Quality</span>
+      183        {#each CHORD_QUALITIES as q (q.id)}
+      184 -        <button class:active={quality === q.id} onclick={() =>
+          - selectQuality(q.id)}>                                        
+      184 +        <button                                               
+      185 +          class:active={quality === q.id}                     
+      186 +          data-tip={lookupTerm(q.id)?.short}                  
+      187 +          onclick={() => selectQuality(q.id)}                 
+      188 +        >                                                     
+      189            {lookupTerm(q.id)?.term ?? q.id}
+      190          </button>
+      191        {/each}
+
+⏺ Update(src/screens/ChordsLibrary.svelte)  ⎿  Added 5 lines, removed 1 line
+      193      <div class="control-group">
+      194        <span class="control-label">Inversion</span>
+      195        {#each inversionsFor(quality) as inv (inv)}
+      196 -        <button class:active={inversion === inv} onclick={() =
+          -> (inversion = inv)}>                                         
+      196 +        <button                                               
+      197 +          class:active={inversion === inv}                    
+      198 +          data-tip={lookupTerm(inv === 0 ? 'root position' : '
+          +inversion')?.short}                                           
+      199 +          onclick={() => (inversion = inv)}                   
+      200 +        >                                                     
+      201            {INV_LABELS[inv]}
+      202          </button>
+      203        {/each}
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 14 lines, removed 2 lines
+      211        <div class="control-group">
+      212          <span class="control-label">Voicing</span>
+      213          <button class:active={activeVoicing === 'full'} onclic
+           k={() => (voicing = 'full')}>Full chord</button>
+      214 -        <button class:active={activeVoicing === 'A'} onclick={
+          -() => (voicing = 'A')}>Shell A (1+7)</button>                 
+      215 -        <button class:active={activeVoicing === 'B'} onclick={
+          -() => (voicing = 'B')}>Shell B (1+3)</button>                 
+      214 +        <button                                               
+      215 +          class:active={activeVoicing === 'A'}                
+      216 +          data-tip={lookupTerm('shell voicing')?.short}       
+      217 +          onclick={() => (voicing = 'A')}                     
+      218 +        >                                                     
+      219 +          Shell A (1+7)                                       
+      220 +        </button>                                             
+      221 +        <button                                               
+      222 +          class:active={activeVoicing === 'B'}                
+      223 +          data-tip={lookupTerm('shell voicing')?.short}       
+      224 +          onclick={() => (voicing = 'B')}                     
+      225 +        >                                                     
+      226 +          Shell B (1+3)                                       
+      227 +        </button>                                             
+      228        </div>
+      229      {/if}
+      230    </div>
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 1 line, removed 1 line
+       97      <div class="control-group">
+       98        <span class="control-label">Type</span>
+       99        {#each SCALE_TYPES as t (t.id)}
+      100 -        <button class:active={typeId === t.id} onclick={() => 
+          -selectType(t.id)}>                                            
+      100 +        <button class:active={typeId === t.id} data-tip={looku
+          +pTerm(t.id)?.short} onclick={() => selectType(t.id)}>         
+      101            {lookupTerm(t.id)?.term ?? t.id}
+      102          </button>
+      103        {/each}
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Error editing file
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      311      <div class="mode-row">
+      312        <span class="group-label">{group.label}</span>
+      313        {#each group.modes as m (m.id)}
+      314 -        <button class="seg" class:active={mode === m.id} oncli
+          -ck={() => setMode(m.id)}>{m.label}</button>                   
+      314 +        <button class="seg" class:active={mode === m.id} data-
+          +tip={m.desc} onclick={() => setMode(m.id)}>                   
+      315 +          {m.label}                                           
+      316 +        </button>                                             
+      317        {/each}
+      318      </div>
+      319    {/each}
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2    import BackToGuide from '../components/BackToGuide.svelte'
+      3    import SongPlayer from '../components/SongPlayer.svelte'
+      4 +  import Term from '../components/Term.svelte'                  
+      5    import { SONG_CATALOG } from '../lib/data/songs/catalog'
+      6    import type { Song } from '../lib/data/songs/types'
+      7    import { parseMidiFile } from '../lib/songs/midiImport'
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 1 line, removed 1 line
+      81      {#each grades as grade (grade)}
+      82        {@const songs = byGrade(grade)}
+      83        {#if songs.length}
+      84 -        <h2 class="grade-h">Grade {grade}</h2>                 
+      84 +        <h2 class="grade-h"><Term term="abrsm" label={`Grade ${
+         +grade}`} /></h2>                                               
+      85          <div class="song-grid">
+      86            {#each songs as song (song.id)}
+      87              <button class="song-tile" onclick={() => openSong(s
+          ong)}>
+
+⏺ Let me check RhythmTrainer for similar term-labeled controls, then verify.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Pattern buttons have authored hints — perfect for the same hover-preview
+  treatment.
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 1 line, removed 1 line
+      171  
+      172    <div class="controls-row">
+      173      {#each levelPatterns as p (p.id)}
+      174 -      <button class="seg" class:active={pattern.id === p.id} o
+          -nclick={() => selectPattern(p.id)}>                           
+      174 +      <button class="seg" class:active={pattern.id === p.id} d
+          +ata-tip={p.hint} onclick={() => selectPattern(p.id)}>         
+      175          {p.label}{p.swing ? ' 𝄋' : ''}
+      176        </button>
+      177      {/each}
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 1 line, removed 1 line
+      179  
+      180    <div class="card">
+      181      {#if pattern.hint}
+      182 -      <p class="hint">{pattern.hint}{pattern.swing ? ' (swing 
+          -feel)' : ''}</p>                                              
+      182 +      <p class="hint"><GlossText text={pattern.hint + (pattern
+          +.swing ? ' (swing feel)' : '')} /></p>                        
+      183      {/if}
+      184  
+      185      <InputPicker preferred="mono" />
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 1 line
+      1  <script lang="ts">
+      2    import BackToGuide from '../components/BackToGuide.svelte'
+      3 +  import GlossText from '../components/GlossText.svelte'        
+      4    import InputPicker from '../components/InputPicker.svelte'
+      5    import SheetMusic from '../components/SheetMusic.svelte'
+      6    import { getAnchorMs, onBeat, startMetronome, stopMetronome } 
+         from '../lib/audio/metronome'
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Clean. Now verifying the hover tooltips work in the real browser.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Done — and yes, it's a good idea in the hover-preview form, which is what I
+  built. All 528 tests still pass, and 9 browser checks confirm the tooltips
+  render and clicking still selects.
+
+  How it works: a small CSS-only data-tip attribute style in app.css (visual
+  twin of the prose tooltips) shows the definition on hover or keyboard focus,
+  above the button. It's deliberately desktop-only: on touch there's no way to
+  peek without selecting, so the definition line for the selected item (added
+  last round) remains the touch path. Two input styles, both covered.
+
+  Where it's now applied:
+  - Chords — every quality button ("Augmented" → "A dreamlike, unsettled chord:
+  two stacked major 3rds…"), the inversion buttons (root position vs. inversion
+  definitions), and the Shell A/B voicing buttons.
+  - Scales — every scale-type button.
+  - Quizzes — mode buttons preview their description ("Cadences" → "A short
+  progression plays — how does it end?") so you know what a mode is before
+  entering it.
+  - Rhythm Trainer — pattern buttons preview their counting hint ("Steady
+  quarters" → "Tap right with the click…"), and the selected pattern's hint line
+  now gets glossary terms too.
+  - Songs — the "Grade 1/2/3…" headings explain the ABRSM grading scale on
+  hover/tap.
+
+  Where I deliberately didn't add them: quiz answer options — a tooltip defining
+  "Half-diminished" on an option would hand you the answer. The post-reveal
+  explanation covers learning there.
+
+  One nuance to be aware of: hover tooltips on the quality buttons slightly
+  duplicate the definition line shown for the selected quality. That's
+  intentional redundancy — the hover is for comparing before you pick, the line
+  is for whoever tapped straight in.
+
+✻ Sautéed for 3m 31s

@@ -1,0 +1,1974 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.203
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+ ▎ Extended: Fable 5 is included in your weekly limit
+ ▎ Through July 12, you can use up to 50% of your weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Run /model and select Fable to use it. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ Read this wiki on voice interaction design and make sure we use this new      
+  knowledge to improve the voice interface in the app                           
+  http://acixd.org/wiki/doku.php                                                
+
+⏺ I'll start by fetching the wiki content, and in parallel explore the current
+  voice interface implementation.
+
+⏺ Explore(Explore voice interface code)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+⏺ Fetch(http://acixd.org/wiki/doku.php)
+  ⎿  Error: Hostname/IP does not match certificate's altnames: Host: acixd.org. 
+     is not in the cert's altnames: DNS:*.accountservergroup.com, 
+     DNS:accountservergroup.com
+
+⏺ The HTTPS upgrade fails due to a certificate mismatch; I'll fetch it over
+  plain HTTP with curl.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Some pages downloaded as near-empty stubs. Let me check those and read the
+  substantive content.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The small pages are index pages pointing to sub-pages that hold the real
+  content — error recovery and confirmation strategies are exactly what I need.
+  Fetching those sub-pages now.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All content downloaded (~196 KB of wikitext). Let me concatenate it into
+  grouped files and read the material.
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Agent "Explore voice interface code" finished · 1m 47s
+
+⏺ The exploration report is in. Now let me read the remaining wiki content.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ Plan(Design voice UI improvement plan)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+⏺ While the Plan agent works out implementation details, one scope question for
+  you — the wiki suggests more improvements than we may want to land in one go.
+
+⏺ User answered Claude's questions:
+  ⎿  · The wiki maps to four improvement areas for the voice UI. Which should 
+     the plan include? → Universal commands (Recommended), Prompt wording pass 
+     (Recommended), Grammar/mimicry test + miss log (Recommended), Error 
+     recovery & correction (Recommended)
+⏺ All four areas are in scope. While the Plan agent finishes, let me verify a
+  few plan-critical files myself.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ The dispatcher, TTS, and matcher internals confirm the design is feasible —
+  notably, the matcher's calibration data (positives ≥ 0.57, negatives ≤ 0.50)
+  gives us a natural "uncertain band" for the did-you-mean confirmation, and
+  tts.ts just needs to remember its last utterance to support "repeat". The Plan
+  agent is still working out the step-by-step implementation; I'll finalize the
+  plan as soon as it reports back.
+
+✻ Crunched for 5m 11s
+
+⏺ Agent "Design voice UI improvement plan" finished · 6m 42s
+
+⏺ The Plan agent's design is thorough and grounded in the actual code — it found
+  a real bug along the way (the Quizzes screen advertises "hear it again",
+  which the parser can't actually parse). Let me write the final plan.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/read-this-wiki-on-lively-turtle.md · /plan 
+     to edit
+     Voice UI improvements from the ACIxD wiki (acixd.org)
+
+     Context
+
+     The user asked me to read the ACIxD voice-interaction design wiki
+     (Association for Conversational Interaction Design — research-backed VUI
+     practice) and apply it to the app's voice interface. The wiki's guidance on
+     error recovery, confirmation strategies, universal commands,
+     conversational maxims, and grammar/mimicry maps onto concrete gaps in our
+     voice stack:
+
+     - Every recognition miss gets the same fixed "Sorry, I didn't catch that…"
+     — the wiki prescribes escalating reprompts ("rapid reprompt" → context
+     examples → switch modality, which for us means pointing at the visual HUD
+     list).
+     - The embedding fallback is binary accept/reject — the wiki prescribes
+     explicit confirmation on low confidence ("…, right?") and a distinct
+     disconfirmation response ("My mistake.", not a no-match message).
+     - Missing the wiki's universal commands repeat and go back.
+     - No one-step correction ("no, D minor") — today you must re-say the wake
+     word after a misrecognition.
+     - Spoken help lists 4 examples (wiki: >2 "sounds like a menu"); the
+     recognizer is deaf while TTS speaks, so all feedback must stay terse.
+     - The wiki's mimicry principle (users parrot what the app advertises) is
+     untested — and indeed Quizzes advertises "hear it again", which the regex
+     parser cannot parse (works only via embedding fallback). An invariant test
+     will lock this down.
+
+     User confirmed all four improvement areas: error recovery & correction,
+     universal commands, prompt wording, grammar/mimicry test + miss log.
+
+     Architecture decision
+
+     A/B/D (reprompts, did-you-mean, correction window) all mutate "what happens
+     after an utterance" state. They become one pure state machine
+     src/lib/voice/convo.ts (injected-env pattern like dispatcher.ts,
+     vitest-covered without a browser). Modes: idle | armed | confirming, with
+     until timestamp (lazily expired — no timers), misses counter, suggestion: 
+     Intent | null. voice.svelte.ts keeps async (fallback embedding) + DOM (tts,
+     history) and delegates decisions to the convo. Dispatcher stays pure; it
+     loses only its unknown-branch messaging.
+
+     Key transition rules:
+     - onWake → armed 8s, say "Yes?" (not remembered for "repeat").
+     - onIntent handled → misses=0, arm 5s correction window (wiki one-step
+     correction).
+     - onFallback(null) → misses++, escalating reprompt: 1→"Sorry?"; 2→two
+     examples from the top (active) scope's phrases; ≥3→Tap "What can I say" for
+     the full list.
+     - onFallback(suggest) → confirming 8s, say ${describeIntent(intent)} — 
+     right?.
+     - affirm while confirming → dispatch suggestion; deny bare → "My mistake."
+     (misses NOT incremented — wiki: disconfirmation ≠ no-match); deny with
+     correction → dispatch correction; timeout → drop silently; any other full
+     command cancels the suggestion and dispatches normally.
+     - Piano-audio false-positive exposure is acceptable: grammar decodes notes
+     as [unk], recognizer is deaf during playback/TTS; a stray bare "no" costs
+     only "My mistake." Document in convo.ts.
+
+     Steps (each lands independently)
+
+     1. Phrase registry + mimicry/grammar invariant test
+
+     - New src/lib/voice/phrases.ts: SCOPE_PHRASES (moved from the 8
+     registration sites: voice.svelte.ts:78-89, ScalesLibrary.svelte:66,
+     ChordsLibrary.svelte:132, Practice.svelte:136, FreePlay.svelte:94,
+     LessonPlayer.svelte:216, GuideScreen.svelte:49, Tuner.svelte:11,
+     Quizzes.svelte:289), expandPhrase() ('slower / faster' →
+     ['slower','faster']), SPOKEN_HELP_EXAMPLES (≤2). Screens import from it.
+     - Fix discovered bug in parser.ts: add /^hear (it|that)( again)?$/ → 
+     {kind:'play-demo'} (words already in grammar).
+     - New src/tests/voicePhrases.test.ts: every expanded phrase parses ('piano 
+     ' + variant → non-unknown); every word of every phrase + help examples ∈
+     buildGrammar(); no phrase/spoken string contains "piano" (tts.ts
+     invariant).
+
+     2. Universals: "repeat" + "go back"
+
+     - tts.ts: remember lastSpoken; speak(text, {remember?}) — meta-prompts
+     ("Sorry?", "Yes?", "My mistake.", confirmations) pass remember:false so
+     "repeat" never replays them.
+     - parser.ts: {kind:'repeat'} for repeat (that) / say (that|it) again / what
+     did you say; re-point go back from lesson-previous (parser.ts:276) to new
+     {kind:'go-back'} (keep back to lessons rule winning; "previous part"
+     remains the lesson command). Add repeat did to grammar staticWords.
+     - voice.svelte.ts global scope: repeat → say tts.lastSpoken || "I haven't 
+     said anything yet."; go-back → history.back() (back UX is URL-backed). Do
+     NOT shadow go-back in LessonPlayer — universals stay consistent (wiki).
+     - Extend src/tests/voiceParser.test.ts.
+
+     3. "Voice is on." enable confirmation
+
+     - voice.enable({announce?: boolean}): speak 'Voice is on.' (remember:false)
+     once listening starts. VoiceButton toggle + HUD Retry pass announce:true;
+     the auto-restore path on page load stays silent (also sidesteps
+     gesture-gated TTS).
+
+     4. Convo state machine + escalating reprompts
+
+     - dispatcher.ts: delete unknown-branch messaging (lines 79-83) — returns
+     {handled:false, feedback:''}; messaging moves to convo. Update
+     voiceDispatcher.test.ts.
+     - New src/lib/voice/convo.ts (createConvo, repromptFor,
+     ARMED_WINDOW_MS=8000, CORRECTION_WINDOW_MS=5000, CONFIRM_WINDOW_MS=8000).
+     - voice.svelte.ts: delete armedUntil; handleFinal becomes thin routing into
+     convo; parseTranscript(text, {armed: convo.isArmed()}).
+     - New src/tests/voiceConvo.test.ts (env-spy style with injected now):
+     escalation sequence, counter reset on success only, window expiry,
+     remember:false on meta prompts, no "piano" in any reprompt.
+
+     5. Correction window + "no," parsing
+
+     - intents.ts: {kind:'deny', correction?: Intent}; parser.ts: extract
+     internal parseCommand(tokens) (pure refactor), then leading no → deny with
+     parsed correction; add no to staticWords explicitly.
+     - convo: deny handling per transition table; voice.svelte.ts routes
+     deny-with-unknown-correction text through the fallback path (reuses
+     fallbackGate).
+     - Tests: parser ("piano no d minor"), convo (correction within window; bare
+     "no" → "My mistake."; idle "no" silent).
+
+     6. Confidence band + "did you mean" (highest-risk, last)
+
+     - intentMatcher.ts: SUGGEST_THRESHOLD = 0.45 + matchIntentBanded() → accept
+     (current rules) | suggest (fails accept but score ≥ 0.45 — covers both
+     margin-failure and near-miss-below-threshold). matchIntent becomes a
+     wrapper returning only accepts (existing tests/callers stay green).
+     - fallback.ts: FallbackOutcome = {kind:'match'|'suggest', intent} | null;
+     suggest whose resolve() returns null degrades to null (never confirm an
+     unexecutable intent).
+     - New src/lib/voice/describe.ts: describeIntent(intent) short spoken
+     paraphrase (move SCREEN_NAME_FOR_ROUTE from dispatcher.ts:23 into
+     intents.ts, re-import). Invariants: never "piano", never empty for
+     bank-producible kinds. New voiceDescribe.test.ts.
+     - parser.ts: {kind:'affirm'} for yes|yeah|yep (NOT "right" — collides with
+     right hand). Grammar += yes yeah yep (total growth across all steps ~4
+     words — negligible for Vosk).
+     - Calibration: split the integration test's negatives into HARD_NEGATIVES
+     (must be fully null, below 0.45) and NEAR_MISS_ROWS (must not be 'match';
+     'suggest' acceptable). Tune 0.45 from the logged run —
+     src/tests/voiceEmbedding.integration.test.ts remains the calibration
+     authority (never hand-tune).
+
+     7. Wording pass (anytime after step 1)
+
+     - Help (voice.svelte.ts:122): rebuild from SPOKEN_HELP_EXAMPLES — 2
+     examples + For everything else, tap "What can I say". (≤2 examples,
+     contractions, new-info-last).
+     - GuideScreen.svelte:52 → "Stages go from one to five." (affirmative);
+     FreePlay.svelte:103 → "First say 'start listening', then 'record'."
+     (instruction order = action order).
+     - Keep already-conformant strings ("Opening Scales.", "Left hand.", "I
+     can't do that on this screen.").
+
+     8. Miss log (optional tuning aid)
+
+     - New src/lib/voice/missLog.ts: capped (~50) localStorage ring buffer
+     piano-tutor.voice-misses of unrecognized transcripts, injected as
+     ConvoEnv.logMiss. No UI; read via devtools to tune grammar/intent bank from
+     real data (the wiki's tune-from-production loop).
+
+     Verification
+
+     - npm test — new voicePhrases/voiceConvo/voiceDescribe tests + extended
+     parser/dispatcher/matcher/fallback tests; npm run check.
+     - npx vitest run src/tests/voiceEmbedding.integration.test.ts — recalibrate
+     SUGGEST_THRESHOLD from its logged scores.
+     - Manual E2E (npm run dev): enable voice → hear "Voice is on."; say
+     gibberish 3× → "Sorry?" → examples → HUD pointer; "piano, show me D major"
+     then "no, D minor" within 5s → corrects; borderline phrasing (e.g. "piano,
+     let me see the D chord please") → "… — right?" → "yes" executes / "no" →
+     "My mistake."; "piano, repeat" replays last real feedback; "piano, go back"
+     steps back; Quizzes "piano, hear it again" now works via the parser.
+
+     Risks
+
+     - Calibration churn in step 6: if hard negatives score above 0.45, raise
+     SUGGEST_THRESHOLD or accept occasional harmless "— right?" prompts (a "no"
+     costs one turn). Decide from the integration test's logged run.
+     - Behavior change: "go back" inside a lesson now means browser-back (was:
+     previous segment; "previous part" still does that).
+     - Step 1's invariant test may surface more broken advertised phrases beyond
+     "hear it again" — fix parser or phrase case by case.
+
+⏺ Plan approved — starting implementation. Let me set up task tracking and read
+  the core files.
+
+  Read 1 file (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+⏺ All phrase registrations found. Now let me read the intent bank and existing
+  tests I'll be extending.
+  Searched for 1 pattern, read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ Write(src/lib/voice/phrases.ts)
+  ⎿  Wrote 45 lines to src/lib/voice/phrases.ts
+       1 /**
+         rtises (in the
+       3  * help HUD and in spoken reprompts). Lives outside the Svelte c
+       4  * tests can enforce the mimicry invariant: users parrot what we
+          advertise, so
+         y word must be
+       6  * decodable by the Vosk grammar (src/tests/voicePhrases.test.ts
+       7  */
+       8 export const SCOPE_PHRASES: Record<string, string[]> = {
+      10     'open scales / chords / practice / free play / tuner',
+     … +48 lines (ctrl+o to expand)
+
+⏺ Now migrate the registration sites to import from the registry:
+
+⏺ Update(src/screens/FreePlay.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  File must be read first
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  File must be read first
+
+  Read 4 files (ctrl+o to expand)
+
+⏺ Update(src/screens/FreePlay.svelte)
+  ⎿  Added 1 line
+      10    import { scoreFromSequence } from '../lib/notation/vexScore'
+      11    import { clusterOnsets, type Onset } from '../lib/transcribe/
+          cluster'
+      12    import { quantizeToGrid, type QuantizedEvent } from '../lib/t
+          ranscribe/quantize'
+      13 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      14    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      15  
+      16    let mode = $state<'melody' | 'chords'>('melody')
+
+⏺ Update(src/screens/FreePlay.svelte)
+  ⎿  Added 1 line, removed 1 line
+      92    $effect(() =>
+      93      registerVoiceCommands({
+      94        name: 'Free Play',
+      95 -      phrases: ['melody mode / chord mode', 'start listening', 
+         -'record at one hundred', 'stop recording', 'clear', 'copy the n
+         -otes'],                                                        
+      95 +      phrases: SCOPE_PHRASES['Free Play'],                     
+      96        handle(intent) {
+      97          if (intent.kind === 'free-play') {
+      98            switch (intent.action) {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      286    $effect(() =>
+      287      registerVoiceCommands({
+      288        name: 'Quizzes',
+      289 -      phrases: ['hear it again', 'next'],                     
+      289 +      phrases: SCOPE_PHRASES['Quizzes'],                      
+      290        handle(intent) {
+      291          if (intent.kind === 'play-demo') {
+      292            void play()
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line, removed 1 line
+      133    $effect(() =>
+      134      registerVoiceCommands({
+      135        name: 'Practice',
+      136 -      phrases: ['practice five finger', 'finger exercise', 'si
+          -ght reading', 'new melody', 'back to lessons'],               
+      136 +      phrases: SCOPE_PHRASES['Practice'],                     
+      137        handle(intent) {
+      138          if (intent.kind === 'open-lesson') {
+      139            if (/sight ?reading/.test(intent.query)) {
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  Added 1 line
+      3    import MicButton from '../components/MicButton.svelte'
+      4    import PianoKeyboard from '../components/PianoKeyboard.svelte'
+      5    import { monoPitch, startMonoDetection, stopMonoDetection } fr
+         om '../lib/audio/monoPitch.svelte'
+      6 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'          
+      7    import { registerVoiceCommands } from '../lib/voice/voice.svel
+         te'
+      8  
+      9    $effect(() =>
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  Added 1 line, removed 1 line
+       9    $effect(() =>
+      10      registerVoiceCommands({
+      11        name: 'Note Detector',
+      12 -      phrases: ['start listening', 'stop listening'],          
+      12 +      phrases: SCOPE_PHRASES['Note Detector'],                 
+      13        handle(intent) {
+      14          if (intent.kind !== 'mic') return null
+      15          if (intent.action === 'start') {
+
+⏺ Now the remaining four sites — I need to read them first and add imports to
+  Quizzes/Practice too:
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line
+      10  <script lang="ts">
+      11    import GlossText from '../components/GlossText.svelte'
+      12    import { guideHref, type GuideLink, type GuideStage } from '.
+          ./lib/data/guide'
+      13 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      14    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      15    import { currentParams } from '../router.svelte'
+      16  
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line, removed 1 line
+      47    $effect(() =>
+      48      registerVoiceCommands({
+      49        name: 'Guide',
+      50 -      phrases: ['show stage two', 'open stage four'],          
+      50 +      phrases: SCOPE_PHRASES['Guide'],                         
+      51        handle(intent) {
+      52          if (intent.kind === 'show-stage') {
+      53            return showStage(intent.stage) ? { say: `Stage ${inte
+          nt.stage}.` } : { say: 'There are five stages.' }
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 1 line
+      16    import { SHELL_QUALITIES, shellVoicing } from '../lib/theory/
+          voicings'
+      17    import type { ChordQualityId, Finger, Hand } from '../lib/the
+          ory/types'
+      18    import { matchRoot } from '../lib/voice/parser'
+      19 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      20    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      21    import { currentParams } from '../router.svelte'
+      22  
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 1 line, removed 1 line
+      130    $effect(() =>
+      131      registerVoiceCommands({
+      132        name: 'Chords',
+      133 -      phrases: ['show me d minor seventh', 'first inversion', 
+          -'block / arpeggio', 'check my chord'],                        
+      133 +      phrases: SCOPE_PHRASES['Chords'],                       
+      134        handle(intent) {
+      135          if (intent.kind === 'show-chord') return applyChordPic
+           k(intent)
+      136          if (intent.kind === 'show-scale' && !intent.explicit) 
+           {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      34    import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/qu
+          iz/modes'
+      35    import { midiToVexKey, type ScoreModel } from '../lib/notatio
+          n/vexScore'
+      36    import { addRecord } from '../lib/practice/history.svelte'
+      37 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      38    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      39    import { currentParams, navigate } from '../router.svelte'
+      40  
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line
+       7    import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP
+           } from '../lib/practice/progress.svelte'
+       8    import { makeSightReading, SIGHT_LEVELS, type SightLevel } fr
+          om '../lib/sightread/generator'
+       9    import { matchLesson } from '../lib/voice/parser'
+      10 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      11    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      12    import { currentParams, navigate } from '../router.svelte'
+      13  
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 1 line
+      11    import { SCALE_TYPES, getScale } from '../lib/theory/scales'
+      12    import type { Finger, Hand, ScaleTypeId } from '../lib/theory
+          /types'
+      13    import { matchRoot } from '../lib/voice/parser'
+      14 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      15    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      16    import { currentParams } from '../router.svelte'
+      17  
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 1 line, removed 1 line
+      64    $effect(() =>
+      65      registerVoiceCommands({
+      66        name: 'Scales',
+      67 -      phrases: ['show me d major', 'e flat harmonic minor', 'le
+         -ft hand', 'play it'],                                          
+      67 +      phrases: SCOPE_PHRASES['Scales'],                        
+      68        handle(intent) {
+      69          if (intent.kind === 'show-scale') {
+      70            const nextType = intent.scaleType ?? typeId
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 1 line
+      12    import { StepMatcher } from '../lib/practice/matcher'
+      13    import { gradeTiming } from '../lib/practice/timingGrader'
+      14    import type { Finger } from '../lib/theory/types'
+      15 +  import { SCOPE_PHRASES } from '../lib/voice/phrases'         
+      16    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      17  
+      18    let {
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 1 line, removed 1 line
+      214    $effect(() =>
+      215      registerVoiceCommands({
+      216        name: 'Lesson',
+      217 -      phrases: ['demo', 'restart', 'next part', 'metronome on 
+          -at eighty', 'slower / faster', 'start listening'],            
+      217 +      phrases: SCOPE_PHRASES['Lesson'],                       
+      218        handle(intent) {
+      219          switch (intent.kind) {
+      220            case 'play-demo':
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line, removed 12 lines
+      75  
+      76  const globalScope: VoiceScopeSpec = {
+      77    name: 'Anywhere',
+      78 -  phrases: [                                                   
+      79 -    'open scales / chords / practice / free play / tuner',     
+      80 -    'go home',                                                 
+      81 -    'start the metronome at ninety',                           
+      82 -    'metronome off',                                           
+      83 -    'set tempo to one hundred',                                
+      84 -    'slower / faster',                                         
+      85 -    'stop',                                                    
+      86 -    'stop the mic',                                            
+      87 -    'help',                                                    
+      88 -    'voice off',                                               
+      89 -  ],                                                           
+      78 +  phrases: SCOPE_PHRASES['Anywhere'],                          
+      79    handle(intent: Intent) {
+      80      switch (intent.kind) {
+      81        case 'navigate':
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line
+      12  import type { Intent, VoiceScopeSpec } from './intents'
+      13  import { loadModelArchive } from './modelLoader'
+      14  import { buildGrammar, parseTranscript } from './parser'
+      15 +import { SCOPE_PHRASES } from './phrases'                      
+      16  import { tts } from './tts'
+      17  
+      18  /**
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 6 lines, removed 2 lines
+      270    if (/start listening|check my (chord|playing)|listen to (me|
+           my playing)/.test(text))
+      271      return { kind: 'mic', action: 'start' }
+      272  
+      273 +  // Universals: repeat the last spoken feedback / browser-sty
+          +le back.                                                      
+      274 +  if (/^(repeat( that)?|say (that|it) again|what did you say)$
+          +/.test(text)) return { kind: 'repeat' }                       
+      275 +                                                              
+      276    // Lesson flow.
+      277    if (/^(restart|start over|again|start again)$/.test(text)) r
+           eturn { kind: 'lesson', action: 'restart' }
+      278    if (/^next( (part|segment|section))?$/.test(text)) return { 
+           kind: 'lesson', action: 'next' }
+      276 -  if (/^previous( (part|segment|section))?$/.test(text) || /^g
+          -o back$/.test(text))                                          
+      277 -    return { kind: 'lesson', action: 'previous' }             
+      279 +  if (/^previous( (part|segment|section))?$/.test(text)) retur
+          +n { kind: 'lesson', action: 'previous' }                      
+      280    if (/back to (the )?lessons|exit( lesson)?$/.test(text)) ret
+           urn { kind: 'lesson', action: 'exit' }
+      281 +  if (/^(go )?back$/.test(text)) return { kind: 'go-back' }   
+      282    if (/new melody/.test(text)) return { kind: 'lesson', action
+           : 'new-melody' }
+      283  
+      284    // Demo playback.
+      285    if (/^(play|play it|play that|demo|play the (demo|scale|chor
+           d)|play it again)$/.test(text))
+      286      return { kind: 'play-demo' }
+      287 +  if (/^hear (it|that)( again)?$/.test(text)) return { kind: '
+          +play-demo' }                                                  
+      288    if (/^block( chord)?$/.test(text)) return { kind: 'play-demo
+           ', variant: 'block' }
+      289    if (/arpeggio|arpeggiate|break it up/.test(text)) return { k
+           ind: 'play-demo', variant: 'arpeggio' }
+      290  
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 1 line
+      388      record recording clear copy notes score
+      389      listening listen check my chord playing voice sleep mic mi
+           crophone
+      390      restart over again next previous part segment section back
+            exit lessons lesson new melody
+      391 +    repeat did hear no yes yeah yep                           
+      392      demo it that block arpeggio arpeggiate break
+      393      sharp flat major minor natural harmonic diminished augment
+           ed dominant seventh seven
+      394      root position first second third inversion left right hand
+
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 2 lines
+      18    | { kind: 'stop-all' } // "piano, stop"
+      19    | { kind: 'help' }
+      20    | { kind: 'voice-off' }
+      21 +  | { kind: 'repeat' } // "say that again" — re-speak the last 
+         +real feedback                                                  
+      22 +  | { kind: 'go-back' } // browser-style back (drill-downs are 
+         +URL-backed)                                                    
+      23    | { kind: 'mic'; action: 'start' | 'stop' } // pitch-detectio
+          n listening, not voice
+      24    // scales (cross-screen capable); explicit = the word "scale"
+           was spoken,
+      25    // so screens that reinterpret bare roots (Chords) must let i
+          t fall through
+
+⏺ Update(src/lib/voice/tts.ts)
+  ⎿  Added 11 lines, removed 1 line
+      12  
+      13  let speaking = false
+      14  let releaseGate: (() => void) | null = null
+      15 +let lastSpoken = ''                                            
+      16  
+      17  function done(): void {
+      18    speaking = false
+     ...
+      20    releaseGate = null
+      21  }
+      22  
+      22 -export function speak(text: string): void {                    
+      23 +export interface SpeakOptions {                                
+      24 +  /**                                                          
+      25 +   * false marks meta-prompts ("Sorry?", "Yes?", confirmations)
+         + that the                                                      
+      26 +   * "repeat" command must not replay; real feedback is remembe
+         +red.                                                           
+      27 +   */                                                          
+      28 +  remember?: boolean                                           
+      29 +}                                                              
+      30 +                                                               
+      31 +export function speak(text: string, opts: SpeakOptions = {}): v
+         +oid {                                                          
+      32    if (typeof speechSynthesis === 'undefined') return
+      33 +  if (text && opts.remember !== false) lastSpoken = text       
+      34    speechSynthesis.cancel()
+      35    done()
+      36    const utterance = new SpeechSynthesisUtterance(text)
+
+⏺ Update(src/lib/voice/tts.ts)
+  ⎿  Added 3 lines
+      54    get speaking() {
+      55      return speaking
+      56    },
+      57 +  get lastSpoken() {                                           
+      58 +    return lastSpoken                                          
+      59 +  },                                                           
+      60    speak,
+      61    cancel,
+      62  }
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 5 lines
+      110          return null // starting needs screen context (mono vs 
+           poly)
+      111        case 'help':
+      112          return { say: 'Try: open scales. Show me D major. Star
+           t the metronome. Or say stop.' }
+      113 +      case 'repeat':                                          
+      114 +        return { say: tts.lastSpoken || "I haven't said anythi
+          +ng yet." }                                                    
+      115 +      case 'go-back':                                         
+      116 +        history.back()                                        
+      117 +        return { say: '' }                                    
+      118        case 'voice-off':
+      119          disable()
+      120          return { say: 'Voice control off.' }
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line, removed 1 line
+      234    })
+      235  }
+      236  
+      237 -async function enable(): Promise<void> {                      
+      237 +async function enable(opts: { announce?: boolean } = {}): Prom
+          +ise<void> {                                                   
+      238    if (!voiceSupported) {
+      239      status = 'error'
+      240      errorMessage = 'This browser does not support voice contro
+           l.'
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 3 lines
+      296      status = 'listening'
+      297      persist(true)
+      298      ensureFallback()
+      299 +    // Confirms the audio path end-to-end on user-initiated en
+          +ables; the                                                    
+      300 +    // auto-restore on page load stays silent.                
+      301 +    if (opts.announce) tts.speak('Voice is on.', { remember: f
+          +alse })                                                       
+      302    } catch (err) {
+      303      console.error('[voice] enable failed:', err)
+      304      status = 'error'
+
+⏺ Update(src/components/VoiceButton.svelte)
+  ⎿  Added 1 line, removed 1 line
+      22  
+      23    function toggle() {
+      24      if (voice.status === 'listening') voice.disable()
+      25 -    else void voice.enable()                                   
+      25 +    else void voice.enable({ announce: true })                 
+      26    }
+      27  </script>
+      28  
+
+⏺ Update(src/components/VoiceHud.svelte)
+  ⎿  Added 1 line, removed 1 line
+       9      {#if voice.status === 'mic-denied' || voice.status === 'err
+          or'}
+      10        <div class="row error">
+      11          <span>{voice.errorMessage || 'Voice control failed.'}</
+          span>
+      12 -        <button class="link" onclick={() => void voice.enable()
+         -}>Retry</button>                                               
+      12 +        <button class="link" onclick={() => void voice.enable({
+         + announce: true })}>Retry</button>                             
+      13        </div>
+      14      {:else if voice.status === 'downloading-model'}
+      15        <div class="row muted">
+
+⏺ Now the tests. Let me check the existing parser test style:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Existing tests are thorough. Now writing the mimicry invariant test and
+  extending the parser tests:
+
+⏺ Write(src/tests/voicePhrases.test.ts)
+  ⎿  Wrote 74 lines to src/tests/voicePhrases.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       3 import { buildGrammar, normalizeTranscript, parseTranscript, WAK
+         E_WORD } from '../lib/voice/parser'
+         m '../lib/voice/phrases'
+       6 /**
+       7  * The mimicry invariant (ACIxD: users parrot the prompts they h
+       8  * Every phrase we advertise — in the HUD command list or spoken
+          by the help
+         mmar-
+         .
+     … +77 lines (ctrl+o to expand)
+
+⏺ Update(src/tests/voiceParser.test.ts)
+  ⎿  Added 15 lines
+      258      expect(parseTranscript('piano go to sleep')).toEqual({ kin
+           d: 'voice-off' })
+      259    })
+      260  
+      261 +  it('repeat', () => {                                        
+      262 +    expect(parseTranscript('piano repeat')).toEqual({ kind: 'r
+          +epeat' })                                                     
+      263 +    expect(parseTranscript('piano repeat that')).toEqual({ kin
+          +d: 'repeat' })                                                
+      264 +    expect(parseTranscript('piano say that again')).toEqual({ 
+          +kind: 'repeat' })                                             
+      265 +    expect(parseTranscript('piano what did you say')).toEqual(
+          +{ kind: 'repeat' })                                           
+      266 +  })                                                          
+      267 +                                                              
+      268 +  it('go back is browser-back, not lesson-previous', () => {  
+      269 +    expect(parseTranscript('piano go back')).toEqual({ kind: '
+          +go-back' })                                                   
+      270 +    expect(parseTranscript('piano back')).toEqual({ kind: 'go-
+          +back' })                                                      
+      271 +    // Lesson navigation keeps its own words.                 
+      272 +    expect(parseTranscript('piano previous part')).toEqual({ k
+          +ind: 'lesson', action: 'previous' })                          
+      273 +    expect(parseTranscript('piano back to lessons')).toEqual({
+          + kind: 'lesson', action: 'exit' })                            
+      274 +  })                                                          
+      275 +                                                              
+      276    it('mic start/stop', () => {
+      277      expect(parseTranscript('piano start listening')).toEqual({
+            kind: 'mic', action: 'start' })
+      278      expect(parseTranscript('piano check my chord')).toEqual({ 
+           kind: 'mic', action: 'start' })
+
+⏺ Update(src/tests/voiceParser.test.ts)
+  ⎿  Added 3 lines
+      304    it('demo', () => {
+      305      expect(parseTranscript('piano demo')).toEqual({ kind: 'pla
+           y-demo' })
+      306      expect(parseTranscript('piano play it')).toEqual({ kind: '
+           play-demo' })
+      307 +    expect(parseTranscript('piano hear it again')).toEqual({ k
+          +ind: 'play-demo' })                                           
+      308 +    // But bare "again" stays a lesson restart.               
+      309 +    expect(parseTranscript('piano again')).toEqual({ kind: 'le
+          +sson', action: 'restart' })                                   
+      310    })
+      311  
+      312    it('free play controls', () => {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 1 line
+      389      listening listen check my chord playing voice sleep mic mi
+           crophone
+      390      restart over again next previous part segment section back
+            exit lessons lesson new melody
+      391      repeat did hear no yes yeah yep
+      392 +    sight reading                                             
+      393      demo it that block arpeggio arpeggiate break
+      394      sharp flat major minor natural harmonic diminished augment
+           ed dominant seventh seven
+      395      root position first second third inversion left right hand
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Steps 1–3 are green (the invariant test caught two real gaps: "hear it again"
+  and "sight reading"). Marking those done and moving to the core state machine:
+
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 3 lines
+      39        mode?: 'melody' | 'chords'
+      40        bpm?: number
+      41      }
+      42 +  // conversation control (one-step correction / confirmation) 
+      43 +  | { kind: 'deny'; correction?: Intent } // "no" / "no, d mino
+         +r" — correction is always a parsed intent                      
+      44 +  | { kind: 'affirm' } // "yes" — accepts a pending "did you me
+         +an" suggestion                                                 
+      45    // wake word heard but the rest didn't parse
+      46    | { kind: 'unknown'; text: string }
+      47  
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 15 lines
+      45    // wake word heard but the rest didn't parse
+      46    | { kind: 'unknown'; text: string }
+      47  
+      48 +/** Spoken names of the screens, used by navigation feedback an
+         +d paraphrases. */                                              
+      49 +export const SCREEN_NAME_FOR_ROUTE: Record<string, string> = { 
+      50 +  '/': 'Home',                                                 
+      51 +  '/guide': 'the Guide',                                       
+      52 +  '/quizzes': 'Quizzes',                                       
+      53 +  '/ear': 'Ear Training',                                      
+      54 +  '/rhythm': 'the Rhythm Trainer',                             
+      55 +  '/songs': 'Songs',                                           
+      56 +  '/scales': 'Scales',                                         
+      57 +  '/chords': 'Chords',                                         
+      58 +  '/practice': 'Practice',                                     
+      59 +  '/play': 'Free Play',                                        
+      60 +  '/tuner': 'Note Detector',                                   
+      61 +}                                                              
+      62 +                                                               
+      63  /** Where an intent can be fulfilled if no active scope handles
+           it. */
+      64  export const ROUTE_FOR_KIND: Partial<Record<Intent['kind'], str
+          ing>> = {
+      65    'show-stage': '/guide',
+
+⏺ Now the describe module and the banded matcher:
+
+⏺ Write(src/lib/voice/describe.ts)
+  ⎿  Wrote 86 lines to src/lib/voice/describe.ts
+       1 import { SCREEN_NAME_FOR_ROUTE, type Intent } from './intents'
+       3 /**
+       4  * Short spoken paraphrase of an intent, used by the "did you me
+         an" prompt
+          what the user
+       6  * said (ACIxD confirmation guidance). Must never contain the wa
+       7  * never be empty for any intent the fallback bank can produce.
+       8  */
+       9 
+         cond inversion', 'third inversion']
+     … +90 lines (ctrl+o to expand)
+
+⏺ Update(src/lib/voice/intentMatcher.ts)
+  ⎿  Added 6 lines
+      32    threshold: number
+      33    /** Best score must beat the best score of every *other* grou
+          p by this much. */
+      34    margin: number
+      35 +  /**                                                          
+      36 +   * Floor for the uncertain band: a best score that fails the 
+         +accept gates                                                   
+      37 +   * but reaches this becomes a "suggest" (spoken "did you mean
+         +" confirmation)                                                
+      38 +   * instead of a rejection.                                   
+      39 +   */                                                          
+      40 +  suggestThreshold: number                                     
+      41  }
+      42  
+      43  export interface MatchResult {
+
+⏺ Update(src/lib/voice/intentMatcher.ts)
+  ⎿  Added 40 lines, removed 6 lines
+      51  }
+      52  
+      53  // Calibrated by src/tests/voiceEmbedding.integration.test.ts a
+          gainst the real
+      54 -// model (positives ≥ 0.57, negatives ≤ 0.50, min cross-group g
+         -ap 0.11);                                                      
+      54 +// model (positives ≥ 0.57, hard negatives ≤ 0.50, min cross-gr
+         +oup gap 0.11);                                                 
+      55  // adjust there, not by hand.
+      56  export const DEFAULT_THRESHOLD = 0.55
+      57  export const DEFAULT_MARGIN = 0.06
+      58 +export const SUGGEST_THRESHOLD = 0.45                          
+      59  
+      59 -export function matchIntent(                                   
+      60 +export type BandedMatch = {                                    
+      61 +  /** accept = act on it; suggest = confirm it aloud first ("…—
+         + right?"). */                                                  
+      62 +  kind: 'accept' | 'suggest'                                   
+      63 +  /** Index into the bank of the winning vector. */            
+      64 +  index: number                                                
+      65 +  /** Group (template) id of the winner. */                    
+      66 +  group: number                                                
+      67 +  score: number                                                
+      68 +  /** Gap to the best-scoring vector of any other group (Infini
+         +ty if none). */                                                
+      69 +  margin: number                                               
+      70 +} | null                                                       
+      71 +                                                               
+      72 +/**                                                            
+      73 + * Three-way nearest-neighbor match: "accept" under the origina
+         +l strict gates,                                                
+      74 + * "suggest" when the best score fails either accept gate (belo
+         +w threshold or                                                 
+      75 + * inside another group's margin) but still clears suggestThres
+         +hold, and null                                                 
+      76 + * below that. Suggestions are confirmed with the user before d
+         +ispatch, so the                                                
+      77 + * uncertain band converts silent rejections into one cheap spo
+         +ken turn.                                                      
+      78 + */                                                            
+      79 +export function matchIntentBanded(                             
+      80    query: Float32Array,
+      81    bank: readonly Float32Array[],
+      82    groups: readonly number[],
+      83    opts: Partial<MatchOptions> = {},
+      64 -): MatchResult | null {                                        
+      84 +): BandedMatch {                                               
+      85    if (groups.length !== bank.length) {
+      86      throw new RangeError(`groups length ${groups.length} does n
+          ot match bank length ${bank.length}`)
+      87    }
+      88    const threshold = opts.threshold ?? DEFAULT_THRESHOLD
+      89    const margin = opts.margin ?? DEFAULT_MARGIN
+      90 +  const suggestThreshold = opts.suggestThreshold ?? SUGGEST_THR
+         +ESHOLD                                                         
+      91  
+      92    let best = -1
+      93    let bestScore = -Infinity
+     ...
+       98        best = i
+       99      }
+      100    }
+       80 -  if (best < 0 || bestScore < threshold) return null          
+      101 +  if (best < 0 || bestScore < suggestThreshold) return null   
+      102  
+      103    let bestOther = -Infinity
+      104    for (let i = 0; i < bank.length; i++) {
+     ...
+      107      if (score > bestOther) bestOther = score
+      108    }
+      109    const gap = bestScore - bestOther // Infinity when no other 
+           group exists
+       89 -  if (gap < margin) return null                               
+      110  
+       91 -  return { index: best, group: groups[best], score: bestScore,
+          - margin: gap }                                                
+      111 +  const kind = bestScore >= threshold && gap >= margin ? 'acce
+          +pt' : 'suggest'                                               
+      112 +  return { kind, index: best, group: groups[best], score: best
+          +Score, margin: gap }                                          
+      113  }
+      114 +                                                              
+      115 +/** The strict two-gate match: accepts only (suggestions read 
+          +as null). */                                                  
+      116 +export function matchIntent(                                  
+      117 +  query: Float32Array,                                        
+      118 +  bank: readonly Float32Array[],                              
+      119 +  groups: readonly number[],                                  
+      120 +  opts: Partial<MatchOptions> = {},                           
+      121 +): MatchResult | null {                                       
+      122 +  const match = matchIntentBanded(query, bank, groups, opts)  
+      123 +  if (!match || match.kind !== 'accept') return null          
+      124 +  const { index, group, score, margin } = match               
+      125 +  return { index, group, score, margin }                      
+      126 +}                                                             
+
+⏺ Update(src/lib/voice/fallback.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import { INTENT_BANK, type IntentTemplate } from './intentBank'
+      2 -import { matchIntent, type MatchOptions } from './intentMatcher'
+      2 +import { matchIntentBanded, type MatchOptions } from './intentMa
+        +tcher'                                                          
+      3  import type { Intent } from './intents'
+      4  
+      5  /**
+
+⏺ Update(src/lib/voice/fallback.ts)
+  ⎿  Added 7 lines, removed 2 lines
+      11  
+      12  export type EmbedFn = (texts: string[]) => Promise<Float32Array
+          []>
+      13  
+      14 +/**                                                            
+      15 + * match = confident, act on it; suggest = uncertain band, conf
+         +irm with the                                                   
+      16 + * user first; null = no usable match.                         
+      17 + */                                                            
+      18 +export type FallbackOutcome = { kind: 'match' | 'suggest'; inte
+         +nt: Intent } | null                                            
+      19 +                                                               
+      20  export interface FallbackResolver {
+      21    /** Resolves once the bank is embedded; rejects if embedding 
+          the bank failed. */
+      22    ready: Promise<void>
+      17 -  /** null = no confident match (caller keeps the original unkn
+         -own intent). */                                                
+      18 -  resolve(text: string): Promise<Intent | null>                
+      23 +  resolve(text: string): Promise<FallbackOutcome>              
+      24  }
+      25  
+      26  export function createFallbackResolver(
+
+⏺ Update(src/lib/voice/fallback.ts)
+  ⎿  Added 7 lines, removed 3 lines
+      50      get ready() {
+      51        return ensureBank()
+      52      },
+      53 -    async resolve(text: string): Promise<Intent | null> {      
+      53 +    async resolve(text: string): Promise<FallbackOutcome> {    
+      54        await ensureBank()
+      55        const [query] = await embed([text])
+      56 -      const match = matchIntent(query, bankVectors!, groups, op
+         -ts)                                                            
+      56 +      const match = matchIntentBanded(query, bankVectors!, grou
+         +ps, opts)                                                      
+      57        if (!match) return null
+      58 -      return templates[match.group].resolve(text)              
+      58 +      // A suggestion whose slots can't be filled is unexecutab
+         +le — never                                                     
+      59 +      // confirm something we couldn't act on.                 
+      60 +      const intent = templates[match.group].resolve(text)      
+      61 +      if (!intent) return null                                 
+      62 +      return { kind: match.kind === 'accept' ? 'match' : 'sugge
+         +st', intent }                                                  
+      63      },
+      64    }
+      65  }
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 20 lines
+      223      return null
+      224    }
+      225  
+      226 +  // One-step correction: a leading "no" disconfirms, optional
+          +ly followed by                                                
+      227 +  // the corrected command ("no, d minor"). When what follows 
+          +"no" isn't a                                                  
+      228 +  // parseable command ("no more beat please"), the whole utte
+          +rance stays                                                   
+      229 +  // unknown so the embedding fallback sees the full phrasing.
+      230 +  if (tokens[0] === 'no') {                                   
+      231 +    const rest = tokens.slice(1)                              
+      232 +    if (rest.length === 0) return { kind: 'deny' }            
+      233 +    const correction = parseCommand(rest)                     
+      234 +    if (correction.kind !== 'unknown') return { kind: 'deny', 
+          +correction }                                                  
+      235 +    return { kind: 'unknown', text: tokens.join(' ') }        
+      236 +  }                                                           
+      237 +                                                              
+      238 +  // Accepts a pending "did you mean" suggestion.             
+      239 +  if (/^(yes|yeah|yep)( please)?$/.test(tokens.join(' '))) ret
+          +urn { kind: 'affirm' }                                        
+      240 +                                                              
+      241 +  return parseCommand(tokens)                                 
+      242 +}                                                             
+      243 +                                                              
+      244 +/** The command body, after wake-word / correction handling. *
+          +/                                                             
+      245 +function parseCommand(tokens: string[]): Intent {             
+      246    const text = tokens.join(' ')
+      247  
+      248    // --- order matters: multi-word "stop X" phrases before bar
+           e "stop" ---
+
+⏺ Now the convo state machine — the heart of the A+B+D design:
+
+⏺ Write(src/lib/voice/convo.ts)
+  ⎿  Wrote 184 lines to src/lib/voice/convo.ts
+       1 import { describeIntent } from './describe'
+       3 import type { Intent } from './intents'
+       4 import { expandPhrase } from './phrases'
+       5 
+       7  * Pure conversation state machine sitting between the parser an
+         d the
+         word), the
+       9  * escalating no-match reprompts, the post-command correction wi
+         ndow ("no,
+         ncertain
+     … +208 lines (ctrl+o to expand)
+
+⏺ Now the dispatcher change, miss log, and voice.svelte.ts rewiring:
+
+⏺ Update(src/lib/voice/dispatcher.ts)
+  ⎿  Added 1 line, removed 1 line
+      1 -import { ROUTE_FOR_KIND, type Intent, type VoiceScopeSpec } from
+        - './intents'                                                    
+      1 +import { ROUTE_FOR_KIND, SCREEN_NAME_FOR_ROUTE, type Intent, typ
+        +e VoiceScopeSpec } from './intents'                             
+      2  
+      3  /**
+      4   * Routes parsed intents to command scopes. Screens register a s
+         cope while
+
+⏺ Update(src/lib/voice/dispatcher.ts)
+  ⎿  Removed 10 lines
+      20  
+      21  const PENDING_TTL_MS = 10_000
+      22  
+      23 -const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {        
+      24 -  '/guide': 'the Guide',                                       
+      25 -  '/quizzes': 'Quizzes',                                       
+      26 -  '/scales': 'Scales',                                         
+      27 -  '/chords': 'Chords',                                         
+      28 -  '/practice': 'Practice',                                     
+      29 -  '/play': 'Free Play',                                        
+      30 -  '/tuner': 'Note Detector',                                   
+      31 -}                                                              
+      32 -                                                               
+      23  export interface Dispatcher {
+      24    /** Pushes a scope onto the stack; returns a disposer. Replay
+          s a pending intent if this scope handles it. */
+      25    register(scope: VoiceScopeSpec): () => void
+
+⏺ Update(src/lib/voice/dispatcher.ts)
+  ⎿  Added 2 lines, removed 5 lines
+      66        return { handled: true, feedback: outcome.say ?? '' }
+      67      }
+      68  
+      69 -    if (intent.kind === 'unknown') {                           
+      70 -      const feedback = "Sorry, I didn't catch that. Say help fo
+         -r commands."                                                   
+      71 -      env.say(feedback)                                        
+      72 -      return { handled: false, feedback }                      
+      73 -    }                                                          
+      69 +    // No-match messaging (escalating reprompts) belongs to the
+         + convo layer.                                                  
+      70 +    if (intent.kind === 'unknown') return { handled: false, fee
+         +dback: '' }                                                    
+      71  
+      72      const route = ROUTE_FOR_KIND[intent.kind]
+      73      if (route) {
+
+⏺ Write(src/lib/voice/missLog.ts)
+  ⎿  Wrote 20 lines to src/lib/voice/missLog.ts
+      1 /**
+      2  * Ring buffer of transcripts the voice pipeline could not resolv
+        e, for tuning
+        ls:
+      4  * localStorage['piano-tutor.voice-misses']). Best-effort; storag
+        e failures
+      5  * are swallowed.
+      6  */
+      8 const STORAGE_KEY = 'piano-tutor.voice-misses'
+      9 const MAX_ENTRIES = 50
+     … +14 lines (ctrl+o to expand)
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 9 lines, removed 2 lines
+       7  import { setMetronomeBpm, startMetronome, stopMetronome } from 
+          '../audio/metronome'
+       8  import * as playback from '../audio/playback'
+       9  import { Resampler } from '../audio/resample'
+      10 +import { createConvo } from './convo'                          
+      11  import { createDispatcher, type Dispatcher } from './dispatcher
+          '
+      11 -import { createFallbackResolver, createSequenceGate, type Fallb
+         -ackResolver } from './fallback'                                
+      12 +import {                                                       
+      13 +  createFallbackResolver,                                      
+      14 +  createSequenceGate,                                          
+      15 +  type FallbackOutcome,                                        
+      16 +  type FallbackResolver,                                       
+      17 +} from './fallback'                                            
+      18  import type { Intent, VoiceScopeSpec } from './intents'
+      19 +import { logMiss } from './missLog'                            
+      20  import { loadModelArchive } from './modelLoader'
+      21  import { buildGrammar, parseTranscript } from './parser'
+      15 -import { SCOPE_PHRASES } from './phrases'                      
+      22 +import { SCOPE_PHRASES, SPOKEN_HELP_EXAMPLES } from './phrases'
+      23  import { tts } from './tts'
+      24  
+      25  /**
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Removed 1 line
+      30   */
+      31  
+      32  const VOSK_SAMPLE_RATE = 16000
+      33 -const ARMED_WINDOW_MS = 8000                                   
+      33  const STORAGE_KEY = 'piano-tutor.voice-enabled'
+      34  const captureProcessorUrl = '/worklets/capture-processor.js'
+      35  
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Removed 1 line
+      54  let workletNode: AudioWorkletNode | null = null
+      55  let resampler: Resampler | null = null
+      56  let workletModuleLoaded: AudioContext | null = null
+      57 -let armedUntil = 0                                             
+      57  let holdingMic = false
+      58  
+      59  export const voiceSupported =
+
+⏺ Update(src/lib/voice/voice.svelte.ts)  ⎿  Added 10 lines
+      70    say: (text) => tts.speak(text),
+      71  })
+      72  
+      73 +// Conversation layer: armed/correction windows, escalating rep
+         +rompts, and                                                    
+      74 +// "did you mean — right?" confirmations. Decisions live in the
+         + pure convo;                                                   
+      75 +// this module only feeds it parsed intents and fallback outcom
+         +es.                                                            
+      76 +const convo = createConvo({                                    
+      77 +  dispatch: (intent) => dispatcher.dispatch(intent),           
+      78 +  say: (text, opts) => tts.speak(text, opts),                  
+      79 +  activePhrases: () => dispatcher.activePhrases(),             
+      80 +  logMiss,                                                     
+      81 +})                                                             
+      82 +                                                               
+      83  /** Screens call this inside $effect to add commands while moun
+          ted. */
+      84  export function registerVoiceCommands(scope: VoiceScopeSpec): (
+          ) => void {
+      85    return dispatcher.register(scope)
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 3 lines, removed 1 line
+      124          }
+      125          return null // starting needs screen context (mono vs 
+           poly)
+      126        case 'help':
+      127 -        return { say: 'Try: open scales. Show me D major. Star
+          -t the metronome. Or say stop.' }                              
+      127 +        return {                                              
+      128 +          say: `You can say things like: ${SPOKEN_HELP_EXAMPLE
+          +S.join(', or ')}. For everything else, tap 'What can I say'.`,
+      129 +        }                                                     
+      130        case 'repeat':
+      131          return { say: tts.lastSpoken || "I haven't said anythi
+           ng yet." }
+      132        case 'go-back':
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 4 lines, removed 5 lines
+      169      })
+      170  }
+      171  
+      172 -async function handleUnknown(intent: Extract<Intent, { kind: '
+          -unknown' }>, seq: number): Promise<void> {                    
+      173 -  let resolved: Intent | null = null                          
+      172 +async function handleUnknown(text: string, seq: number): Promi
+          +se<void> {                                                    
+      173 +  let outcome: FallbackOutcome = null                         
+      174    if (fallback) {
+      175      try {
+      176 -      resolved = await fallback.resolve(intent.text)          
+      176 +      outcome = await fallback.resolve(text)                  
+      177      } catch (err) {
+      178        console.warn('[voice] intent fallback failed:', err)
+      179      }
+      180    }
+      181    if (!fallbackGate.isCurrent(seq)) return // superseded by a 
+           newer utterance
+      182 -  const { feedback } = dispatcher.dispatch(resolved ?? intent)
+      183 -  lastFeedback = feedback                                     
+      182 +  lastFeedback = convo.onFallback(outcome, text)              
+      183  }
+      184  
+      185  // -----------------------------------------------------------
+           ----------------
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 4 lines, removed 9 lines
+      187  // -----------------------------------------------------------
+           ----------------
+      188  
+      189  function handleFinal(text: string): void {
+      190 -  const armed = Date.now() < armedUntil                       
+      191 -  const intent = parseTranscript(text, { armed })             
+      190 +  const intent = parseTranscript(text, { armed: convo.isArmed(
+          +) })                                                          
+      191    if (!intent) return // no wake word — silently ignore
+      193 -  armedUntil = 0                                              
+      192    lastHeard = text.replace(/\[unk\]/g, '').replace(/\s+/g, ' '
+           ).trim()
+      193    // Every new utterance supersedes any in-flight fallback res
+           olution.
+      194    const seq = fallbackGate.next()
+      195    if (intent.kind === 'wake') {
+      198 -    armedUntil = Date.now() + ARMED_WINDOW_MS                 
+      199 -    lastFeedback = 'Yes?'                                     
+      200 -    tts.speak('Yes?')                                         
+      196 +    lastFeedback = convo.onWake()                             
+      197      return
+      198    }
+      199    if (intent.kind === 'unknown') {
+      204 -    void handleUnknown(intent, seq)                           
+      200 +    void handleUnknown(intent.text, seq)                      
+      201      return
+      202    }
+      207 -  const { feedback } = dispatcher.dispatch(intent)            
+      208 -  lastFeedback = feedback                                     
+      203 +  lastFeedback = convo.onIntent(intent)                       
+      204  }
+      205  
+      206  let grammarActive = false
+
+⏺ Now the remaining wording changes and reading the tests that need updating:
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 1 line, removed 1 line
+      50        phrases: SCOPE_PHRASES['Guide'],
+      51        handle(intent) {
+      52          if (intent.kind === 'show-stage') {
+      53 -          return showStage(intent.stage) ? { say: `Stage ${inte
+         -nt.stage}.` } : { say: 'There are five stages.' }              
+      53 +          return showStage(intent.stage) ? { say: `Stage ${inte
+         +nt.stage}.` } : { say: 'Stages go from one to five.' }         
+      54          }
+      55          return null
+      56        },
+
+⏺ Update(src/screens/FreePlay.svelte)
+  ⎿  Added 1 line, removed 1 line
+      101                return { say: mode === 'chords' ? 'Chord mode.' 
+           : 'Melody mode.' }
+      102              case 'record':
+      103                if (recState !== 'idle') return { say: 'Already 
+           recording.' }
+      104 -              if (mic.status !== 'running') return { say: 'Say
+          - start listening first, then record.' }                       
+      104 +              if (mic.status !== 'running') return { say: "Fir
+          +st say 'start listening', then 'record'." }                   
+      105                if (intent.bpm !== undefined) recBpm = Math.max(
+           40, Math.min(160, intent.bpm))
+      106                void startRecording()
+      107                return { say: `Recording at ${recBpm} — one bar 
+           of count-in.` }
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Updating these two tests for the new contracts:
+
+⏺ Update(src/tests/voiceDispatcher.test.ts)
+  ⎿  Added 3 lines, removed 3 lines
+       90      expect(handled).toBe(0)
+       91    })
+       92  
+       93 -  it('unknown intent → polite fallback, not handled', () => { 
+       93 +  it('unknown intent → silent not-handled (no-match messaging 
+          +is the convo layer)', () => {                                 
+       94      const { env, spoken } = makeEnv()
+       95      const d = createDispatcher(env)
+       96      const res = d.dispatch({ kind: 'unknown', text: 'purple mo
+           nkey' })
+       97 -    expect(res.handled).toBe(false)                           
+       98 -    expect(spoken[0]).toContain("didn't catch")               
+       97 +    expect(res).toEqual({ handled: false, feedback: '' })     
+       98 +    expect(spoken).toEqual([])                                
+       99    })
+      100  
+      101    it('unhandled unroutable intent → screen hint', () => {
+
+⏺ Update(src/tests/voiceFallback.test.ts)
+  ⎿  Added 16 lines, removed 4 lines
+      45  describe('createFallbackResolver', () => {
+      46    it('resolves a confident match to the winning template intent
+          ', async () => {
+      47      const resolver = createFallbackResolver(makeEmbed(), BANK, 
+          OPTS)
+      48 -    expect(await resolver.resolve('sounds like alpha')).toEqual
+         -({ kind: 'help' })                                             
+      48 +    expect(await resolver.resolve('sounds like alpha')).toEqual
+         +({                                                             
+      49 +      kind: 'match',                                           
+      50 +      intent: { kind: 'help' },                                
+      51 +    })                                                         
+      52    })
+      53  
+      51 -  it('below-threshold query → null', async () => {             
+      54 +  it('below-suggest-threshold query → null', async () => {     
+      55      const resolver = createFallbackResolver(makeEmbed(), BANK, 
+          OPTS)
+      56      expect(await resolver.resolve('off topic entirely')).toBeNu
+          ll()
+      57    })
+      58  
+      56 -  it('cross-template ambiguity → null', async () => {          
+      57 -    // Equidistant between templates a and b (cos ≈ 0.707 to ea
+         -ch).                                                           
+      59 +  it('cross-template ambiguity → suggest (confirmed aloud, neve
+         +r silently dispatched)', async () => {                         
+      60 +    // Equidistant between templates a and b (cos ≈ 0.707 to ea
+         +ch): fails the                                                 
+      61 +    // margin gate but clears the suggest floor.               
+      62      const resolver = createFallbackResolver(makeEmbed(), BANK, 
+          OPTS)
+      63 +    expect(await resolver.resolve('somewhere in between')).toEq
+         +ual({                                                          
+      64 +      kind: 'suggest',                                         
+      65 +      intent: { kind: 'help' },                                
+      66 +    })                                                         
+      67 +  })                                                           
+      68 +                                                               
+      69 +  it('a raised suggest floor turns ambiguity back into null', a
+         +sync () => {                                                   
+      70 +    const resolver = createFallbackResolver(makeEmbed(), BANK, 
+         +{ ...OPTS, suggestThreshold: 0.8 })                            
+      71      expect(await resolver.resolve('somewhere in between')).toBe
+          Null()
+      72    })
+      73  
+
+⏺ API Error: Connection closed mid-response. The response above may be 
+  incomplete.
+
+⏺ Update(src/tests/voiceFallback.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      92      const resolver = createFallbackResolver(makeEmbed(), BANK, 
+          OPTS)
+      93      // No await of resolver.ready first — resolve must self-ini
+          tialize.
+      94      const result = await resolver.resolve('sounds like alpha')
+      95 -    expect(result).toEqual({ kind: 'help' })                   
+      95 +    expect(result).toEqual({ kind: 'match', intent: { kind: 'he
+         +lp' } })                                                       
+      96    })
+      97  
+      98    it('ready resolves after the bank embeds', async () => {
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Adding banded-match tests:
+
+⏺ Update(src/tests/voiceMatcher.test.ts)
+  ⎿  Added 2 lines
+       4    DEFAULT_MARGIN,
+       5    DEFAULT_THRESHOLD,
+       6    matchIntent,
+       7 +  matchIntentBanded,                                           
+       8 +  SUGGEST_THRESHOLD,                                           
+       9  } from '../lib/voice/intentMatcher'
+      10  
+      11  const v = (...xs: number[]) => new Float32Array(xs)
+
+⏺ Update(src/tests/voiceMatcher.test.ts)
+  ⎿  Added 38 lines
+       86    it('default gates are biased toward rejection', () => {
+       87      expect(DEFAULT_THRESHOLD).toBeGreaterThanOrEqual(0.5)
+       88      expect(DEFAULT_MARGIN).toBeGreaterThan(0)
+       89 +    expect(SUGGEST_THRESHOLD).toBeLessThan(DEFAULT_THRESHOLD) 
+       90    })
+       91  })
+       92 +                                                              
+       93 +describe('matchIntentBanded', () => {                         
+       94 +  const bank = [v(1, 0, 0), v(0, 1, 0), v(0, 0, 1)]           
+       95 +  const groups = [0, 0, 1]                                    
+       96 +  const opts = { threshold: 0.6, margin: 0.06, suggestThreshol
+          +d: 0.45 }                                                     
+       97 +                                                              
+       98 +  it('strict-gate winner → accept', () => {                   
+       99 +    expect(matchIntentBanded(v(1, 0, 0), bank, groups, opts)).
+          +toMatchObject({                                               
+      100 +      kind: 'accept',                                         
+      101 +      group: 0,                                               
+      102 +    })                                                        
+      103 +  })                                                          
+      104 +                                                              
+      105 +  it('above suggest floor but below threshold → suggest', () =
+          +> {                                                           
+      106 +    // cos ≈ 0.577 to each vector: fails threshold 0.6, clears
+          + 0.45.                                                        
+      107 +    expect(matchIntentBanded(v(1, 1, 1), bank, groups, opts)).
+          +toMatchObject({ kind: 'suggest' })                            
+      108 +  })                                                          
+      109 +                                                              
+      110 +  it('clears threshold but fails the cross-group margin → sugg
+          +est', () => {                                                 
+      111 +    // Nearly equidistant between group 0 (≈0.714) and group 1
+          + (≈0.700).                                                    
+      112 +    const m = matchIntentBanded(v(1, 0, 0.98), bank, groups, {
+          + ...opts, threshold: 0.5 })                                   
+      113 +    expect(m).toMatchObject({ kind: 'suggest' })              
+      114 +    expect(m!.margin).toBeLessThan(0.06)                      
+      115 +  })                                                          
+      116 +                                                              
+      117 +  it('below the suggest floor → null', () => {                
+      118 +    expect(matchIntentBanded(v(0, 0, 0), bank, groups, opts)).
+          +toBeNull()                                                    
+      119 +    // Weak similarity everywhere (≈0.33 with one strong axis 
+          +missing).                                                     
+      120 +    expect(matchIntentBanded(v(1, 3, 3), bank, groups, { ...op
+          +ts, suggestThreshold: 0.8 })).toBeNull()                      
+      121 +  })                                                          
+      122 +                                                              
+      123 +  it('matchIntent is the accepts-only view of the banded match
+          +', () => {                                                    
+      124 +    const q = v(1, 1, 1) // suggest band                      
+      125 +    expect(matchIntentBanded(q, bank, groups, opts)).not.toBeN
+          +ull()                                                         
+      126 +    expect(matchIntent(q, bank, groups, opts)).toBeNull()     
+      127 +  })                                                          
+      128 +})                                                            
+
+⏺ Now the convo and describe test suites:
+
+⏺ Write(src/tests/voiceConvo.test.ts)
+  ⎿  Wrote 224 lines to src/tests/voiceConvo.test.ts
+      1 import { describe, expect, it } from 'vitest'
+      2 import {
+      3   ARMED_WINDOW_MS,
+      4   CONFIRM_WINDOW_MS,
+      5   CORRECTION_WINDOW_MS,
+      6   createConvo,
+      7   repromptFor,
+      8 } from '../lib/voice/convo'
+      9 import type { Intent } from '../lib/voice/intents'
+     … +247 lines (ctrl+o to expand)
+
+⏺ Write(src/tests/voiceDescribe.test.ts)
+  ⎿  Wrote 49 lines to src/tests/voiceDescribe.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { describeIntent } from '../lib/voice/describe'
+       3 import { INTENT_BANK } from '../lib/voice/intentBank'
+       5 
+       6 describe('describeIntent', () => {
+       7   it('paraphrases task-focused, not transcript-focused', () => {
+       8     expect(describeIntent({ kind: 'navigate', route: '/scales' }
+         )).toBe('open Scales')
+         bpm: 90 })).toBe(
+      10       'start the metronome at 90',
+     … +53 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All unit suites green. Adding parser tests for the correction/affirm syntax,
+  then updating the embedding calibration test:
+
+⏺ Update(src/tests/voiceParser.test.ts)
+  ⎿  Added 34 lines
+      40    })
+      41  })
+      42  
+      43 +describe('one-step correction and confirmation words', () => { 
+      44 +  it('bare "no" is a deny', () => {                            
+      45 +    expect(parseTranscript('piano no')).toEqual({ kind: 'deny' 
+         +})                                                             
+      46 +    expect(parseTranscript('no', { armed: true })).toEqual({ ki
+         +nd: 'deny' })                                                  
+      47 +  })                                                           
+      48 +                                                               
+      49 +  it('"no, <command>" carries the parsed correction', () => {  
+      50 +    expect(parseTranscript('piano no d minor')).toEqual({      
+      51 +      kind: 'deny',                                            
+      52 +      correction: expect.objectContaining({ kind: 'show-scale',
+         + root: 'D' }),                                                 
+      53 +    })                                                         
+      54 +    expect(parseTranscript('no slower', { armed: true })).toEqu
+         +al({                                                           
+      55 +      kind: 'deny',                                            
+      56 +      correction: { kind: 'set-bpm', delta: -10 },             
+      57 +    })                                                         
+      58 +  })                                                           
+      59 +                                                               
+      60 +  it('"no" + unparseable rest stays unknown with the FULL text 
+         +(fallback needs it)', () => {                                  
+      61 +    // "no more beat please" is an intent-bank example for metr
+         +onome-stop;                                                    
+      62 +    // stripping the "no" would change what the embedding sees.
+      63 +    expect(parseTranscript('piano no more beat please')).toEqua
+         +l({                                                            
+      64 +      kind: 'unknown',                                         
+      65 +      text: 'no more beat please',                             
+      66 +    })                                                         
+      67 +  })                                                           
+      68 +                                                               
+      69 +  it('yes / yeah / yep affirm', () => {                        
+      70 +    expect(parseTranscript('piano yes')).toEqual({ kind: 'affir
+         +m' })                                                          
+      71 +    expect(parseTranscript('yeah', { armed: true })).toEqual({ 
+         +kind: 'affirm' })                                              
+      72 +    expect(parseTranscript('yes please', { armed: true })).toEq
+         +ual({ kind: 'affirm' })                                        
+      73 +    expect(parseTranscript('yep', { armed: true })).toEqual({ k
+         +ind: 'affirm' })                                               
+      74 +  })                                                           
+      75 +})                                                             
+      76 +                                                               
+      77  describe('navigation', () => {
+      78    const cases: [string, string][] = [
+      79      ['piano go home', '/'],
+  Read 1 file (ctrl+o to expand)
+
+⏺ This integration test needs the outcome-shape update and the negatives split.
+  Rewriting the relevant sections:
+
+⏺ Update(src/tests/voiceEmbedding.integration.test.ts)
+  ⎿  Added 1 line
+       9    DEFAULT_MARGIN,
+      10    DEFAULT_THRESHOLD,
+      11    matchIntent,
+      12 +  SUGGEST_THRESHOLD,                                           
+      13  } from '../lib/voice/intentMatcher'
+      14  import { buildGrammar, parseTranscript } from '../lib/voice/par
+          ser'
+      15  
+
+⏺ Update(src/tests/voiceEmbedding.integration.test.ts)
+  ⎿  Added 16 lines, removed 6 lines
+       84  ]
+       85  
+       86  /**
+       87 - * Must NOT match anything: gibberish, off-domain, and near-mi
+          -sses. These may                                               
+       88 - * use open vocabulary — the open-vocab Vosk fallback path exi
+          -sts, and the                                                  
+       89 - * matcher must reject whatever reaches it.                   
+       87 + * Gibberish and clearly off-domain utterances: must produce N
+          +O outcome at                                                  
+       88 + * all — not even a spoken "did you mean" suggestion — so they
+          + calibrate                                                    
+       89 + * SUGGEST_THRESHOLD (the suggest floor). These may use open v
+          +ocabulary — the                                               
+       90 + * open-vocab Vosk fallback path exists, and the matcher must 
+          +reject whatever                                               
+       91 + * reaches it.                                                
+       92   */
+       91 -const NEGATIVE_ROWS: string[] = [                             
+       93 +const HARD_NEGATIVE_ROWS: string[] = [                        
+       94    'purple monkey dishwasher',
+       95    'the weather is nice today',
+       96    'what time is it',
+       97 +  'my sister plays the violin',                               
+       98 +  'turn on the kitchen lights',                               
+       99 +]                                                             
+      100 +                                                              
+      101 +/**                                                           
+      102 + * On-domain chatter that must never be silently ACTED on. Lan
+          +ding in the                                                   
+      103 + * suggest band is acceptable by design: a wrong "…— right?" c
+          +osts the user                                                 
+      104 + * one "no", a wrong action costs undoing it.                 
+      105 + */                                                           
+      106 +const NEAR_MISS_ROWS: string[] = [                            
+      107    'i like this piano',
+      108    'that sounds nice',
+      109    'my hands are tired',
+      110    'this song is really hard',
+       99 -  'my sister plays the violin',                               
+      100 -  'turn on the kitchen lights',                               
+      111  ]
+      112  
+      113  let embed: EmbedFn
+
+⏺ Update(src/tests/voiceEmbedding.integration.test.ts)
+  ⎿  Added 10 lines, removed 3 lines
+      141        for (const word of phrase.split(' ')) {
+      142          expect(grammar, `"${word}" not in Vosk grammar`).toCon
+           tain(word)
+      143        }
+      144 -      expect(await resolver.resolve(phrase)).toMatchObject(exp
+          -ected)                                                        
+      144 +      expect(await resolver.resolve(phrase)).toMatchObject({ k
+          +ind: 'match', intent: expected })                             
+      145      })
+      146    }
+      147  })
+      148  
+      149  describe('adversarial negatives (real model)', () => {
+      150 -  for (const phrase of NEGATIVE_ROWS) {                       
+      151 -    it(`"${phrase}" → null`, async () => {                    
+      150 +  for (const phrase of HARD_NEGATIVE_ROWS) {                  
+      151 +    it(`hard: "${phrase}" → null (not even a suggestion)`, asy
+          +nc () => {                                                    
+      152        expect(await resolver.resolve(phrase)).toBeNull()
+      153      })
+      154    }
+      155 +                                                              
+      156 +  for (const phrase of NEAR_MISS_ROWS) {                      
+      157 +    it(`near-miss: "${phrase}" → never a silent match`, async 
+          +() => {                                                       
+      158 +      const outcome = await resolver.resolve(phrase)          
+      159 +      expect(outcome?.kind).not.toBe('match')                 
+      160 +    })                                                        
+      161 +  }                                                           
+      162  })
+      163  
+      164  describe('threshold calibration', () => {
+
+⏺ Update(src/tests/voiceEmbedding.integration.test.ts)
+  ⎿  Added 15 lines, removed 10 lines
+      175        positiveScores.push(m!.score)
+      176        positiveGaps.push(m!.margin)
+      177      }
+      178 -    const negativeScores: number[] = []                       
+      179 -    for (const phrase of NEGATIVE_ROWS) {                     
+      178 +    const bestScoreFor = async (phrase: string): Promise<numbe
+          +r> => {                                                       
+      179        const [q] = await embed([phrase])
+      180        let best = -Infinity
+      181        for (const v of bankVectors) best = Math.max(best, cosin
+           eSimilarity(q, v))
+      183 -      negativeScores.push(best)                               
+      182 +      return best                                             
+      183      }
+      184 +    const hardNegativeScores = await Promise.all(HARD_NEGATIVE
+          +_ROWS.map(bestScoreFor))                                      
+      185 +    const nearMissScores = await Promise.all(NEAR_MISS_ROWS.ma
+          +p(bestScoreFor))                                              
+      186  
+      187      const minPositive = Math.min(...positiveScores)
+      188      const minGap = Math.min(...positiveGaps)
+      188 -    const maxNegative = Math.max(...negativeScores)           
+      189 +    const maxHardNegative = Math.max(...hardNegativeScores)   
+      190 +    const maxNearMiss = Math.max(...nearMissScores)           
+      191      // eslint-disable-next-line no-console
+      192      console.log(
+      193        `[calibration] positives: min=${minPositive.toFixed(3)} 
+           minGap=${minGap.toFixed(3)} ` +
+      192 -        `| negatives: max=${maxNegative.toFixed(3)} ` +       
+      193 -        `| threshold=${DEFAULT_THRESHOLD} margin=${DEFAULT_MAR
+          -GIN}`,                                                        
+      194 +        `| hard negatives: max=${maxHardNegative.toFixed(3)} |
+          + near misses: max=${maxNearMiss.toFixed(3)} ` +               
+      195 +        `| threshold=${DEFAULT_THRESHOLD} margin=${DEFAULT_MAR
+          +GIN} suggest=${SUGGEST_THRESHOLD}`,                           
+      196      )
+      197  
+      196 -    // Every accepted paraphrase needs headroom above both gat
+          -es; every                                                     
+      197 -    // negative must sit safely below the threshold. If either
+          - fails, tune the                                              
+      198 -    // constants or the example bank HERE — this test is the c
+          -alibration record.                                            
+      198 +    // Every accepted paraphrase needs headroom above both acc
+          +ept gates; hard                                               
+      199 +    // negatives must sit below the suggest floor (no spurious
+          + "did you                                                     
+      200 +    // mean"); near misses must at least stay out of silent-ac
+          +cept territory.                                               
+      201 +    // If any fails, tune the constants or the example bank HE
+          +RE — this test                                                
+      202 +    // is the calibration record.                             
+      203      expect(minPositive).toBeGreaterThan(DEFAULT_THRESHOLD)
+      204      expect(minGap).toBeGreaterThan(DEFAULT_MARGIN)
+      201 -    expect(maxNegative).toBeLessThan(DEFAULT_THRESHOLD)       
+      205 +    expect(maxHardNegative).toBeLessThan(SUGGEST_THRESHOLD)   
+      206 +    expect(maxNearMiss).toBeLessThan(DEFAULT_THRESHOLD)       
+      207    }, 120_000)
+      208  })
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Build is clean (the chunk-size warning is pre-existing). Let me update
+  CLAUDE.md's voice section to reflect the new architecture, and save a
+  reference memory:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 13 lines
+      65      the target screen's scope registers (pending-intent, 10 s T
+          TL). `buildGrammar()` generates
+      66      the Kaldi word-list grammar (+`"[unk]"`) so piano notes/cha
+          tter decode as `[unk]` and are
+      67      dropped before the wake-word check.
+      68 +  - `convo.ts` — **pure** conversation state machine between pa
+         +rser and dispatcher (design                                    
+      69 +    follows the ACIxD VUI wiki, acixd.org — HTTP only, cert is 
+         +broken for HTTPS): armed window                                
+      70 +    after the wake word AND after every command (5 s one-step c
+         +orrection: "no, d minor" / bare                                
+      71 +    "no" → "My mistake."), escalating no-match reprompts ("Sorr
+         +y?" → two examples from the                                    
+      72 +    active scope → point at the HUD list, then give up until re
+         +-woken), and "…— right?"                                       
+      73 +    confirmation of uncertain fallback matches ("yes"/"no"). `d
+         +escribe.ts` renders intents as                                 
+      74 +    spoken paraphrases for those confirmations. Universal comma
+         +nds: "repeat" (re-speaks                                       
+      75 +    `tts.lastSpoken`; meta-prompts are excluded via `speak(text
+         +, {remember:false})`) and                                      
+      76 +    "go back" (`history.back()` — drill-downs are URL-backed). 
+      77 +  - `phrases.ts` — single registry of advertised example phrase
+         +s per scope                                                    
+      78 +    (`SCOPE_PHRASES`); screens import it, and `src/tests/voiceP
+         +hrases.test.ts` enforces the                                   
+      79 +    mimicry invariant: every advertised phrase must parse AND b
+         +e decodable under the grammar.                                 
+      80 +    Add new example phrases here, never inline in a screen.    
+      81    - Embedding fallback (Tier 1): when the regex parser yields `
+          {kind:'unknown'}`,
+      82      `voice.svelte.ts` embeds the transcript (MiniLM via `embedd
+          er.ts`, lazily preloaded on
+      83      voice enable) and nearest-neighbor matches it against `inte
+          ntBank.ts` — example phrasings
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 4 lines, removed 2 lines
+      86      threshold + cross-template margin (calibrated by
+      87      `src/tests/voiceEmbedding.integration.test.ts`, which runs 
+          the REAL model offline in node
+      88      env — tune constants there, never by hand). All matching lo
+          gic is pure
+      89 -    (`intentBank`/`intentMatcher`/`fallback` — vitest-covered);
+         - a miss falls back to the old                                  
+      90 -    "didn't catch that". Bank example words are auto-added to t
+         -he Vosk grammar                                                
+      89 +    (`intentBank`/`intentMatcher`/`fallback` — vitest-covered);
+         + scores in the uncertain band                                  
+      90 +    (`SUGGEST_THRESHOLD` ≤ score < accept gates) become a spoke
+         +n "did you mean" confirmation                                  
+      91 +    via `convo.ts`; full misses get the escalating reprompts an
+         +d are logged to                                                
+      92 +    `missLog.ts` (localStorage ring buffer, for tuning). Bank e
+         +xample words are auto-added to the Vosk grammar                
+      93      (invariant-tested), so keep examples to real English words 
+          the small model knows.
+      94      Antonym-ish intents (faster/slower, arpeggio/block) share O
+          NE template with the direction
+      95      read from the transcript — separate templates sit too close
+           in embedding space.
+
+  Ran 1 shell command, recalled 1 memory, wrote 2 memories (ctrl+o to expand)
+
+⏺ Done. I read the ACIxD wiki (Association for Conversational Interaction Design
+  — a research-backed voice-UI design reference at acixd.org), mapped its
+  guidance onto the app's voice interface, and implemented the improvements. All
+  673 tests pass, typecheck is clean, and the production build succeeds.
+
+  What the wiki changed in the app:
+
+  1. Escalating reprompts (wiki: "stepping stones and safety nets"): instead of
+  the same "Sorry, I didn't catch that…" every time, a miss now gets "Sorry?", a
+  second miss gets two example phrases from the current screen's commands ("You
+  can say: show me d major, or left hand."), and a third points at the visual
+  HUD list and goes quiet until re-woken — the multimodal equivalent of an IVR's
+  touchtone fallback.
+  2. "Did you mean … — right?" confirmation: the embedding fallback was binary
+  accept/reject; there's now an uncertain band (SUGGEST_THRESHOLD 0.45 ≤ score <
+  accept gates) that asks aloud instead of failing. Recalibrated against the
+  real MiniLM model: hard negatives peak at 0.440 (never prompt), on-domain
+  chatter peaks at 0.478 (worst case is one cheap "no"), true paraphrases stay
+  above 0.55 (still act silently).
+  3. One-step correction (wiki: allow "No, $500"): every successful command
+  opens a 5-second window where "no, d minor" corrects without repeating the
+  wake word, and bare "no" gets "My mistake." — deliberately distinct from a
+  no-match message, per the wiki's disconfirmation guidance.
+  4. Universal commands: added "repeat" / "say that again" (re-speaks the last
+  real feedback; meta-prompts like "Sorry?" are excluded) and "go back" (browser
+  back — your URL-backed navigation made this free). "Go back" inside a lesson
+  now means back-navigation; "previous part" still steps segments.
+  5. Prompt wording per the conversational maxims: spoken help cut from 4
+  examples to 2 (wiki: three "sounds like a menu") plus a pointer to the HUD;
+  "There are five stages." → "Stages go from one to five." (affirmative — tells
+  the user what to say); enabling voice now confirms "Voice is on."
+  (user-initiated enables only, silent on page reload).
+  6. Mimicry invariant test (wiki: users parrot what you advertise): all
+  advertised phrases moved to a single registry (src/lib/voice/phrases.ts) and a
+  new test enforces that every one parses and survives the Vosk grammar. It
+  immediately caught two real bugs — "hear it again" (advertised on Quizzes,
+  unparseable) and "sight reading" (advertised, but "sight" wasn't in the
+  grammar so it could never be decoded). Plus a localStorage ring buffer of
+  unrecognized transcripts (piano-tutor.voice-misses) for the wiki's
+  tune-from-real-data loop.
+
+  Architecturally, the reprompt/correction/confirmation logic lives in one new
+  pure state machine, src/lib/voice/convo.ts (idle → armed → confirming,
+  lazily-expiring windows, no timers), tested in voiceConvo.test.ts —
+  voice.svelte.ts just feeds it parsed intents. I updated CLAUDE.md to document
+  the new layer.
+
+  One thing worth trying live (mic behavior can't be tested headlessly): enable
+  voice, say "piano" + gibberish three times to hear the escalation, then
+  something borderline like "piano, let me hear a beat maybe" to see the "—
+  right?" confirmation flow.
+
+✻ Cooked for 33m 50s
+
+※ recap: Applied the ACIxD voice-design wiki to the app's voice UI: escalating reprompts, did-you-mean confirmations, one-step corrections, repeat/go-back commands, and a phrase-grammar invariant test. All done, tests green. Next: try the mic flows live in the app. (disable recaps in /config)
+
+❯ commit                                                                        
+⏺ The working tree also has your pre-existing in-progress changes (glossary
+  work, etc.) mixed into some of the same files I touched. Let me check the
+  overlap before staging:
+
+  Committed fa6fda3, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Committed as fa6fda3 — "Add conversational error recovery and confirmations to
+  voice control", 30 files, +1039/−105. The working tree is clean apart from
+  the untracked chat transcript .txt files, which I left alone (per the project
+  rule, no Claude attribution in the message).
+
+✻ Worked for 58s
+
+! git status                                                                    
+  ⎿  On branch main
+     Your branch is ahead of 'origin/main' by 1 commit.
+       (use "git push" to publish your local commits)
+     … +14 lines (ctrl+o to expand)
+
+⏺ The commit is in and the tree is clean apart from those chat transcript .txt
+  files. You're one commit ahead of origin/main — say the word if you want me to
+  push.
+
+  If those transcript files keep accumulating in the repo root, I could add a
+  .gitignore entry (e.g. /2026-*.txt and /chats/) so they stop showing up in git
+  status — just let me know.
+
+✻ Baked for 7s
+
+! git push                                                                      
+  ⎿  To https://github.com/kepler471/piano-tutor.git
+        8964741..fa6fda3  main -> main
+
+⏺ Pushed — fa6fda3 is now on origin/main. The voice UX improvements from the
+  ACIxD wiki are live in the repo.
+
+✻ Churned for 4s
+
+! /export                                                                       
+  ⎿  /opt/homebrew/bin/bash: line 1: /export: No such file or directory
+  ⎿  Interrupted · What should Claude do instead?
+
+! /export                                                                       
+  ⎿  /opt/homebrew/bin/bash: line 1: /export: No such file or directory
+
+
+⏺ /export is a Claude Code slash command, not a shell command — the ! prefix
+  sent it to bash, which is why it failed. Type it directly at the prompt (no
+  !):
+
+  /export
+
+  That'll save this conversation transcript (which looks like how those
+  2026-07-*.txt files in your repo root got created, by the way).
+
+✻ Brewed for 7s

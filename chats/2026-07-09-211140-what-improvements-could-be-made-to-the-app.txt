@@ -1,0 +1,2797 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.205
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor/.claude/worktrees/general-improvements
+
+
+❯ What improvements could be made to the app?                                   
+
+⏺ I'll survey the app to find improvement opportunities. Let me first check my
+  memory of deferred ideas, then explore the codebase.
+
+  Recalled 2 memories (ctrl+o to expand)
+
+⏺ Now let me explore the codebase from a few angles in parallel.
+
+⏺ 3 background agents launched (↓ to manage)
+   ├ Survey app screens and UX
+   ├ Survey practice/content/quiz gaps
+   └ Survey audio/voice/tech debt
+
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+⏺ The survey agents are running in the background; I'll compile the improvement
+  list as their reports come in.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+  ⎿  Invalid tool parameters
+
+⏺ The three survey agents are still working — I'll be notified when each
+  completes and will then assemble the improvement recommendations.
+
+✻ Worked for 1m 12s
+
+⏺ Agent "Survey app screens and UX" finished · 1m 45s
+
+⏺ The screens/UX survey is in — the biggest gaps there: no settings screen, A4
+  hardcoded to 440, progress data collected but barely used (guide is
+  progress-blind, levels don't persist for quizzes/rhythm). Waiting for the
+  other two surveys before assembling recommendations.
+
+✻ Sautéed for 6s
+
+⏺ Agent "Survey audio/voice/tech debt" finished · 2m 11s
+
+⏺ The technical survey is also in — headline findings: no offline/PWA support
+  despite ~70 MB of local models, poly grading latency of 0.5–1.5 s that mono
+  onsets could cut, hardcoded A4=440, no responsive/dark/touch support, and the
+  Vosk grammar silently falling back to open vocabulary. One more survey
+  (learning content) still running.
+
+✻ Baked for 7s
+
+⏺ Agent "Survey practice/content/quiz gaps" finished · 2m 23s
+
+  ⎿  Tip: You've fanned out three survey agents in parallel and they're 
+     reporting back as they finish — this is exactly the right pattern for broad
+     exploration. When you're ready to act on the findings, you can → Ask 
+     Claude to "fan out subagents, one per improvement category"
+
+⏺ All three surveys are complete. Let me consolidate the findings into the plan
+  file, then ask which direction you want to pursue.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User answered Claude's questions:
+  ⎿  · Which improvement areas should I plan in detail? (You can pick several — 
+     I'd start with song practice mechanics as the highest-impact one.) → 
+     Platform: PWA + settings, Detection: fusion + A4, Progress & guide 
+     integration, Song practice tools (Recommended)
+⏺ Plan(Design four-area improvement plan)
+  ⎿  Done (29 tool uses · 100.9k tokens · 7m 0s)
+  (ctrl+o to expand)
+
+⏺ The plan came back solid. Let me spot-check the riskiest integration points
+  before finalizing.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ All spot-checks confirm the plan's claims. Writing the final plan now.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: 
+     ~/.claude/plans/what-improvements-could-be-resilient-koala.md · /plan to 
+     edit
+     Piano Tutor — General Improvements (4 areas)
+
+     Context
+
+     Survey of the app found it healthy (no TODOs, strong pure-logic test
+     coverage, 100+ songs,
+     14 quiz modes) but with four clear gaps the user chose to address, all
+     confirmed by code
+     reading:
+
+     1. Song practice grades note order only — SongPlayer.svelte has no tempo
+     control
+     (demo always song.tempoBpm), no metronome/count-in, no looping, and never
+     calls the
+     existing timingGrader.ts even though stepsFromSong already emits startBeat.
+     2. Progress is collected but unused — history.svelte.ts read only by Home's
+     last-6
+     list; progress.svelte.ts levels wired only to sight-reading (quiz/rhythm
+     levels reset
+     on reload); the guide shows no completion indicators.
+     3. Detection — A4=440 hardcoded (noteEvents.ts:27,33, no calibration); in
+     mic-poly
+     mode grading waits 0.5–1.5 s for Basic Pitch while the ~10 ms mono detector
+     is
+     display-only (routing.ts forwards poly events exclusively).
+     4. Platform — no PWA (not installable/offline despite ~70 MB local models),
+     no settings
+     screen, preferences don't persist, voice missLog has no UI.
+
+     Four phases, each independently mergeable. Suggested order: 2 → 1 → 3 → 4
+     (Phase 3 creates settings.svelte.ts; Phase 4 surfaces it).
+
+     ---
+     Phase 1 — Song practice tools
+
+     Files: modify src/components/SongPlayer.svelte,
+     src/lib/practice/songSteps.ts;
+     create src/lib/practice/songPrefs.svelte.ts; extend
+     src/tests/songSteps.test.ts.
+
+     - Tempo slider (40–180, default song.tempoBpm): demo() passes the chosen
+     bpm to
+     playSong(notes, bpm, song.swing) (already parameterized, verified
+     SongPlayer.svelte:117). Persist per song in new songPrefs.svelte.ts
+     singleton
+     ('piano-tutor.song-prefs', Record<songId, {bpm}>, follow history.svelte.ts
+     load/persist pattern).
+     - Metronome + count-in: mirror LessonPlayer's wiring
+     (LessonPlayer.svelte:99–107) with
+     countInBeats: song.timeSignature[0]; restart on attempt reset so each try
+     gets a
+     count-in. Metronome intentionally does NOT set playback.isPlaying — that
+     keeps the mic
+     live for grading; do not change.
+     - Timing feedback (opt-in, wait-mode stays default): copy LessonPlayer's
+     proven pattern
+     (verified lines 57–78, 166–175): collect advanceTimes on outcome.advanced;
+     on done,
+     if metronome on and all steps advanced, gradeTiming(...) anchored to the
+     first note
+     (advanceTimes[0] - steps[0].startBeat * beatMs), swing-aware. Show "Timing:
+     N%" on the
+     completion card. Suppress when activeSource === 'mic-poly' (poly latency
+     makes
+     ms-grading meaningless; fused/mono/midi OK).
+     - Arbitrary measure range + loop: From/To measure inputs alongside section
+     chips
+     (stepsFromSong already supports ranges); loop checkbox auto-restarts ~1.2 s
+     after
+     completion. Mirror range in URL via navigate(..., {replace: true}) with
+     param bars=3-6
+     (NOT from/to — from=guide is taken by guide deep links). Pure
+     parseBarsParam/barsParam helpers in songSteps.ts, unit-tested.
+
+     Phase 2 — Progress & guide integration
+
+     Files: modify src/lib/practice/history.svelte.ts (MAX_RECORDS 200→500),
+     src/screens/{Quizzes,RhythmTrainer,GuideScreen,Home}.svelte; create pure
+     src/lib/practice/stats.ts, src/lib/practice/guideProgress.ts + tests
+     src/tests/{stats,guideProgress}.test.ts. guide.ts stays untouched
+     (data-only).
+
+     - Persist quiz levels via existing progress.svelte.ts: key quiz-${mode};
+     precedence
+     URL level param > stored level (capped to mode's level count) > 1;
+     recordRun at round
+     end next to the existing addRecord (Quizzes.svelte:~301).
+     - Persist rhythm level: key 'rhythm', same precedence; recordRun('rhythm', 
+     clean, 4)
+     in finish() where clean = no missed/extra and all hits perfect/good.
+     - Guide indicators: pure guideProgress.ts maps each GuideLink to history
+     lessonId
+     formats (lesson → id; song → song-${id}; quiz → quiz-${mode}; rhythm prefix
+     rhythm-l${level}-; sight prefix sight-reading-L${level}-;
+     scales/chords/routes →
+     null). guideItemStats(link, records, now) → {count, lastAt, recent};
+     GuideScreen
+     renders small badges (✓ ×3 / "practiced this week"). Integrity test over
+     real
+     GUIDE_STAGES pins the id formats against the writers (mirrors
+     guide.test.ts).
+     - Home stats: pure stats.ts — dayStreak(records, now) +
+     weekSegments(records, now);
+     Home shows "🔥 N-day streak · M segments this week". No minutes (no
+     duration field; out
+     of scope).
+
+     Phase 3 — Detection: A4 calibration + mono/poly fusion
+
+     Files: create src/lib/settings.svelte.ts, src/lib/input/fusion.ts (pure),
+     src/tests/fusion.test.ts; modify src/lib/audio/{noteEvents,monoTracker}.ts,
+     src/lib/audio/monoPitch.svelte.ts,
+     src/lib/input/{routing,noteInput.svelte}.ts,
+     src/screens/Tuner.svelte; extend src/tests/detection.test.ts.
+
+     - Settings singleton ('piano-tutor.settings', mic.svelte.ts getter
+     convention):
+     {a4 (clamped 435–445), fusion: boolean (default true), defaultHand}.
+     localStorage
+     guarded, no DOM types (imported by test-adjacent modules).
+     - A4: add defaulted a4 = 440 params to frequencyToMidi/midiToFrequency
+     (all existing callers/tests unchanged); thread through MonoTrackerOptions →
+     monoPitch.svelte.ts reads settings.a4 at detection start. Tuner gains an
+     auto-calibrate flow: hold A4, average cents for ~1.5 s, newA4 = a4 · 
+     2^(avg/1200)
+     (pure calibratedA4 helper, unit-tested), confirm → save → restart
+     detection.
+     Poly (Basic Pitch) stays at 440 — within ±20 cents its semitone binning is
+     unaffected;
+     note this in the settings copy and CLAUDE.md.
+     - Fusion — new pure MonoPolyFuser in fusion.ts:
+     mono on → record onset, forward immediately (instant grading); poly on → if
+     an
+     unconsumed mono onset with same midi within maxPolyLagMs (default 2000)
+     exists, consume
+     it and drop (dedup), else forward (chord non-top notes). Exact midi match
+     (chords contain
+     legit octaves); one-to-one consumption handles repeated notes; poly has no
+     note-offs —
+     don't wait for them. MIDI bypasses the fuser.
+     - Wiring: new ActiveSource 'mic-fused'; chooseSource(midiAvailable, 
+     preferred, fusionEnabled) returns it when poly preferred + fusion on;
+     shouldForward forwards both
+     mono and poly for it. noteInput.svelte.ts owns one fuser, applies after
+     shouldForward,
+     resets on start/stop. Legacy poly-only path stays reachable via the
+     settings toggle
+     (escape hatch: mono octave-flicker can flash wrong-notes during chords;
+     wait-mode means
+     it never blocks progress).
+     - Tests: fusion dedup/window/repeat/reset cases + extended chooseSource/
+     shouldForward; detection.test.ts synthesizes a 442-based tone → tracker
+     with a4: 442
+     reads ~0 cents, with 440 reads ≈ +8 cents; calibratedA4 round-trip.
+
+     Phase 4 — Platform: settings screen + PWA
+
+     Files: create src/screens/Settings.svelte, PWA icons; modify src/App.svelte
+     (route /settings + nav), src/screens/Home.svelte (tile),
+     src/screens/{ScalesLibrary,ChordsLibrary}.svelte (init hand from
+     settings.defaultHand),
+     src/lib/voice/missLog.ts (add readMisses()/clearMisses()), vite.config.ts,
+     index.html, package.json, CLAUDE.md.
+
+     - Settings screen (plain navigate, no sub-state): Tuning (A4 + link to
+     Tuner
+     calibration), Detection (fusion toggle + "chords analyzed at A=440" note),
+     Practice
+     defaults (hand — control tweak, settings-persisted, not URL), Voice
+     (miss-log table +
+     Clear), optional offline/storage status.
+     - PWA: vite-plugin-pwa@^1.3.0 (verified compatible with this repo's
+     Vite 8),
+     registerType: 'autoUpdate', devOptions.enabled: false (dev serves ort-wasm
+     from
+     node_modules — see embedder.ts).
+       - Precache app shell only; globIgnores for model/**, model-vosk/**, 
+     model-minilm/**, tfjs-wasm/**, ort-wasm/**, worklets/** (never precache ~70
+     MB).
+       - Runtime CacheFirst routes: same-origin /model/, /tfjs-wasm/,
+     /ort-wasm/,
+     /worklets/ (cache piano-tutor.sw-static); Salamander samples host
+     (tonejs.github.io/audio/salamander/, maxEntries ~40) so demos work offline.
+       - No route for /model-vosk/ (modelLoader.ts already Cache-API caches it
+     with a
+     progress bar — an SW route would double-store 41 MB and break the progress
+     UI) and
+     none for /model-minilm/ (transformers.js self-caches; verify at
+     implementation).
+       - Manifest: standalone, start_url: '/' (hash routing needs no server
+     config),
+     192/512 + maskable icons generated from public/favicon.svg and committed.
+
+     Cross-cutting
+
+     - Voice feedback strings must never contain "piano"; any new advertised
+     phrases go only in
+     src/lib/voice/phrases.ts (enforced by voicePhrases.test.ts).
+     - New drill-down state URL-backed via navigate(); control tweaks use
+     replace
+     (user expects browser back to always work).
+     - No tfjs upgrade (basic-pitch pins 3.x). Pure logic stays DOM-free.
+     - Update CLAUDE.md per phase (settings singleton, fusion routing, SW
+     caching policy).
+
+     Verification
+
+     Per phase: npm test + npm run check. Dev smoke (npm run dev, use /verify
+     skill for
+     Playwright driving):
+     - P1: open song → tempo 60 → metronome+count-in → complete a section →
+     timing % shown;
+     bars-range replace doesn't pollute back history.
+     - P2: finish a quiz round + rhythm run → reload → levels persist; guide
+     shows ✓ badges;
+     Home shows streak.
+     - P3: fusion on with poly preferred → single notes grade instantly, chords
+     complete when
+     poly lands; Tuner calibration round-trips; detection tests pass at a4=442.
+     - P4: npm run build && npm run preview → precache excludes model dirs; go
+     offline after
+     one full visit (incl. enabling voice once) → app loads, demo plays, voice
+     initializes
+     from cache; Lighthouse installability passes.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Quizzes screen understood. Now let me look at how Practice.svelte uses the
+  progress store (to mirror its pattern) and at RhythmTrainer.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Now let me read the guide data structures, GuideScreen, and Home.
+
+  Searched for 2 patterns, read 3 files (ctrl+o to expand)
+
+⏺ All context gathered. Now writing Phase 2: the pure helpers first, then wiring
+  the screens.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Write(src/lib/practice/stats.ts)
+  ⎿  Wrote 34 lines to src/lib/practice/stats.ts
+      1 /**
+      2  * Pure practice-history statistics (no DOM types — vitest-covere
+        d).
+      3  * Consumed by the Home screen's streak/week summary.
+      4  */
+      5 
+      6 interface Dated {
+      7   /** ISO timestamp */
+      8   at: string
+      9 }
+     … +31 lines (ctrl+o to expand)
+⏺ Write(src/lib/practice/guideProgress.ts)
+  ⎿  Wrote 70 lines to src/lib/practice/guideProgress.ts
+       1 import type { GuideLink } from '../data/guide'
+       2 import type { PracticeRecord } from './history.svelte'
+       4 /**
+       5  * Derive per-guide-link practice indicators from the history lo
+         g. The guide
+         knows which
+       7  * `lessonId` format each link's target screen writes into histo
+         ry:
+       9  * - lessons:   the lesson id itself           (LessonPlayer)
+      10  * - songs:     `song-${songId}`               (SongPlayer)
+     … +71 lines (ctrl+o to expand)
+
+⏺ Update(src/lib/practice/history.svelte.ts)
+  ⎿  Added 1 line, removed 1 line
+      13  }
+      14  
+      15  const STORAGE_KEY = 'piano-tutor.practice-history'
+      16 -const MAX_RECORDS = 200                                        
+      16 +const MAX_RECORDS = 500                                        
+      17  
+      18  function load(): PracticeRecord[] {
+      19    try {
+
+⏺ Now wiring persistent quiz levels into Quizzes.svelte.
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      41    import { QUIZ_LEVEL_COUNTS, type QuizModeId } from '../lib/qu
+          iz/modes'
+      42    import { midiToVexKey, type ScoreModel } from '../lib/notatio
+          n/vexScore'
+      43    import { addRecord } from '../lib/practice/history.svelte'
+      44 +  import { getProgress, recordRun, setLevel as setStoredLevel, 
+         +STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'    
+      45    import { SCOPE_PHRASES } from '../lib/voice/phrases'
+      46    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      47    import { currentParams, navigate } from '../router.svelte'
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 10 lines, removed 2 lines
+      102    let mode = $state<QuizModeId>('intervals')
+      103    let level = $state(1)
+      104  
+      105 +  /** Persisted level for a mode, capped to its level count. *
+          +/                                                             
+      106 +  function storedLevel(m: QuizModeId): number {               
+      107 +    return Math.min(getProgress(`quiz-${m}`).level, QUIZ_LEVEL
+          +_COUNTS[m])                                                   
+      108 +  }                                                           
+      109 +                                                              
+      110    // Mode and level are mirrored in the URL (?mode=&level=) wi
+           th replace
+      111    // navigation: refresh and back-into-the-screen restore them
+           , but toggling
+      112    // modes never stacks history entries. The $effect below als
+           o applies
+      108 -  // guide deep links and back/forward param changes.         
+      113 +  // guide deep links and back/forward param changes. A URL wi
+          +thout a valid                                                 
+      114 +  // level falls back to the mode's persisted level.          
+      115    const routeParams = $derived(currentParams())
+      116  
+      117    function fromParams(params: Readonly<Record<string, string>>
+           ): { mode: QuizModeId; level: number } | null {
+     ...
+      120      const linkedLevel = Number(params.level)
+      121      const validLevel =
+      122        Number.isInteger(linkedLevel) && linkedLevel >= 1 && lin
+           kedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]
+      117 -    return { mode: linkedMode, level: validLevel ? linkedLevel
+          - : 1 }                                                        
+      123 +    return { mode: linkedMode, level: validLevel ? linkedLevel
+          + : storedLevel(linkedMode) }                                  
+      124    }
+      125  
+      126    // Initial deep link, applied before the first render.
+     ...
+      128    if (initial) {
+      129      mode = initial.mode
+      130      level = initial.level
+      131 +  } else {                                                    
+      132 +    level = storedLevel(mode)                                 
+      133    }
+      134  
+      135    function reflectRoute() {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines, removed 1 line
+      193  
+      194    function setMode(m: QuizModeId) {
+      195      mode = m
+      196 -    level = 1                                                 
+      196 +    level = storedLevel(m)                                    
+      197      resetRound()
+      198      reflectRoute()
+      199    }
+      200  
+      201    function setLevel(l: number) {
+      202      level = l
+      203 +    setStoredLevel(`quiz-${mode}`, l)                         
+      204      resetRound()
+      205      reflectRoute()
+      206    }
+
+⏺ Now the round-end streak recording and completion-card feedback in Quizzes:
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 16 lines
+      306      maybeRecord()
+      307    }
+      308  
+      309 +  // Feedback for the round-complete card: streak towards the 
+          +next level, or                                                
+      310 +  // the level-up itself (three perfect rounds in a row bump t
+          +he stored level).                                             
+      311 +  let roundFeedback = $state<string | null>(null)             
+      312 +  let autoLeveled = $state(false)                             
+      313 +                                                              
+      314    function maybeRecord() {
+      315      if (answered < roundSize) return
+      316      addRecord({
+     ...
+      322        kind: 'ear',
+      323        score: { correct, total: answered },
+      324      })
+      325 +    const { leveledUp, progress } = recordRun(`quiz-${mode}`, 
+          +correct === answered, maxLevel)                               
+      326 +    if (leveledUp) {                                          
+      327 +      level = progress.level                                  
+      328 +      autoLeveled = true                                      
+      329 +      roundFeedback = `🎉 Three perfect rounds — you're now on
+          + level ${progress.level}.`                                    
+      330 +      reflectRoute()                                          
+      331 +    } else if (correct === answered && level < maxLevel) {    
+      332 +      roundFeedback = `Perfect round — ${progress.streak}/${ST
+          +REAK_TO_LEVEL_UP} towards level ${level + 1}.`                
+      333 +    } else {                                                  
+      334 +      roundFeedback = null                                    
+      335 +    }                                                         
+      336    }
+      337  
+      338    function next() {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      189      echoResult = null
+      190      phraseResult = null
+      191      heard = false
+      192 +    roundFeedback = null                                      
+      193 +    autoLeveled = false                                       
+      194    }
+      195  
+      196    function setMode(m: QuizModeId) {
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 4 lines, removed 1 line
+      402      {#if roundDone}
+      403        <div class="complete">
+      404          🎉 Round complete — {correct} / {answered} correct.
+      405 +        {#if roundFeedback}                                   
+      406 +          <span class="feedback">{roundFeedback}</span>       
+      407 +        {/if}                                                 
+      408          <button class="primary" onclick={resetRound}>New round
+           </button>
+      406 -        {#if correct === answered && level < maxLevel}        
+      409 +        {#if !autoLeveled && correct === answered && level < m
+          +axLevel}                                                      
+      410            <button class="primary" onclick={() => setLevel(leve
+           l + 1)}>Level up →</button>
+      411          {/if}
+      412        </div>
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 5 lines
+      564    .next {
+      565      align-self: flex-start;
+      566    }
+      567 +  .feedback {                                                 
+      568 +    display: block;                                           
+      569 +    font-size: 13px;                                          
+      570 +    color: #475569;                                           
+      571 +  }                                                           
+      572    button.primary {
+      573      align-self: flex-start;
+      574    }
+
+⏺ Now RhythmTrainer: persistent level + streak recording.
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 11 lines, removed 6 lines
+       8    import { onInput } from '../lib/input/noteInput.svelte'
+       9    import { durationFromBeats, type HighlightState, type ScoreMo
+          del } from '../lib/notation/vexScore'
+      10    import { addRecord } from '../lib/practice/history.svelte'
+      11 +  import { getProgress, recordRun, setLevel as setStoredLevel, 
+         +STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'    
+      12    import { gradeTiming, type TimingResult } from '../lib/practi
+          ce/timingGrader'
+      13    import { currentParams } from '../router.svelte'
+      14  
+      15    const SWING_RATIO = 2 / 3
+      16    const COUNT_IN = 4
+      17 +  const MAX_LEVEL = 4                                          
+      18 +  const ACTIVITY = 'rhythm'                                    
+      19  
+      17 -  let level = $state<1 | 2 | 3 | 4>(1)                         
+      20 +  type Level = 1 | 2 | 3 | 4                                   
+      21 +                                                               
+      22 +  let level = $state<Level>(1)                                 
+      23    let patternId = $state(RHYTHM_PATTERNS[0].id)
+      24    let bpm = $state(80)
+      25  
+      21 -  // Deep link from the learning guide, read once at mount.    
+      26 +  // Guide deep link (read once at mount) wins; otherwise resum
+         +e the                                                          
+      27 +  // persisted level.                                          
+      28    {
+      29      const linked = Number(currentParams().level)
+      24 -    if (linked === 1 || linked === 2 || linked === 3 || linked 
+         -=== 4) {                                                       
+      25 -      level = linked                                           
+      26 -      patternId = RHYTHM_PATTERNS.find((p) => p.level === linke
+         -d)!.id                                                         
+      27 -    }                                                          
+      30 +    const stored = Math.min(getProgress(ACTIVITY).level, MAX_LE
+         +VEL) as Level                                                  
+      31 +    level = linked === 1 || linked === 2 || linked === 3 || lin
+         +ked === 4 ? linked : stored                                    
+      32 +    patternId = RHYTHM_PATTERNS.find((p) => p.level === level)!
+         +.id                                                            
+      33    }
+      34  
+      35    const levelPatterns = $derived(RHYTHM_PATTERNS.filter((p) => 
+          p.level === level))
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 6 lines, removed 1 line
+      46  
+      47    const totalBeats = $derived(pattern.bars * ((pattern.timeSign
+          ature[0] * 4) / pattern.timeSignature[1]))
+      48  
+      49 -  function setLevel(l: 1 | 2 | 3 | 4) {                        
+      49 +  function setLevel(l: Level) {                                
+      50      stopRun()
+      51      level = l
+      52      patternId = RHYTHM_PATTERNS.find((p) => p.level === l)!.id
+      53 +    result = null                                              
+      54 +    runFeedback = null                                         
+      55 +    setStoredLevel(ACTIVITY, l)                                
+      56    }
+      57  
+      58    function selectPattern(id: string) {
+      59      stopRun()
+      60      patternId = id
+      61 +    result = null                                              
+      62 +    runFeedback = null                                         
+      63    }
+      64  
+      65    function stopRun() {
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 3 lines
+      39    let phase = $state<Phase>('idle')
+      40    let countBeat = $state(0)
+      41    let result = $state<TimingResult | null>(null)
+      42 +  // Streak-towards-level-up message for the summary card. Leve
+         +l-ups unlock                                                   
+      43 +  // the next level in the store but never switch patterns mid-
+         +view.                                                          
+      44 +  let runFeedback = $state<string | null>(null)                
+      45  
+      46    let onsets: { tMs: number }[] = []
+      47    let stopBeatListener: (() => void) | null = null
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 14 lines
+       97            total: pattern.events.length,
+       98          },
+       99        })
+      100 +      const clean =                                           
+      101 +        result.missed.length === 0 &&                         
+      102 +        result.extra.length === 0 &&                          
+      103 +        result.hits.every((h) => h.rating === 'perfect' || h.r
+          +ating === 'good')                                             
+      104 +      const { leveledUp, progress } = recordRun(ACTIVITY, clea
+          +n, MAX_LEVEL)                                                 
+      105 +      if (leveledUp) {                                        
+      106 +        runFeedback = `🎉 Three clean runs in a row — Level ${
+          +progress.level} unlocked.`                                    
+      107 +      } else if (clean && level < MAX_LEVEL) {                
+      108 +        runFeedback = `Clean run — ${progress.streak}/${STREAK
+          +_TO_LEVEL_UP} towards level ${level + 1}.`                    
+      109 +      } else {                                                
+      110 +        runFeedback = null                                    
+      111 +      }                                                       
+      112      }
+      113      phase = 'done'
+      114    }
+      115  
+      116    async function start() {
+      117 +                                                              
+      118 +  async function start() {                                    
+      119      result = null
+      120      onsets = []
+      121      phase = 'count-in'
+
+⏺ I made a paste error in that edit — let me inspect and fix.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 1 line, removed 2 lines
+      114    }
+      115  
+      116    async function start() {
+      117 -                                                              
+      118 -  async function start() {                                    
+      117      result = null
+      118 +    runFeedback = null                                        
+      119      onsets = []
+      120      phase = 'count-in'
+      121      countBeat = 0
+
+⏺ Fixed. Now show the streak feedback in the summary card and a level hint:
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 3 lines
+      231          {#if summary.off}· {summary.off} early/late{/if}
+      232          {#if summary.missed}· {summary.missed} missed{/if}
+      233          {#if summary.extra}· {summary.extra} stray tap{summary
+           .extra === 1 ? '' : 's'}{/if}
+      234 +        {#if runFeedback}                                     
+      235 +          <span class="feedback">{runFeedback}</span>         
+      236 +        {/if}                                                 
+      237          <button class="primary" onclick={start}>↺ Again</butto
+           n>
+      238        </div>
+      239        <p class="hint legend">
+
+⏺ Update(src/screens/RhythmTrainer.svelte)  ⎿  Added 5 lines
+      286    .count.live {
+      287      color: #16a34a;
+      288    }
+      289 +  .feedback {                                                 
+      290 +    display: block;                                           
+      291 +    font-size: 13px;                                          
+      292 +    color: #475569;                                           
+      293 +  }                                                           
+      294    .legend .lg.green {
+      295      color: #16a34a;
+      296    }
+
+⏺ Now the guide badges in GuideScreen.svelte:
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 2 lines
+      10  <script lang="ts">
+      11    import GlossText from '../components/GlossText.svelte'
+      12    import { guideHref, type GuideLink, type GuideStage } from '.
+          ./lib/data/guide'
+      13 +  import { guideItemStats } from '../lib/practice/guideProgress
+         +'                                                              
+      14 +  import { practiceHistory } from '../lib/practice/history.svel
+         +te'                                                            
+      15    import { SCOPE_PHRASES } from '../lib/voice/phrases'
+      16    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      17    import { currentParams } from '../router.svelte'
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 11 lines
+      46      return LINK_GROUPS.map((g) => ({ label: g.label, links: sta
+          ge[g.key] })).filter((g) => g.links.length > 0)
+      47    }
+      48  
+      49 +  // The guide data stays progress-blind; the screen derives "p
+         +racticed"                                                      
+      50 +  // badges from the history log (null for reference-only links
+         +).                                                             
+      51 +  function stats(link: GuideLink) {                            
+      52 +    return guideItemStats(link, practiceHistory.records, new Da
+         +te())                                                          
+      53 +  }                                                            
+      54 +                                                               
+      55 +  function badgeTitle(s: NonNullable<ReturnType<typeof stats>>)
+         +: string {                                                     
+      56 +    const when = s.lastAt ? ` — last on ${new Date(s.lastAt).to
+         +LocaleDateString()}` : ''                                      
+      57 +    return `Practiced ${s.count} time${s.count === 1 ? '' : 's'
+         +}${when}`                                                      
+      58 +  }                                                            
+      59 +                                                               
+      60    $effect(() =>
+      61      registerVoiceCommands({
+      62        name: 'Guide',
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 5 lines, removed 1 line
+      110                <span class="group-label">{group.label}</span>
+      111                <div class="chips">
+      112                  {#each group.links as link (link.label)}
+      113 -                  <a class="chip" href={guideHref(link)}>{link
+          -.label}</a>                                                   
+      113 +                  {@const s = stats(link)}                    
+      114 +                  <a class="chip" class:practiced={s?.recent} 
+          +href={guideHref(link)}>                                       
+      115 +                    {link.label}{#if s && s.count > 0}<span cl
+          +ass="tick" title={badgeTitle(s)}>                             
+      116 +                        ✓{s.count > 1 ? `×${s.count}` : ''}</s
+          +pan>{/if}                                                     
+      117 +                  </a>                                        
+      118                  {/each}
+      119                </div>
+      120              </div>
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 5 lines, removed 1 line
+      127                {#if section.links.length}
+      128                  <div class="chips">
+      129                    {#each section.links as link (link.label)}
+      130 -                    <a class="chip" href={guideHref(link)}>{li
+          -nk.label}</a>                                                 
+      130 +                    {@const s = stats(link)}                  
+      131 +                    <a class="chip" class:practiced={s?.recent
+          +} href={guideHref(link)}>                                     
+      132 +                      {link.label}{#if s && s.count > 0}<span 
+          +class="tick" title={badgeTitle(s)}>                           
+      133 +                          ✓{s.count > 1 ? `×${s.count}` : ''}<
+          +/span>{/if}                                                   
+      134 +                    </a>                                      
+      135                    {/each}
+      136                  </div>
+      137                {/if}
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 14 lines
+      250    .chip:hover {
+      251      background: #dbeafe;
+      252    }
+      253 +  .chip.practiced {                                           
+      254 +    border-color: #86efac;                                    
+      255 +    background: #f0fdf4;                                      
+      256 +    color: #15803d;                                           
+      257 +  }                                                           
+      258 +  .chip.practiced:hover {                                     
+      259 +    background: #dcfce7;                                      
+      260 +  }                                                           
+      261 +  .tick {                                                     
+      262 +    margin-left: 5px;                                         
+      263 +    font-size: 12px;                                          
+      264 +    color: #16a34a;                                           
+      265 +    font-weight: 600;                                         
+      266 +  }                                                           
+      267    .theory p {
+      268      color: #334155;
+      269      font-size: 14px;
+
+⏺ Update the guide's intro copy (it now shows practice badges) and add Home
+  stats:
+
+⏺ Update(src/screens/GuideScreen.svelte)
+  ⎿  Added 3 lines, removed 2 lines
+      75    <h1>Learning Guide</h1>
+      76    <p class="hint">
+      77      A path from your first notes to early intermediate playing,
+           using everything in this app —
+      78 -    and pointing to the outside learning worth adding along the
+         - way. There is nothing to unlock                               
+      79 -    and nothing is tracked: read a stage, practice from it, and
+         - move on when it feels secure.                                 
+      78 +    and pointing to the outside learning worth adding along the
+         + way. There is nothing to unlock:                              
+      79 +    read a stage, practice from it, and move on when it feels s
+         +ecure. A green ✓ marks material                                
+      80 +    you've already practiced.                                  
+      81    </p>
+      82    <p class="hint">
+      83      Work a stage for a few weeks. Little and often beats long a
+          nd rare — twenty focused minutes a
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 3 lines
+       1  <script lang="ts">
+       2    import { practiceHistory } from '../lib/practice/history.svel
+          te'
+       3 +  import { dayStreak, weekSegments } from '../lib/practice/stat
+         +s'                                                             
+       4    import { navigate } from '../router.svelte'
+       5  
+       6    const recent = $derived(practiceHistory.records.slice(0, 6))
+       7 +  const streak = $derived(dayStreak(practiceHistory.records, ne
+         +w Date()))                                                     
+       8 +  const weekCount = $derived(weekSegments(practiceHistory.recor
+         +ds, new Date()))                                               
+       9  
+      10    // One-time welcome for first-run users (a UI flag, not progr
+          ess tracking).
+      11    const WELCOMED_KEY = 'piano-tutor.welcomed'
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 5 lines, removed 5 lines
+      111  
+      112    {#if recent.length}
+      113      <h2 class="recent-h">Recent practice</h2>
+      114 -    {#if practiceHistory.today.length}                        
+      115 -      <p class="hint">                                        
+      116 -        {practiceHistory.today.length} segment{practiceHistory
+          -.today.length === 1 ? '' : 's'} completed today — keep it up! 
+      117 -      </p>                                                    
+      118 -    {/if}                                                     
+      114 +    <p class="hint">                                          
+      115 +      {#if streak > 1}🔥 {streak}-day streak ·{/if}           
+      116 +      {weekCount} segment{weekCount === 1 ? '' : 's'} this wee
+          +k{#if practiceHistory.today.length}                           
+      117 +        · {practiceHistory.today.length} today — keep it up!{/
+          +if}                                                           
+      118 +    </p>                                                      
+      119      <ul class="recent">
+      120        {#each recent as r (r.at)}
+      121          <li>
+
+⏺ Now the tests for the two pure modules:
+
+⏺ Write(src/tests/stats.test.ts)
+  ⎿  Wrote 52 lines to src/tests/stats.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { dayStreak, weekSegments } from '../lib/practice/stats'
+       3 
+       4 const NOW = new Date('2026-07-09T18:00:00Z')
+       5 
+       6 function daysAgo(n: number, hour = 10): { at: string } {
+       7   const d = new Date(NOW)
+       8   d.setDate(d.getDate() - n)
+       9   d.setHours(hour, 0, 0, 0)
+      10   return { at: d.toISOString() }
+     … +47 lines (ctrl+o to expand)
+
+⏺ Write(src/tests/guideProgress.test.ts)
+  ⎿  Wrote 107 lines to src/tests/guideProgress.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { GUIDE_STAGES, type GuideLink } from '../lib/data/guide'
+       3 import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
+         e/guideProgress'
+       5 import { makeSightReading } from '../lib/sightread/generator'
+       6 
+       7 const NOW = new Date('2026-07-09T18:00:00Z')
+       8 
+          at: string } {
+      10   const d = new Date(NOW)
+     … +124 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Two small issues to fix — check the ChordQualityId values first:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Update(src/tests/guideProgress.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      30  
+      31    it('returns null for reference-only links', () => {
+      32      expect(guideLinkMatcher({ kind: 'scale', root: 'C', type: '
+          major', label: 'C major' })).toBeNull()
+      33 -    expect(guideLinkMatcher({ kind: 'chord', root: 'C', quality
+         -: 'maj', label: 'C' })).toBeNull()                             
+      33 +    expect(guideLinkMatcher({ kind: 'chord', root: 'C', quality
+         +: 'major', label: 'C' })).toBeNull()                           
+      34      expect(guideLinkMatcher({ kind: 'route', route: '/circle', 
+          label: 'Circle' })).toBeNull()
+      35    })
+      36  })
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      129      mode = initial.mode
+      130      level = initial.level
+      131    } else {
+      132 -    level = storedLevel(mode)                                 
+      132 +    // Default mode — resume its persisted level. (Literal id:
+          + referencing                                                  
+      133 +    // `mode` here would only capture its initial value anyway
+          +.)                                                            
+      134 +    level = storedLevel('intervals')                          
+      135    }
+      136  
+      137    function reflectRoute() {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Phase 2 is clean — 0 errors, all tests pass. Let me check the branch state and
+  commit this phase so the phases stay independently mergeable:
+
+  Committed 3ef0a7d, amended commit a2d974d, ran 1 shell command (ctrl+o to expand)
+  Searched for 1 pattern, read 4 files (ctrl+o to expand)
+
+⏺ Let me check the router's navigate signature, then write the changes.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Now writing the songPrefs singleton and the bars-param helpers:
+
+⏺ Write(src/lib/practice/songPrefs.svelte.ts)
+  ⎿  Wrote 38 lines to src/lib/practice/songPrefs.svelte.ts
+      1 /**
+      2  * Per-song practice preferences (currently just the chosen pract
+        ice tempo),
+      3  * persisted to localStorage so a slowed-down piece stays slowed 
+        down.
+      5 export interface SongPref {
+      6   bpm: number
+      7 }
+      8 
+      9 const STORAGE_KEY = 'piano-tutor.song-prefs'
+     … +30 lines (ctrl+o to expand)
+
+⏺ Update(src/lib/practice/songSteps.ts)
+  ⎿  Added 23 lines
+      42    return [...groups.values()].sort((a, b) => a.startBeat - b.st
+          artBeat)
+      43  }
+      44  
+      45 +/**                                                            
+      46 + * Parse a `bars=3-6` URL param (1-based inclusive) into a 0-ba
+         +sed measure                                                    
+      47 + * range, or null when absent/invalid. Ranges are clamped to th
+         +e song, so a                                                   
+      48 + * stale link to a shorter piece still lands somewhere sensible
+         +.                                                              
+      49 + */                                                            
+      50 +export function parseBarsParam(                                
+      51 +  value: string | undefined,                                   
+      52 +  measureCount: number,                                        
+      53 +): { fromMeasure: number; toMeasure: number } | null {         
+      54 +  if (!value) return null                                      
+      55 +  const m = /^(\d+)-(\d+)$/.exec(value)                        
+      56 +  if (!m) return null                                          
+      57 +  const from = Number(m[1])                                    
+      58 +  const to = Number(m[2])                                      
+      59 +  if (from < 1 || to < from || from > measureCount) return null
+      60 +  return { fromMeasure: from - 1, toMeasure: Math.min(to, measu
+         +reCount) - 1 }                                                 
+      61 +}                                                              
+      62 +                                                               
+      63 +/** Inverse of parseBarsParam: 0-based range → `3-6` (1-based i
+         +nclusive). */                                                  
+      64 +export function barsParam(fromMeasure: number, toMeasure: numbe
+         +r): string {                                                   
+      65 +  return `${fromMeasure + 1}-${toMeasure + 1}`                 
+      66 +}                                                              
+      67 +                                                               
+      68  export function stepsFromSong(song: Song, opts: SongStepOptions
+          ): LessonStep[] {
+      69    return songSlices(song, opts).map((slice) => {
+      70      const ordered = [...slice.notes].sort((a, b) => a.midi - b.
+          midi)
+
+⏺ Now the main SongPlayer changes — script section first:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 51 lines, removed 1 line
+       2    import GrandSheetMusic from './GrandSheetMusic.svelte'
+       3    import InputPicker from './InputPicker.svelte'
+       4    import PianoKeyboard from './PianoKeyboard.svelte'
+       5 +  import { setMetronomeBpm, startMetronome, stopMetronome } fro
+         +m '../lib/audio/metronome'                                     
+       6    import { playSong } from '../lib/audio/playback'
+       7    import { beatsPerMeasure, type Song } from '../lib/data/songs
+          /types'
+       8    import { noteInput, onInput } from '../lib/input/noteInput.sv
+          elte'
+       9    import type { HighlightState } from '../lib/notation/vexScore
+          '
+      10    import { addRecord } from '../lib/practice/history.svelte'
+      11    import { StepMatcher } from '../lib/practice/matcher'
+      11 -  import { stepsFromSong } from '../lib/practice/songSteps'    
+      12 +  import { songPrefs } from '../lib/practice/songPrefs.svelte' 
+      13 +  import { barsParam, parseBarsParam, stepsFromSong } from '../
+         +lib/practice/songSteps'                                        
+      14 +  import { gradeTiming } from '../lib/practice/timingGrader'   
+      15 +  import { currentParams, navigate } from '../router.svelte'   
+      16  
+      17    let { song, onexit }: { song: Song; onexit?: () => void } = $
+          props()
+      18  
+      19 +  const MIN_BPM = 40                                           
+      20 +  const MAX_BPM = 180                                          
+      21 +                                                               
+      22    type Hands = 'both' | 'R' | 'L'
+      23    let hands = $state<Hands>('both')
+      24    let fromMeasure = $state(0)
+     ...
+      33    // mirrors what was played — never the expected keys or finge
+          rs.
+      34    let showKeyboard = $state(false)
+      35    let showFingering = $state(true)
+      36 +  let metronomeOn = $state(false)                              
+      37 +  let loop = $state(false)                                     
+      38 +  // Practice tempo, persisted per song. svelte-ignore as above
+         +: keyed per song.                                              
+      39 +  // svelte-ignore state_referenced_locally                    
+      40 +  let bpm = $state(songPrefs.get(song.id)?.bpm ?? song.tempoBpm
+         +)                                                              
+      41  
+      42 +  // Range and hand sub-state mirrors into the URL (?bars=3-6&h
+         +ands=R) with                                                   
+      43 +  // replace navigation — restorable on refresh, no history pol
+         +lution.                                                        
+      44 +  // (Param is `bars`, not `from`/`to`: `from=guide` is the gui
+         +de breadcrumb.)                                                
+      45 +  {                                                            
+      46 +    const params = currentParams()                             
+      47 +    const linked = parseBarsParam(params.bars, song.measures.le
+         +ngth)                                                          
+      48 +    if (linked) {                                              
+      49 +      fromMeasure = linked.fromMeasure                         
+      50 +      toMeasure = linked.toMeasure                             
+      51 +    }                                                          
+      52 +    if (params.hands === 'R' || params.hands === 'L') hands = p
+         +arams.hands                                                    
+      53 +  }                                                            
+      54 +                                                               
+      55 +  function reflectRoute() {                                    
+      56 +    const params: Record<string, string> = { song: song.id }   
+      57 +    if (fromMeasure !== 0 || toMeasure !== song.measures.length
+         + - 1) {                                                        
+      58 +      params.bars = barsParam(fromMeasure, toMeasure)          
+      59 +    }                                                          
+      60 +    if (hands !== 'both') params.hands = hands                 
+      61 +    const from = currentParams().from                          
+      62 +    if (from) params.from = from                               
+      63 +    navigate('/songs', params, { replace: true })              
+      64 +  }                                                            
+      65 +                                                               
+      66    function selectSection(from: number, to: number) {
+      67      fromMeasure = from
+      68      toMeasure = to
+      69      resetKey++
+      70      version++
+      71 +    reflectRoute()                                             
+      72    }
+      73  
+      74 +  function setHands(h: Hands) {                                
+      75 +    hands = h                                                  
+      76 +    resetKey++                                                 
+      77 +    version++                                                  
+      78 +    reflectRoute()                                             
+      79 +  }                                                            
+      80 +                                                               
+      81 +  function setBpm(value: number) {                             
+      82 +    const n = Math.round(Number(value))                        
+      83 +    bpm = Number.isFinite(n) && n > 0 ? Math.min(MAX_BPM, Math.
+         +max(MIN_BPM, n)) : song.tempoBpm                               
+      84 +    songPrefs.setBpm(song.id, bpm)                             
+      85 +  }                                                            
+      86 +                                                               
+      87    const range = $derived({ hands, fromMeasure, toMeasure })
+      88    const steps = $derived(stepsFromSong(song, range))
+      89  
+
+⏺ Now the timing capture, metronome and loop effects:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 25 lines
+       92      return new StepMatcher(steps, { lookahead: true })
+       93    })
+       94  
+       95 +  // Wall-clock times of each step advance — graded against th
+          +e beat grid on                                                
+       96 +  // completion when the metronome is on (same pattern as Less
+          +onPlayer).                                                    
+       97 +  let advanceTimes: number[] = []                             
+       98 +  let timingPct = $state<number | null>(null)                 
+       99    $effect(() => {
+      100 +    void matcher                                              
+      101 +    advanceTimes = []                                         
+      102 +    timingPct = null                                          
+      103 +  })                                                          
+      104 +                                                              
+      105 +  // Metronome with a one-bar count-in; restarted on every att
+          +empt so each                                                  
+      106 +  // run gets its own count-in. It deliberately does NOT gate 
+          +the mic                                                       
+      107 +  // (playback.isPlaying stays false) — grading listens while 
+          +it ticks.                                                     
+      108 +  $effect(() => {                                             
+      109 +    void resetKey                                             
+      110 +    if (metronomeOn) {                                        
+      111 +      void startMetronome(bpm, { countInBeats: song.timeSignat
+          +ure[0] })                                                     
+      112 +      return () => stopMetronome()                            
+      113 +    }                                                         
+      114 +  })                                                          
+      115 +  $effect(() => {                                             
+      116 +    if (metronomeOn) setMetronomeBpm(bpm)                     
+      117 +  })                                                          
+      118 +                                                              
+      119 +  $effect(() => {                                             
+      120      return onInput((ev) => {
+      121        if (ev.kind !== 'on' || matcher.done) return
+      122        const outcome = matcher.onOnset(ev.midi)
+      123        version++
+      124 +      if (outcome.advanced) advanceTimes.push(ev.tMs ?? perfor
+          +mance.now())                                                  
+      125        if (outcome.wrong) {
+      126          const flashed = ev.midi
+      127          wrongFlash = new Set([...wrongFlash, flashed])
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 34 lines
+      156      return matcher.cursor
+      157    })
+      158  
+      159 +  // Loop-the-section drilling: auto-restart shortly after com
+          +pletion.                                                      
+      160 +  $effect(() => {                                             
+      161 +    if (loop && done && steps.length > 0) {                   
+      162 +      const t = setTimeout(() => {                            
+      163 +        resetKey++                                            
+      164 +        version++                                             
+      165 +      }, 1200)                                                
+      166 +      return () => clearTimeout(t)                            
+      167 +    }                                                         
+      168 +  })                                                          
+      169 +                                                              
+      170    let loggedDone = false
+      171    $effect(() => {
+      172      if (done && steps.length > 0 && !loggedDone) {
+      173        loggedDone = true
+      174 +      // Rhythm read-through grade, relative to the run's own 
+          +first note.                                                   
+      175 +      // Suppressed on mic-poly input: its 0.5–1.5 s detection
+          + latency makes                                                
+      176 +      // millisecond grading meaningless. A lookahead-skip adv
+          +ances the cursor                                              
+      177 +      // twice on one onset, so the length check fails and the
+          + run simply                                                   
+      178 +      // isn't timing-graded.                                 
+      179 +      if (                                                    
+      180 +        metronomeOn &&                                        
+      181 +        noteInput.activeSource !== 'mic-poly' &&              
+      182 +        steps.length > 1 &&                                   
+      183 +        steps.every((s) => s.startBeat !== undefined) &&      
+      184 +        advanceTimes.length === steps.length                  
+      185 +      ) {                                                     
+      186 +        const beatMs = 60000 / bpm                            
+      187 +        const anchor = advanceTimes[0] - steps[0].startBeat! *
+          + beatMs                                                       
+      188 +        const result = gradeTiming(                           
+      189 +          steps.map((s) => ({ startBeat: s.startBeat! })),    
+      190 +          advanceTimes.map((tMs) => ({ tMs })),               
+      191 +          bpm,                                                
+      192 +          anchor,                                             
+      193 +          song.swing ? { swingRatio: 2 / 3 } : {},            
+      194 +        )                                                     
+      195 +        timingPct = Math.round(result.accuracy * 100)         
+      196 +      }                                                       
+      197        addRecord({
+      198          lessonId: `song-${song.id}`,
+      199          title: song.title,
+
+⏺ Now the demo tempo and the markup changes:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 1 line, removed 1 line
+      223            notes.push({ midi: n.midi, startBeat: (m - fromMeasu
+           re) * bpm + n.startBeat, durationBeats: n.durationBeats })
+      224          }
+      225        }
+      226 -      await playSong(notes, song.tempoBpm, song.swing)        
+      226 +      await playSong(notes, bpm, song.swing)                  
+      227      } finally {
+      228        demoPlaying = false
+      229      }
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 59 lines
+      271          {s.label}
+      272        </button>
+      273      {/each}
+      274 +    <label class="bars">                                      
+      275 +      Bars                                                    
+      276 +      <input                                                  
+      277 +        type="number"                                         
+      278 +        min="1"                                               
+      279 +        max={toMeasure + 1}                                   
+      280 +        value={fromMeasure + 1}                               
+      281 +        onchange={(e) => {                                    
+      282 +          const v = Math.round(Number(e.currentTarget.value)) 
+      283 +          const from = Number.isFinite(v) ? Math.min(Math.max(
+          +v, 1), toMeasure + 1) : 1                                     
+      284 +          e.currentTarget.value = String(from)                
+      285 +          selectSection(from - 1, toMeasure)                  
+      286 +        }}                                                    
+      287 +      />                                                      
+      288 +      –                                                       
+      289 +      <input                                                  
+      290 +        type="number"                                         
+      291 +        min={fromMeasure + 1}                                 
+      292 +        max={song.measures.length}                            
+      293 +        value={toMeasure + 1}                                 
+      294 +        onchange={(e) => {                                    
+      295 +          const v = Math.round(Number(e.currentTarget.value)) 
+      296 +          const to = Number.isFinite(v) ? Math.min(Math.max(v,
+          + fromMeasure + 1), song.measures.length) : song.measures.lengt
+          +h                                                             
+      297 +          e.currentTarget.value = String(to)                  
+      298 +          selectSection(fromMeasure, to - 1)                  
+      299 +        }}                                                    
+      300 +      />                                                      
+      301 +    </label>                                                  
+      302 +    <label class="opt">                                       
+      303 +      <input type="checkbox" bind:checked={loop} /> Loop      
+      304 +    </label>                                                  
+      305    </div>
+      306  
+      307    <div class="controls-row">
+      308 +    <span class="control-label">Tempo:</span>                 
+      309 +    <input                                                    
+      310 +      class="tempo-slider"                                    
+      311 +      type="range"                                            
+      312 +      min={MIN_BPM}                                           
+      313 +      max={MAX_BPM}                                           
+      314 +      value={bpm}                                             
+      315 +      oninput={(e) => setBpm(Number(e.currentTarget.value))}  
+      316 +    />                                                        
+      317 +    <input                                                    
+      318 +      class="tempo-num"                                       
+      319 +      type="number"                                           
+      320 +      min={MIN_BPM}                                           
+      321 +      max={MAX_BPM}                                           
+      322 +      value={bpm}                                             
+      323 +      onchange={(e) => {                                      
+      324 +        setBpm(Number(e.currentTarget.value))                 
+      325 +        e.currentTarget.value = String(bpm)                   
+      326 +      }}                                                      
+      327 +    />                                                        
+      328 +    <span class="hint-inline">BPM{bpm !== song.tempoBpm ? ` (s
+          +core: ♩=${song.tempoBpm})` : ''}</span>                       
+      329 +    <label class="opt">                                       
+      330 +      <input type="checkbox" bind:checked={metronomeOn} />    
+      331 +      Metronome ({song.timeSignature[0]}-beat count-in, grades
+          + your timing)                                                 
+      332 +    </label>                                                  
+      333 +  </div>                                                      
+      334 +                                                              
+      335 +  <div class="controls-row">                                  
+      336      <span class="control-label">Hands:</span>
+      337      {#each [['both', 'Both'], ['R', 'Right'], ['L', 'Left']] a
+           s const as [value, label] (value)}
+      338        <button
+
+⏺ Now the hands buttons (use setHands), completion card timing line, and styles:
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 1 line, removed 9 lines
+      335    <div class="controls-row">
+      336      <span class="control-label">Hands:</span>
+      337      {#each [['both', 'Both'], ['R', 'Right'], ['L', 'Left']] a
+           s const as [value, label] (value)}
+      338 -      <button                                                 
+      339 -        class="seg"                                           
+      340 -        class:active={hands === value}                        
+      341 -        onclick={() => {                                      
+      342 -          hands = value                                       
+      343 -          resetKey++                                          
+      344 -          version++                                           
+      345 -        }}                                                    
+      346 -      >                                                       
+      338 +      <button class="seg" class:active={hands === value} oncli
+          +ck={() => setHands(value)}>                                   
+      339          {label}
+      340        </button>
+      341      {/each}
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 6 lines
+      366      <div class="complete">
+      367        🎉 Passage complete — {steps.length} steps,
+      368        {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong
+            note${mistakes === 1 ? '' : 's'} along the way.`}
+      369 +      {#if timingPct !== null}                                
+      370 +        <span class="timing">Timing: {timingPct}% in the pocke
+          +t at ♩={bpm}.</span>                                          
+      371 +      {/if}                                                   
+      372 +      {#if loop}                                              
+      373 +        <span class="timing">Looping — starting again…</span> 
+      374 +      {/if}                                                   
+      375        <button
+      376          class="primary"
+      377          onclick={() => {
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 32 lines
+      437    .spacer {
+      438      flex: 1;
+      439    }
+      440 +  .bars,                                                      
+      441 +  .opt {                                                      
+      442 +    display: flex;                                            
+      443 +    align-items: center;                                      
+      444 +    gap: 6px;                                                 
+      445 +    font-size: 13px;                                          
+      446 +    color: #475569;                                           
+      447 +  }                                                           
+      448 +  .bars input {                                               
+      449 +    width: 52px;                                              
+      450 +    padding: 4px 6px;                                         
+      451 +    border: 1px solid #e2e8f0;                                
+      452 +    border-radius: 6px;                                       
+      453 +  }                                                           
+      454 +  .tempo-slider {                                             
+      455 +    width: 140px;                                             
+      456 +  }                                                           
+      457 +  .tempo-num {                                                
+      458 +    width: 60px;                                              
+      459 +    padding: 4px 6px;                                         
+      460 +    border: 1px solid #e2e8f0;                                
+      461 +    border-radius: 6px;                                       
+      462 +  }                                                           
+      463 +  .hint-inline {                                              
+      464 +    font-size: 13px;                                          
+      465 +    color: #64748b;                                           
+      466 +  }                                                           
+      467 +  .timing {                                                   
+      468 +    display: block;                                           
+      469 +    font-size: 13px;                                          
+      470 +    color: #475569;                                           
+      471 +  }                                                           
+      472    .show-kb {
+      473      display: flex;
+      474      align-items: center;
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/songSteps.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import { describe, expect, it } from 'vitest'
+      2  import { SONG_CATALOG } from '../lib/data/songs/catalog'
+      3  import { beatsPerMeasure } from '../lib/data/songs/types'
+      4 -import { songSlices, stepsFromSong } from '../lib/practice/songS
+        -teps'                                                           
+      4 +import { barsParam, parseBarsParam, songSlices, stepsFromSong } 
+        +from '../lib/practice/songSteps'                                
+      5  import { songSystems } from '../lib/notation/songScore'
+      6  
+      7  const ode = SONG_CATALOG.find((s) => s.id === 'ode-to-joy')!
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 1 line
+      44    // (Param is `bars`, not `from`/`to`: `from=guide` is the gui
+          de breadcrumb.)
+      45    {
+      46      const params = currentParams()
+      47 +    // svelte-ignore state_referenced_locally                  
+      48      const linked = parseBarsParam(params.bars, song.measures.le
+          ngth)
+      49      if (linked) {
+      50        fromMeasure = linked.fromMeasure
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Phase 1 is clean. Let me do a quick browser smoke of the song player before
+  committing — loading the verify skill:
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Made 1 scratchpad edit +93, ran 2 shell commands (ctrl+o to expand)
+
+⏺ All green. One cosmetic fix — a collapsed space in the Home stats line:
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 3 lines, removed 3 lines
+      112    {#if recent.length}
+      113      <h2 class="recent-h">Recent practice</h2>
+      114      <p class="hint">
+      115 -      {#if streak > 1}🔥 {streak}-day streak ·{/if}           
+      116 -      {weekCount} segment{weekCount === 1 ? '' : 's'} this wee
+          -k{#if practiceHistory.today.length}                           
+      117 -        · {practiceHistory.today.length} today — keep it up!{/
+          -if}                                                           
+      115 +      {(streak > 1 ? `🔥 ${streak}-day streak · ` : '') +     
+      116 +        `${weekCount} segment${weekCount === 1 ? '' : 's'} thi
+          +s week` +                                                     
+      117 +        (practiceHistory.today.length ? ` · ${practiceHistory.
+          +today.length} today — keep it up!` : '')}                     
+      118      </p>
+      119      <ul class="recent">
+      120        {#each recent as r (r.at)}
+
+  Committed 14a18b7 (ctrl+o to expand)
+
+  Read 5 files (ctrl+o to expand)
+
+⏺ Now let me check all the places that reference mic-poly or chooseSource so the
+  new fused source integrates everywhere:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ All consumers identified. Writing Phase 3 files — settings singleton,
+  noteEvents a4 support, fusion:
+
+⏺ Write(src/lib/settings.svelte.ts)
+  ⎿  Wrote 75 lines to src/lib/settings.svelte.ts
+       1 /**
+          object.
+       3  * Shared reactive singleton (getter-object convention, see mic.
+       4  *
+         45 Hz).
+       6  *      Poly (Basic Pitch) is trained at 440 and cannot be recal
+       7  *      this ±20-cent range its semitone binning is unaffected.
+       8  * fusion — in chord mode, grade instant mono onsets and dedup t
+       9  *      poly notes (see input/fusion.ts) instead of waiting only
+      10  * defaultHand — initial hand in the scale/chord libraries.
+     … +75 lines (ctrl+o to expand)
+
+⏺ Update(src/lib/audio/noteEvents.ts)
+  ⎿  Added 13 lines, removed 4 lines
+      23  
+      24  export type NoteEventListener = (ev: NoteEvent) => void
+      25  
+      26 -export function frequencyToMidi(freq: number): { midi: number; 
+         -cents: number } {                                              
+      27 -  const midiFloat = 69 + 12 * Math.log2(freq / 440)            
+      26 +export function frequencyToMidi(freq: number, a4 = 440): { midi
+         +: number; cents: number } {                                    
+      27 +  const midiFloat = 69 + 12 * Math.log2(freq / a4)             
+      28    const midi = Math.round(midiFloat)
+      29    return { midi, cents: (midiFloat - midi) * 100 }
+      30  }
+      31  
+      32 -export function midiToFrequency(midi: number): number {        
+      33 -  return 440 * Math.pow(2, (midi - 69) / 12)                   
+      32 +export function midiToFrequency(midi: number, a4 = 440): number
+         + {                                                             
+      33 +  return a4 * Math.pow(2, (midi - 69) / 12)                    
+      34  }
+      35 +                                                               
+      36 +/**                                                            
+      37 + * Tuning-calibration step: if a reference A4 read `avgCents` o
+         +ff under the                                                   
+      38 + * current tuning, this is the A4 that would read it as 0. (Cal
+         +lers clamp to                                                  
+      39 + * a sane range — see settings.clampA4.)                       
+      40 + */                                                            
+      41 +export function calibratedA4(currentA4: number, avgCents: numbe
+         +r): number {                                                   
+      42 +  return currentA4 * Math.pow(2, avgCents / 1200)              
+      43 +}                                                              
+
+⏺ Write(src/lib/input/fusion.ts)
+  ⎿  Wrote 57 lines to src/lib/input/fusion.ts
+       1 import type { NoteSource } from '../audio/noteEvents'
+       3 /**
+       4  * Mono/poly fusion for chord practice ('mic-fused' routing): th
+       5  * tracker hears the most prominent line ~10 ms after the onset,
+       6  * Pitch delivers full polyphony 0.5–1.5 s later. Forward mono o
+         nsets
+         re-reports the
+       8  * same physical keypress; poly notes with no mono match (the ot
+       9  * chord) still pass. Pure logic — vitest-covered in fusion.test
+      10  */
+     … +59 lines (ctrl+o to expand)
+
+⏺ Now routing, monoTracker, monoPitch, and noteInput wiring:
+
+⏺ Update(src/lib/input/routing.ts)
+  ⎿  Added 21 lines, removed 7 lines
+       1  import type { NoteSource } from '../audio/noteEvents'
+       2  
+       3  /** Which input is actively feeding grading/display. */
+       4 -export type ActiveSource = 'midi' | 'mic-mono' | 'mic-poly' | '
+         -none'                                                          
+       4 +export type ActiveSource = 'midi' | 'mic-mono' | 'mic-poly' | '
+         +mic-fused' | 'none'                                            
+       5  
+       6  /**
+       7   * Pick the input source for a practice session. MIDI always wi
+          ns when a
+       8   * device is connected — instant and polyphonic-accurate — othe
+          rwise the
+       9 - * caller's preferred mic detector decides.                    
+       9 + * caller's preferred mic detector decides. Chord practice defa
+         +ults to                                                        
+      10 + * 'mic-fused' (instant mono onsets + poly for the rest of the 
+         +chord, deduped                                                 
+      11 + * by MonoPolyFuser); the fusion setting toggles back to poly-o
+         +nly.                                                           
+      12   */
+      11 -export function chooseSource(midiAvailable: boolean, preferred:
+         - 'mono' | 'poly'): ActiveSource {                              
+      13 +export function chooseSource(                                  
+      14 +  midiAvailable: boolean,                                      
+      15 +  preferred: 'mono' | 'poly',                                  
+      16 +  fusionEnabled = true,                                        
+      17 +): ActiveSource {                                              
+      18    if (midiAvailable) return 'midi'
+      13 -  return preferred === 'poly' ? 'mic-poly' : 'mic-mono'        
+      19 +  if (preferred === 'poly') return fusionEnabled ? 'mic-fused' 
+         +: 'mic-poly'                                                   
+      20 +  return 'mic-mono'                                            
+      21  }
+      22  
+      23  /**
+      24   * Should an event from `source` reach hub subscribers while `a
+          ctive` is the
+      18 - * chosen source? Grading must hear exactly one detector: in mi
+         -c-poly mode the                                                
+      19 - * mono tracker still runs (level meter, pressed keys) but only
+         - poly events                                                   
+      20 - * count.                                                      
+      25 + * chosen source? Grading must hear one detector — except 'mic-
+         +fused', where                                                  
+      26 + * both mic detectors forward and the fuser dedups. In mic-poly
+         + mode the mono                                                 
+      27 + * tracker still runs (level meter, pressed keys) but only poly
+         + events count.                                                 
+      28   */
+      29  export function shouldForward(source: NoteSource, active: Activ
+          eSource): boolean {
+      30    switch (active) {
+     ...
+      34        return source === 'mono'
+      35      case 'mic-poly':
+      36        return source === 'poly'
+      37 +    case 'mic-fused':                                          
+      38 +      return source === 'mono' || source === 'poly'            
+      39      case 'none':
+      40        return false
+      41    }
+      42  }
+      43 +                                                               
+      44 +/** The mic source `preferred` should be running (for detector 
+         +restarts). */                                                  
+      45 +export function expectedMicSource(preferred: 'mono' | 'poly', f
+         +usionEnabled: boolean): ActiveSource {                         
+      46 +  return chooseSource(false, preferred, fusionEnabled)         
+      47 +}                                                              
+
+⏺ Update(src/lib/audio/monoTracker.ts)
+  ⎿  Added 2 lines
+      12    octaveMemorySec?: number
+      13    releaseFrames?: number
+      14    noiseFloorK?: number
+      15 +  /** Tuning reference in Hz (default 440) — see settings.a4. *
+         +/                                                              
+      16 +  a4?: number                                                  
+      17  }
+      18  
+      19  export interface MonoState {
+⏺ Update(src/lib/audio/monoTracker.ts)
+  ⎿  Added 1 line
+      52    private octaveMemorySec: number
+      53    private releaseFrames: number
+      54    private noiseFloorK: number
+      55 +  private a4: number                                           
+      56    private noiseFloor = new NoiseFloor()
+      57  
+      58    private candidateMidi: number | null = null
+
+⏺ Update(src/lib/audio/monoTracker.ts)
+  ⎿  Added 1 line
+      74      this.octaveMemorySec = opts.octaveMemorySec ?? 0.5
+      75      this.releaseFrames = opts.releaseFrames ?? 6
+      76      this.noiseFloorK = opts.noiseFloorK ?? 2.5
+      77 +    this.a4 = opts.a4 ?? 440                                   
+      78    }
+      79  
+      80    /**
+
+⏺ Update(src/lib/audio/monoTracker.ts)
+  ⎿  Added 1 line, removed 1 line
+      150      const [freq, clarity] = this.detector.findPitch(frame, sam
+           pleRate)
+      151      this.state.clarity = clarity
+      152  
+      153 -    const { midi, cents } = frequencyToMidi(freq)             
+      153 +    const { midi, cents } = frequencyToMidi(freq, this.a4)    
+      154      const valid = clarity >= this.minClarity && rms >= effMinR
+           ms && midi >= MIDI_MIN && midi <= MIDI_MAX
+      155  
+      156      if (!valid) {
+
+⏺ Update(src/lib/audio/monoPitch.svelte.ts)
+  ⎿  Added 1 line
+      1 +import { settings } from '../settings.svelte'                   
+      2  import { mic } from './mic.svelte'
+      3  import { MonoTracker } from './monoTracker'
+      4  import type { NoteEvent, NoteEventListener } from './noteEvents'
+
+⏺ Update(src/lib/audio/monoPitch.svelte.ts)
+  ⎿  Added 2 lines, removed 1 line
+      76  export async function startMonoDetection(): Promise<void> {
+      77    await mic.start()
+      78    if (mic.status !== 'running' || running) return
+      79 -  tracker = new MonoTracker({ frameSize: FRAME_SIZE })         
+      79 +  // a4 is read at detection start; the Tuner restarts detectio
+         +n to apply it.                                                 
+      80 +  tracker = new MonoTracker({ frameSize: FRAME_SIZE, a4: settin
+         +gs.a4 })                                                       
+      81    buffer = new Float32Array(FRAME_SIZE)
+      82    running = true
+      83    intervalId = window.setInterval(detectTick, POLL_MS)
+
+⏺ Now the noteInput hub wiring for the fused source:
+
+⏺ Update(src/lib/input/noteInput.svelte.ts)
+  ⎿  Added 14 lines, removed 3 lines
+       2  import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDe
+          tection } from '../audio/monoPitch.svelte'
+       3  import type { NoteEvent, NoteEventListener } from '../audio/not
+          eEvents'
+       4  import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDe
+          tection } from '../audio/polyPitch.svelte'
+       5 +import { settings } from '../settings.svelte'                  
+       6 +import { MonoPolyFuser } from './fusion'                       
+       7  import { midi, onMidiEvent } from './midi.svelte'
+       8  import { chooseSource, shouldForward, type ActiveSource } from 
+          './routing'
+       9  
+      10  /**
+      11   * Unified note-input hub: one subscription point over MIDI, mi
+          c-mono and
+      10 - * mic-poly. Screens call start('mono' | 'poly') with the detec
+         -tor they'd                                                     
+      11 - * want *if* the mic is used; when a MIDI keyboard is connected
+         - it is always                                                  
+      12 - * preferred and the mic never starts.                         
+      12 + * mic-poly/fused. Screens call start('mono' | 'poly') with the
+         + detector                                                      
+      13 + * they'd want *if* the mic is used; when a MIDI keyboard is co
+         +nnected it is                                                  
+      14 + * always preferred and the mic never starts. In 'mic-fused' mo
+         +de (chord                                                      
+      15 + * practice with fusion enabled) both mic detectors forward and
+         + the fuser                                                     
+      16 + * drops poly re-reports of notes mono already graded.         
+      17   */
+      18  let active = $state<ActiveSource>('none')
+      19  let midiNotes = $state(new Set<number>())
+      20  
+      21 +const fuser = new MonoPolyFuser()                              
+      22  const listeners = new Set<NoteEventListener>()
+      23  
+      24  function emit(ev: NoteEvent) {
+      25    if (!shouldForward(ev.source, active)) return
+      26 +  if (                                                         
+      27 +    active === 'mic-fused' &&                                  
+      28 +    !fuser.accept({ source: ev.source, kind: ev.kind, midi: ev.
+         +midi, tMs: ev.tMs ?? performance.now() })                      
+      29 +  ) {                                                          
+      30 +    return                                                     
+      31 +  }                                                            
+      32    listeners.forEach((fn) => fn(ev))
+      33  }
+      34  
+
+⏺ Update(src/lib/input/noteInput.svelte.ts)
+  ⎿  Added 6 lines, removed 4 lines
+      47  }
+      48  
+      49  async function start(preferred: 'mono' | 'poly'): Promise<void>
+           {
+      50 -  const source = chooseSource(midi.hasInput, preferred)        
+      50 +  const source = chooseSource(midi.hasInput, preferred, setting
+         +s.fusion)                                                      
+      51    if (source === 'midi') {
+      52      active = 'midi'
+      53      return
+      54    }
+      55    await startMonoDetection()
+      56    if (mic.status !== 'running') return // denied or errored; st
+          ay 'none'
+      57 -  if (source === 'mic-poly') await startPolyDetection()        
+      57 +  if (source === 'mic-poly' || source === 'mic-fused') await st
+         +artPolyDetection()                                             
+      58 +  fuser.reset()                                                
+      59    active = source
+      60  }
+      61  
+      62  function stop(): void {
+      62 -  if (active === 'mic-poly') stopPolyDetection()               
+      63 -  if (active === 'mic-mono' || active === 'mic-poly') stopMonoD
+         -etection()                                                     
+      63 +  if (active === 'mic-poly' || active === 'mic-fused') stopPoly
+         +Detection()                                                    
+      64 +  if (active !== 'midi' && active !== 'none') stopMonoDetection
+         +()                                                             
+      65 +  fuser.reset()                                                
+      66    active = 'none'
+      67  }
+      68  
+
+⏺ Update(src/lib/input/noteInput.svelte.ts)
+  ⎿  Added 1 line, removed 1 line
+      78      if (active === 'midi') return midiNotes
+      79      const s = new Set<number>()
+      80      if (monoPitch.midi !== null) s.add(monoPitch.midi)
+      81 -    if (active === 'mic-poly') for (const m of polyPitch.active
+         -Notes) s.add(m)                                                
+      81 +    if (active === 'mic-poly' || active === 'mic-fused') for (c
+         +onst m of polyPitch.activeNotes) s.add(m)                      
+      82      return s
+      83    },
+      84    start,
+
+⏺ Now update the consumers — LessonPlayer's detector-restart condition and
+  InputPicker's chord badge:
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      90    // (e.g. moving to a hands-together segment), restart with th
+          e right detector.
+      91    $effect(() => {
+      92      const mode = effectiveMode
+      93 -    if (noteInput.activeSource === (mode === 'poly' ? 'mic-mono
+         -' : 'mic-poly')) {                                             
+      93 +    const activeSource = noteInput.activeSource                
+      94 +    const isMic = activeSource !== 'midi' && activeSource !== '
+         +none'                                                          
+      95 +    if (isMic && activeSource !== expectedMicSource(mode, setti
+         +ngs.fusion)) {                                                 
+      96        noteInput.stop()
+      97        void noteInput.start(mode)
+      98      }
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 2 lines
+       6    import { setMetronomeBpm, startMetronome, stopMetronome } fro
+          m '../lib/audio/metronome'
+       7    import { playChord, playChordSequence, playSequence } from '.
+          ./lib/audio/playback'
+       8    import { noteInput, onInput } from '../lib/input/noteInput.sv
+          elte'
+       9 +  import { expectedMicSource } from '../lib/input/routing'     
+      10 +  import { settings } from '../lib/settings.svelte'            
+      11    import type { Lesson } from '../lib/data/lessons'
+      12    import { scoreFromSteps, type HighlightState } from '../lib/n
+          otation/vexScore'
+      13    import { addRecord } from '../lib/practice/history.svelte'
+
+⏺ Update(src/components/InputPicker.svelte)
+  ⎿  Added 4 lines, removed 2 lines
+      38        <div class="meter" title="Input level">
+      39          <div class="meter-fill" style="width: {levelPct}%"></di
+          v>
+      40        </div>
+      41 -      {#if noteInput.activeSource === 'mic-poly'}              
+      41 +      {#if noteInput.activeSource === 'mic-poly' || noteInput.a
+         +ctiveSource === 'mic-fused'}                                   
+      42          {#if polyPitch.status === 'loading'}
+      43            <span class="badge loading">loading chord model…</spa
+          n>
+      44          {:else if polyPitch.status === 'listening'}
+      45 -          <span class="badge ready">chord detection on ({polyPi
+         -tch.backend})</span>                                           
+      45 +          <span class="badge ready">                           
+      46 +            chord detection on ({polyPitch.backend}{noteInput.a
+         +ctiveSource === 'mic-fused' ? ' + instant melody' : ''})       
+      47 +          </span>                                              
+      48          {:else if polyPitch.status === 'error'}
+      49            <span class="input-error">chord model failed: {polyPi
+          tch.errorMessage}</span>
+      50          {/if}
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/components/LessonPlayer.svelte)
+  ⎿  Added 4 lines, removed 2 lines
+      303    <InputPicker preferred={effectiveMode} />
+      304    {#if effectiveMode === 'poly' && noteInput.activeSource !== 
+           'midi' && segment.hand === 'both'}
+      305      <p class="hint">
+      306 -      🎹 Hands-together grading works best with a MIDI keyboar
+          -d — mic chord detection runs about a                          
+      307 -      second behind your playing.                             
+      306 +      🎹 Hands-together grading works best with a MIDI keyboar
+          +d —                                                           
+      307 +      {noteInput.activeSource === 'mic-fused'                 
+      308 +        ? 'the mic grades the top line instantly, but the rema
+          +ining chord notes land about a second behind.'                
+      309 +        : 'mic chord detection runs about a second behind your
+          + playing.'}                                                   
+      310      </p>
+      311    {/if}
+      312  
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 4 lines, removed 2 lines
+      358    <InputPicker preferred={needsChords ? 'poly' : 'mono'} />
+      359    {#if needsChords && noteInput.activeSource !== 'midi'}
+      360      <p class="hint">
+      361 -      🎹 This piece has chords or both hands — it works best w
+          -ith a MIDI keyboard. Mic chord                                
+      362 -      detection runs about a second behind.                   
+      361 +      🎹 This piece has chords or both hands — it works best w
+          +ith a MIDI keyboard.                                          
+      362 +      {noteInput.activeSource === 'mic-fused'                 
+      363 +        ? 'The mic grades the top line instantly; the remainin
+          +g chord notes land about a second behind.'                    
+      364 +        : 'Mic chord detection runs about a second behind.'}  
+      365      </p>
+      366    {/if}
+      367  
+
+⏺ Now the Tuner calibration flow:
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  Added 59 lines
+       3    import MicButton from '../components/MicButton.svelte'
+       4    import PianoKeyboard from '../components/PianoKeyboard.svelte
+          '
+       5    import { monoPitch, startMonoDetection, stopMonoDetection } f
+          rom '../lib/audio/monoPitch.svelte'
+       6 +  import { calibratedA4 } from '../lib/audio/noteEvents'       
+       7 +  import { A4_DEFAULT, settings } from '../lib/settings.svelte'
+       8    import { SCOPE_PHRASES } from '../lib/voice/phrases'
+       9    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      10  
+      11 +  // --- A4 calibration: hold the A above middle C (MIDI 69); w
+         +e average the                                                  
+      12 +  // cents offset for ~1.5 s and move the tuning reference so i
+         +t reads 0.                                                     
+      13 +  const SAMPLE_MS = 50                                         
+      14 +  const SAMPLES_NEEDED = 30                                    
+      15 +                                                               
+      16 +  let calibrating = $state(false)                              
+      17 +  let calSamples = $state(0)                                   
+      18 +  let calMessage = $state('')                                  
+      19 +  let calTimer = 0                                             
+      20 +  let samples: number[] = []                                   
+      21 +                                                               
+      22 +  function stopCalibration() {                                 
+      23 +    clearInterval(calTimer)                                    
+      24 +    calibrating = false                                        
+      25 +    calSamples = 0                                             
+      26 +    samples = []                                               
+      27 +  }                                                            
+      28 +                                                               
+      29 +  async function applyA4(value: number) {                      
+      30 +    settings.setA4(value)                                      
+      31 +    // The tracker reads a4 at start — restart detection to app
+         +ly.                                                            
+      32 +    if (monoPitch.running) {                                   
+      33 +      stopMonoDetection()                                      
+      34 +      await startMonoDetection()                               
+      35 +    }                                                          
+      36 +  }                                                            
+      37 +                                                               
+      38 +  async function startCalibration() {                          
+      39 +    calMessage = ''                                            
+      40 +    if (!monoPitch.running) await startMonoDetection()         
+      41 +    if (!monoPitch.running) return // mic denied/errored — MicB
+         +utton shows why                                                
+      42 +    calibrating = true                                         
+      43 +    samples = []                                               
+      44 +    calSamples = 0                                             
+      45 +    calTimer = window.setInterval(async () => {                
+      46 +      if (monoPitch.midi === 69) {                             
+      47 +        samples.push(monoPitch.cents)                          
+      48 +        calSamples = samples.length                            
+      49 +        if (samples.length >= SAMPLES_NEEDED) {                
+      50 +          const avg = samples.reduce((a, b) => a + b, 0) / samp
+         +les.length                                                     
+      51 +          const next = calibratedA4(settings.a4, avg)          
+      52 +          stopCalibration()                                    
+      53 +          await applyA4(next)                                  
+      54 +          calMessage = `Tuning reference set to A4 = ${settings
+         +.a4.toFixed(1)} Hz.`                                           
+      55 +        }                                                      
+      56 +      }                                                        
+      57 +    }, SAMPLE_MS)                                              
+      58 +  }                                                            
+      59 +                                                               
+      60 +  $effect(() => () => clearInterval(calTimer)) // teardown on n
+         +avigate away                                                   
+      61 +                                                               
+      62 +  async function resetA4() {                                   
+      63 +    stopCalibration()                                          
+      64 +    await applyA4(A4_DEFAULT)                                  
+      65 +    calMessage = `Tuning reference reset to A4 = 440 Hz.`      
+      66 +  }                                                            
+      67 +                                                               
+      68    $effect(() =>
+      69      registerVoiceCommands({
+      70        name: 'Note Detector',
+
+⏺ Now the Tuner markup for calibration:
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  Added 21 lines
+      120        </p>
+      121      </div>
+      122  
+      123 +    <div class="calibration">                                 
+      124 +      <span class="cal-ref">Tuning reference: A4 = {settings.a
+          +4.toFixed(1)} Hz</span>                                       
+      125 +      {#if calibrating}                                       
+      126 +        <span class="cal-live">Hold the A above middle C… {Mat
+          +h.round((calSamples / SAMPLES_NEEDED) * 100)}%</span>         
+      127 +        <button class="ghost" onclick={stopCalibration}>Cancel
+          +</button>                                                     
+      128 +      {:else}                                                 
+      129 +        <button class="ghost" onclick={startCalibration}>Calib
+          +rate — hold the A above middle C</button>                     
+      130 +        {#if settings.a4 !== A4_DEFAULT}                      
+      131 +          <button class="ghost" onclick={resetA4}>Reset to 440
+          +</button>                                                     
+      132 +        {/if}                                                 
+      133 +      {/if}                                                   
+      134 +      {#if calMessage}                                        
+      135 +        <span class="cal-done">{calMessage}</span>            
+      136 +      {/if}                                                   
+      137 +    </div>                                                    
+      138 +    <p class="hint">                                          
+      139 +      Instruments tuned away from concert pitch read every not
+          +e a few cents off — calibrating moves                         
+      140 +      the reference so “in tune” means in tune with <em>your</
+          +em> instrument. Chord detection always                        
+      141 +      analyzes at A=440.                                      
+      142 +    </p>                                                      
+      143 +                                                              
+      144      <PianoKeyboard from={36} to={96} {pressed} />
+      145    </div>
+      146  </section>
+
+⏺ Update(src/screens/Tuner.svelte)
+  ⎿  Added 25 lines
+      197      color: #94a3b8;
+      198      margin-top: 4px;
+      199    }
+      200 +  .calibration {                                              
+      201 +    display: flex;                                            
+      202 +    align-items: center;                                      
+      203 +    gap: 12px;                                                
+      204 +    flex-wrap: wrap;                                          
+      205 +    font-size: 13px;                                          
+      206 +    color: #475569;                                           
+      207 +  }                                                           
+      208 +  .cal-ref {                                                  
+      209 +    font-weight: 600;                                         
+      210 +  }                                                           
+      211 +  .cal-live {                                                 
+      212 +    color: #1d4ed8;                                           
+      213 +    font-weight: 600;                                         
+      214 +  }                                                           
+      215 +  .cal-done {                                                 
+      216 +    color: #16a34a;                                           
+      217 +  }                                                           
+      218 +  .ghost {                                                    
+      219 +    border: none;                                             
+      220 +    background: none;                                         
+      221 +    color: #1d4ed8;                                           
+      222 +    cursor: pointer;                                          
+      223 +    font-size: 13px;                                          
+      224 +  }                                                           
+      225  </style>
+
+⏺ Now the fusion tests and detection-test extension:
+⏺ Write(src/tests/fusion.test.ts)
+  ⎿  Wrote 84 lines to src/tests/fusion.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       3 import { chooseSource, expectedMicSource, shouldForward } from '
+         ../lib/input/routing'
+       4 
+       6 const mono = (midi: number, tMs: number): Ev => ({ source: 'mono
+         ', kind: 'on', midi, tMs })
+         ', kind: 'on', midi, tMs })
+       8 
+       9 describe('MonoPolyFuser', () => {
+         ly re-report', () => {
+     … +94 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/detection.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import { describe, expect, it } from 'vitest'
+      2  import { MonoTracker } from '../lib/audio/monoTracker'
+      3 -import { midiToFrequency, type NoteEvent } from '../lib/audio/no
+        -teEvents'                                                       
+      3 +import { calibratedA4, frequencyToMidi, midiToFrequency, type No
+        +teEvent } from '../lib/audio/noteEvents'                        
+      4  import { clusterOnsets } from '../lib/transcribe/cluster'
+      5  
+      6  const SAMPLE_RATE = 44100
+
+⏺ Update(src/tests/detection.test.ts)
+  ⎿  Added 45 lines
+      273    })
+      274  })
+      275  
+      276 +describe('A4 calibration', () => {                            
+      277 +  /** Steady tone frame from an instrument tuned to the given 
+          +A4. */                                                        
+      278 +  function detunedFrame(midi: number, a4: number): Float32Arra
+          +y<ArrayBuffer> {                                              
+      279 +    const freq = midiToFrequency(midi, a4)                    
+      280 +    const out = new Float32Array(FRAME)                       
+      281 +    for (let i = 0; i < FRAME; i++) {                         
+      282 +      const t = i / SAMPLE_RATE                               
+      283 +      out[i] =                                                
+      284 +        0.6 * Math.sin(2 * Math.PI * freq * t) +              
+      285 +        0.25 * Math.sin(2 * Math.PI * 2 * freq * t) +         
+      286 +        0.1 * Math.sin(2 * Math.PI * 3 * freq * t)            
+      287 +    }                                                         
+      288 +    return out                                                
+      289 +  }                                                           
+      290 +                                                              
+      291 +  function settle(tracker: MonoTracker, midi: number, a4: numb
+          +er) {                                                         
+      292 +    for (let i = 0; i < 20; i++) tracker.process(detunedFrame(
+          +midi, a4), SAMPLE_RATE, i * 0.01)                             
+      293 +  }                                                           
+      294 +                                                              
+      295 +  it('a 442-tuned instrument reads sharp under the default ref
+          +erence', () => {                                              
+      296 +    const tracker = new MonoTracker({ frameSize: FRAME })     
+      297 +    settle(tracker, 69, 442)                                  
+      298 +    expect(tracker.state.midi).toBe(69)                       
+      299 +    // 442 vs 440 is +7.85 cents.                             
+      300 +    expect(tracker.state.cents).toBeGreaterThan(5)            
+      301 +    expect(tracker.state.cents).toBeLessThan(11)              
+      302 +  })                                                          
+      303 +                                                              
+      304 +  it('a tracker calibrated to 442 reads the same tone in tune'
+          +, () => {                                                     
+      305 +    const tracker = new MonoTracker({ frameSize: FRAME, a4: 44
+          +2 })                                                          
+      306 +    settle(tracker, 69, 442)                                  
+      307 +    expect(tracker.state.midi).toBe(69)                       
+      308 +    expect(Math.abs(tracker.state.cents)).toBeLessThan(3)     
+      309 +  })                                                          
+      310 +                                                              
+      311 +  it('calibratedA4 zeroes the measured offset (round-trip)', (
+          +) => {                                                        
+      312 +    const trueA4 = 443.2                                      
+      313 +    const { cents } = frequencyToMidi(midiToFrequency(69, true
+          +A4), 440)                                                     
+      314 +    const corrected = calibratedA4(440, cents)                
+      315 +    expect(corrected).toBeCloseTo(trueA4, 6)                  
+      316 +    // …and re-measuring under the corrected reference reads ~
+          +0 cents.                                                      
+      317 +    expect(frequencyToMidi(midiToFrequency(69, trueA4), correc
+          +ted).cents).toBeCloseTo(0, 6)                                 
+      318 +  })                                                          
+      319 +})                                                            
+      320 +                                                              
+      321  describe('onset clustering (Tier A transcription)', () => {
+      322    it('groups near-simultaneous onsets into a chord', () => {
+      323      const clustered = clusterOnsets([
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Quick smoke of the Tuner screen (mic can't run headless, but the UI must
+  render cleanly):
+
+  Made 1 scratchpad edit +30, committed 61e2e2a, ran 3 shell commands (ctrl+o to expand)
+
+⏺ An existing routing test in midiParse.test.ts asserts the old default —
+  updating it to the new fused default:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/midiParse.test.ts)
+  ⎿  Added 3 lines, removed 1 line
+      54  
+      55    it('falls back to the preferred mic detector', () => {
+      56      expect(chooseSource(false, 'mono')).toBe('mic-mono')
+      57 -    expect(chooseSource(false, 'poly')).toBe('mic-poly')       
+      57 +    // Chord practice fuses by default; poly-only behind the fu
+         +sion toggle.                                                   
+      58 +    expect(chooseSource(false, 'poly')).toBe('mic-fused')      
+      59 +    expect(chooseSource(false, 'poly', false)).toBe('mic-poly')
+      60    })
+      61  
+      62    it('forwards only the active source to subscribers', () => {
+
+  Amended commit 63a7030 (ctrl+o to expand)
+
+  Searched for 1 pattern, read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ vite-plugin-pwa 1.3.0 installed. Now generating PWA icons (🎹 on brand-blue
+  background) with Playwright:
+
+  Made 1 scratchpad edit +28, read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(vite.config.ts)
+  ⎿  Error writing file
+
+⏺ Update(index.html)
+  ⎿  File must be read first
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Write(vite.config.ts)
+  ⎿  Added 61 lines, removed 1 line
+       1  import { defineConfig } from 'vite'
+       2  import { svelte } from '@sveltejs/vite-plugin-svelte'
+       3 +import { VitePWA } from 'vite-plugin-pwa'                      
+       4  
+       5  // https://vite.dev/config/
+       6  export default defineConfig({
+       6 -  plugins: [svelte()],                                         
+       7 +  plugins: [                                                   
+       8 +    svelte(),                                                  
+       9 +    // Installable + offline-capable. The app shell is precache
+         +d; the big model                                               
+      10 +    // and WASM assets (~70 MB total) are runtime-cached on fir
+         +st use instead —                                               
+      11 +    // precaching them would download everything up front. The 
+         +Vosk archive is                                                
+      12 +    // deliberately NOT service-worker-cached: modelLoader.ts a
+         +lready streams it                                              
+      13 +    // into its own Cache with a progress bar, and an SW route 
+         +would both                                                     
+      14 +    // double-store 41 MB and break that progress UI. model-min
+         +ilm is likewise                                                
+      15 +    // left to transformers.js's own Cache-API caching.        
+      16 +    VitePWA({                                                  
+      17 +      registerType: 'autoUpdate',                              
+      18 +      // Dev serves ort-wasm from node_modules (see embedder.ts
+         +) — a dev SW                                                   
+      19 +      // would interfere; keep it prod-only.                   
+      20 +      devOptions: { enabled: false },                          
+      21 +      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],  
+      22 +      manifest: {                                              
+      23 +        name: 'Piano Tutor',                                   
+      24 +        short_name: 'Piano Tutor',                             
+      25 +        description:                                           
+      26 +          'Practice companion for your piano — it listens throu
+         +gh the microphone (or MIDI) and the score waits for you.',     
+      27 +        display: 'standalone',                                 
+      28 +        start_url: '/',                                        
+      29 +        background_color: '#f8fafc',                           
+      30 +        theme_color: '#1d4ed8',                                
+      31 +        icons: [                                               
+      32 +          { src: 'pwa-192.png', sizes: '192x192', type: 'image/
+         +png' },                                                        
+      33 +          { src: 'pwa-512.png', sizes: '512x512', type: 'image/
+         +png' },                                                        
+      34 +          { src: 'pwa-maskable-512.png', sizes: '512x512', type
+         +: 'image/png', purpose: 'maskable' },                          
+      35 +        ],                                                     
+      36 +      },                                                       
+      37 +      workbox: {                                               
+      38 +        globPatterns: ['**/*.{js,css,html,svg,woff2}'],        
+      39 +        globIgnores: ['model/**', 'model-vosk/**', 'model-minil
+         +m/**', 'tfjs-wasm/**', 'ort-wasm/**', 'worklets/**'],          
+      40 +        // Model/WASM dirs are only re-copied on package upgrad
+         +es; bump this                                                  
+      41 +        // cache name when re-copying them (see CLAUDE.md "Stat
+         +ic assets").                                                   
+      42 +        runtimeCaching: [                                      
+      43 +          {                                                    
+      44 +            urlPattern: ({ url, sameOrigin }) =>               
+      45 +              sameOrigin && /^\/(model|tfjs-wasm|ort-wasm|workl
+         +ets)\//.test(url.pathname),                                    
+      46 +            handler: 'CacheFirst',                             
+      47 +            options: {                                         
+      48 +              cacheName: 'piano-tutor.sw-static',              
+      49 +              expiration: { maxEntries: 60 },                  
+      50 +              cacheableResponse: { statuses: [0, 200] },       
+      51 +            },                                                 
+      52 +          },                                                   
+      53 +          {                                                    
+      54 +            // Salamander piano samples (Tone.js) so demo playb
+         +ack works offline.                                             
+      55 +            urlPattern: ({ url }) => url.hostname === 'tonejs.g
+         +ithub.io' && url.pathname.includes('/audio/salamander/'),      
+      56 +            handler: 'CacheFirst',                             
+      57 +            options: {                                         
+      58 +              cacheName: 'piano-tutor.sw-samples',             
+      59 +              expiration: { maxEntries: 40 },                  
+      60 +              cacheableResponse: { statuses: [0, 200] },       
+      61 +            },                                                 
+      62 +          },                                                   
+      63 +        ],                                                     
+      64 +      },                                                       
+      65 +    }),                                                        
+      66 +  ],                                                           
+      67    worker: {
+      68      format: 'es',
+      69    },
+
+⏺ Update(index.html)  ⎿  Added 2 lines
+       3    <head>
+       4      <meta charset="UTF-8" />
+       5      <link rel="icon" type="image/svg+xml" href="/favicon.svg" /
+          >
+       6 +    <link rel="apple-touch-icon" href="/apple-touch-icon.png" /
+         +>                                                              
+       7      <meta name="viewport" content="width=device-width, initial-
+          scale=1.0" />
+       8 +    <meta name="theme-color" content="#1d4ed8" />              
+       9      <title>Piano Tutor</title>
+      10    </head>
+      11    <body>
+
+⏺ Now missLog readers and the Settings screen:
+
+⏺ Update(src/lib/voice/missLog.ts)
+  ⎿  File must be read first
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(src/lib/voice/missLog.ts)
+  ⎿  Added 27 lines, removed 5 lines
+       1  /**
+       2   * Ring buffer of transcripts the voice pipeline could not reso
+          lve, for tuning
+       3 - * the grammar and intent bank from real usage (read it in devt
+         -ools:                                                          
+       4 - * localStorage['piano-tutor.voice-misses']). Best-effort; stor
+         -age failures                                                   
+       5 - * are swallowed.                                              
+       3 + * the grammar and intent bank from real usage — reviewable in 
+         +the Settings                                                   
+       4 + * screen (or devtools: localStorage['piano-tutor.voice-misses'
+         +]).                                                            
+       5 + * Best-effort; storage failures are swallowed.                
+       6   */
+       7  
+       8  const STORAGE_KEY = 'piano-tutor.voice-misses'
+       9  const MAX_ENTRIES = 50
+      10  
+      11 +export interface VoiceMiss {                                   
+      12 +  text: string                                                 
+      13 +  ts: number                                                   
+      14 +}                                                              
+      15 +                                                               
+      16  export function logMiss(text: string): void {
+      17    try {
+      13 -    const raw = localStorage.getItem(STORAGE_KEY)              
+      14 -    const entries: { text: string; ts: number }[] = raw ? JSON.
+         -parse(raw) : []                                                
+      18 +    const entries = readMisses()                               
+      19      entries.push({ text, ts: Date.now() })
+      20      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.sl
+          ice(-MAX_ENTRIES)))
+      21    } catch {
+      22      // best-effort
+      23    }
+      24  }
+      25 +                                                               
+      26 +/** Oldest first, as stored. */                                
+      27 +export function readMisses(): VoiceMiss[] {                    
+      28 +  try {                                                        
+      29 +    const raw = localStorage.getItem(STORAGE_KEY)              
+      30 +    return raw ? (JSON.parse(raw) as VoiceMiss[]) : []         
+      31 +  } catch {                                                    
+      32 +    return []                                                  
+      33 +  }                                                            
+      34 +}                                                              
+      35 +                                                               
+      36 +export function clearMisses(): void {                          
+      37 +  try {                                                        
+      38 +    localStorage.removeItem(STORAGE_KEY)                       
+      39 +  } catch {                                                    
+      40 +    // best-effort                                             
+      41 +  }                                                            
+      42 +}                                                              
+
+⏺ Write(src/screens/Settings.svelte)
+  ⎿  Wrote 196 lines to src/screens/Settings.svelte
+       1 <script lang="ts">
+       2   import { A4_DEFAULT, A4_MAX, A4_MIN, settings } from '../lib/s
+       3   import { clearMisses, readMisses, type VoiceMiss } from '../li
+         b/voice/missLog'
+       4   import { navigate } from '../router.svelte'
+       6   let misses = $state<VoiceMiss[]>(readMisses().reverse()) // ne
+         west first
+       7 
+       9     clearMisses()
+      10     misses = []
+     … +208 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/screens/Settings.svelte)
+  ⎿  Added 1 line, removed 4 lines
+      129  
+      130  <style>
+      131    .card {
+      132 -    background: #fff;                                         
+      133 -    border: 1px solid #e2e8f0;                                
+      134 -    border-radius: 12px;                                      
+      135 -    padding: 16px 20px;                                       
+      132      margin-top: 16px;
+      133 +    gap: 10px;                                                
+      134    }
+      135    .card h2 {
+      136      margin: 0 0 10px;
+
+⏺ Now register the route in App.svelte, add the Home tile, and wire the default
+  hand into the libraries:
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line
+      13    import Songs from './screens/Songs.svelte'
+      14    import FreePlay from './screens/FreePlay.svelte'
+      15    import Tuner from './screens/Tuner.svelte'
+      16 +  import Settings from './screens/Settings.svelte'             
+      17  
+      18    const links = [
+      19      { route: '/', label: 'Home' },
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line
+      27      { route: '/songs', label: 'Songs' },
+      28      { route: '/play', label: 'Free Play' },
+      29      { route: '/tuner', label: 'Note Detector' },
+      30 +    { route: '/settings', label: '⚙︎' },                        
+      31    ]
+      32  
+      33    const route = $derived(currentRoute())
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 2 lines
+      64      <FreePlay />
+      65    {:else if route === '/tuner'}
+      66      <Tuner />
+      67 +  {:else if route === '/settings'}                             
+      68 +    <Settings />                                               
+      69    {:else}
+      70      <Home />
+      71    {/if}
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 5 lines
+      69        title: 'Note Detector',
+      70        desc: 'Single-note detector and tuner — check what the ap
+          p hears and how it is calibrated.',
+      71      },
+      72 +    {                                                          
+      73 +      route: '/settings',                                      
+      74 +      title: 'Settings',                                       
+      75 +      desc: 'Tuning reference, detection options, practice defa
+         +ults, voice-control diagnostics and offline status.',          
+      76 +    },                                                         
+      77    ]
+      78  </script>
+      79  
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Now check + build + preview to verify the service worker output:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(vite.config.ts)
+  ⎿  Added 22 lines, removed 1 line
+      36        },
+      37        workbox: {
+      38          globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+      39 -        globIgnores: ['model/**', 'model-vosk/**', 'model-minil
+         -m/**', 'tfjs-wasm/**', 'ort-wasm/**', 'worklets/**'],          
+      39 +        globIgnores: [                                         
+      40 +          'model/**',                                          
+      41 +          'model-vosk/**',                                     
+      42 +          'model-minilm/**',                                   
+      43 +          'tfjs-wasm/**',                                      
+      44 +          'ort-wasm/**',                                       
+      45 +          'worklets/**',                                       
+      46 +          // The lazy vosk chunk is ~6 MB — too big to precache
+         + on every first                                                
+      47 +          // visit; the assets runtime route below picks it up 
+         +on first use.                                                  
+      48 +          'assets/vosk-*.js',                                  
+      49 +        ],                                                     
+      50          // Model/WASM dirs are only re-copied on package upgrad
+          es; bump this
+      51          // cache name when re-copying them (see CLAUDE.md "Stat
+          ic assets").
+      52          runtimeCaching: [
+      53            {
+      54 +            // Hash-named build assets skipped by the precache 
+         +(the vosk                                                      
+      55 +            // chunk) — immutable, so cache-first is safe.     
+      56 +            urlPattern: ({ url, sameOrigin }) => sameOrigin && 
+         +url.pathname.startsWith('/assets/'),                           
+      57 +            handler: 'CacheFirst',                             
+      58 +            options: {                                         
+      59 +              cacheName: 'piano-tutor.sw-assets',              
+      60 +              expiration: { maxEntries: 20 },                  
+      61 +              cacheableResponse: { statuses: [0, 200] },       
+      62 +            },                                                 
+      63 +          },                                                   
+      64 +          {                                                    
+      65              urlPattern: ({ url, sameOrigin }) =>
+      66                sameOrigin && /^\/(model|tfjs-wasm|ort-wasm|workl
+          ets)\//.test(url.pathname),
+      67              handler: 'CacheFirst',
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now the offline smoke test against the preview build:
+
+  Made 1 scratchpad edit +52, ran 2 shell commands (ctrl+o to expand)
+⏺ Update(src/lib/settings.svelte.ts)
+  ⎿  Added 7 lines, removed 1 line
+      60    get defaultHand() {
+      61      return store.defaultHand
+      62    },
+      63 +  // Setters are no-ops when unchanged — callers write back fro
+         +m $effects,                                                    
+      64 +  // and an unconditional store swap would retrigger them.     
+      65    setA4(value: number): void {
+      64 -    store = { ...store, a4: clampA4(value) }                   
+      66 +    const a4 = clampA4(value)                                  
+      67 +    if (store.a4 === a4) return                                
+      68 +    store = { ...store, a4 }                                   
+      69      persist()
+      70    },
+      71    setFusion(on: boolean): void {
+      72 +    if (store.fusion === on) return                            
+      73      store = { ...store, fusion: on }
+      74      persist()
+      75    },
+      76    setDefaultHand(hand: 'R' | 'L'): void {
+      77 +    if (store.defaultHand === hand) return                     
+      78      store = { ...store, defaultHand: hand }
+      79      persist()
+      80    },
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All clean. Final step — update CLAUDE.md to document the new pieces:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 19 lines, removed 1 line
+       99      (`piano-tutor.vosk-model`), then hands vosk-browser a blob
+            URL.
+      100    - Mic lifecycle: voice holds the mic via `mic.acquire()`/`re
+           lease()` (refcounted) so
+      101      `stopMonoDetection()`'s `mic.stop()` can't tear down the s
+           tream while voice listens.
+      102 +- `src/lib/input/` — unified note-input hub (`noteInput.svelte
+          +.ts`) over MIDI / mic-mono /                                  
+      103 +  mic-poly. Routing is pure (`routing.ts`): MIDI always wins; 
+          +chord practice defaults to                                    
+      104 +  `mic-fused` — mono onsets grade instantly, poly fills in the
+          + rest of the chord, and the pure                              
+      105 +  `MonoPolyFuser` (`fusion.ts`, unit-tested) drops poly re-rep
+          +orts of mono-graded notes                                     
+      106 +  (exact-midi, 2 s lag window). `settings.fusion` toggles back
+          + to poly-only.                                                
+      107 +- `src/lib/settings.svelte.ts` — persisted app settings (`pian
+          +o-tutor.settings`): `a4` tuning                               
+      108 +  reference (435–445; threaded through `frequencyToMidi`/`Mono
+          +Tracker`, applied on detection                                
+      109 +  start; the Tuner has an auto-calibrate flow; Basic Pitch sta
+          +ys at 440 by design), `fusion`,                               
+      110 +  `defaultHand`. Surfaced in the Settings screen (`/settings`)
+          +, which also shows the voice                                  
+      111 +  miss log (`voice/missLog.ts`) and offline status. Setters ar
+          +e no-ops when unchanged —                                     
+      112 +  screens write back from `$effect`s.                         
+      113  - `src/lib/practice/` — `matcher.ts` is a pure cursor matcher 
+           ("wait, don't fail": wrong notes
+      103 -  flash but never advance); `history.svelte.ts` persists compl
+          -etions to localStorage.                                       
+      114 +  flash but never advance); `history.svelte.ts` persists compl
+          +etions to localStorage (cap 500).                             
+      115 +  `progress.svelte.ts` (level/streak, 3 clean runs → level up)
+          + backs sight-reading, quizzes                                 
+      116 +  (`quiz-${mode}`) and rhythm (`rhythm`). `stats.ts` (Home str
+          +eak/week counts) and                                          
+      117 +  `guideProgress.ts` (maps guide links to the history `lessonI
+          +d` formats each screen writes;                                
+      118 +  integrity-tested) are pure. `timingGrader.ts` grades onsets 
+          +against the beat grid — used by                               
+      119 +  RhythmTrainer, LessonPlayer and SongPlayer (metronome on; su
+          +ppressed on laggy `mic-poly`).                                
+      120 +  `songPrefs.svelte.ts` persists per-song practice tempo; `son
+          +gSteps.ts` also owns the                                      
+      121 +  `bars=3-6` URL-param helpers for arbitrary measure-range pra
+          +ctice.                                                        
+      122  - `src/lib/data/lessons/` — practice content (five-finger, Han
+           on No. 1, scale routine incl.
+      123    melodic minors, chromatic, contrary motion, arpeggios in all
+            24 keys, I–IV–V–I cadences
+      124    (poly), jazz, generated sight-reading melodies).
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 2 lines, removed 1 line
+      129    `npx vite-node scripts/midiToCatalog.ts file.mid`, paste + c
+           lamp/curate.
+      130  - `src/lib/data/guide.ts` — the learning guide: five curriculu
+           m stages whose deep links are
+      131    integrity-tested against the lesson/song/quiz registries (`s
+           rc/tests/guide.test.ts`).
+      132 -  Deliberately static — the guide never tracks progress.      
+      132 +  Deliberately static data — GuideScreen derives "practiced ✓"
+          + badges from history via                                      
+      133 +  `practice/guideProgress.ts`; never add tracking to the guide
+          + data itself.                                                 
+      134  - `src/lib/quiz/` + `src/lib/theory/quiz.ts` + `src/lib/ear/qu
+           iz.ts` — pure quiz generators
+      135    (11 modes) behind `/quizzes` (`/ear` is an alias route).
+      136  - `src/lib/transcribe/` — `cluster.ts` (Tier A: onsets → chord
+           s, no rhythm) and `quantize.ts`
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 11 lines
+      153  
+      154  Re-copy these after upgrading the corresponding packages.
+      155  
+      156 +## PWA / offline (vite-plugin-pwa in vite.config.ts)          
+      157 +                                                              
+      158 +Installable, offline-capable (prod only; the dev SW is disable
+          +d because dev serves ort-wasm                                 
+      159 +from node_modules). Precache = app shell only; `globIgnores` k
+          +eeps every model/WASM dir (and                                
+      160 +the ~6 MB lazy vosk JS chunk) out of it. Runtime CacheFirst ro
+          +utes: hashed `/assets/`,                                      
+      161 +same-origin `/model|tfjs-wasm|ort-wasm|worklets/` (cache `pian
+          +o-tutor.sw-static` — **bump the                               
+      162 +cache name when re-copying those dirs**, they aren't content-h
+          +ashed), and the Salamander                                    
+      163 +sample host so demos play offline. Deliberately NO route for `
+          +model-vosk/` (modelLoader.ts                                  
+      164 +already Cache-API-caches it with a progress bar; an SW route w
+          +ould double-store 41 MB) or                                   
+      165 +`model-minilm/` (transformers.js self-caches).                
+      166 +                                                              
+      167  ## Conventions
+      168  
+      169  - Svelte 5 runes everywhere; shared reactive singletons are `.
+           svelte.ts` modules exporting an
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All green. Committing Phase 4 and cleaning up the servers:
+
+  Committed 15bf8b2 (ctrl+o to expand)
+
+  Wrote 1 memory (ctrl+o to expand)
+
+⏺ All four phases are complete, each as its own commit on the
+  worktree-general-improvements branch, verified with the full test suite (769
+  passing, 0 type errors) and Playwright smoke tests against the real app.
+
+  What landed:
+
+  1. Song practice tools (14a18b7) — The song player now has a per-song
+  persisted tempo slider (the demo plays at your chosen tempo), a metronome with
+  a one-bar count-in, arbitrary bar-range practice (e.g. bars 3–6) alongside
+  the authored sections, a loop toggle that auto-restarts a finished passage,
+  and rhythm grading: with the metronome on, completing a passage shows "Timing:
+  N% in the pocket" using the existing timing grader. Range and hand choices
+  live in the URL, so refresh restores them and back still works.
+  2. Progress integration (a2d974d) — Quiz and rhythm levels now persist across
+  reloads through the same streak-of-3 level-up store sight-reading uses, with
+  feedback like "Perfect round — 2/3 towards level 3" on completion cards. The
+  guide shows green ✓ badges on material you've practiced (derived from history
+  — the guide data itself stays static), and Home shows a day-streak and
+  segments-this-week line.
+  3. Detection: A4 calibration + fusion (63a7030) — The Note Detector gained an
+  auto-calibrate flow: hold the A above middle C for ~1.5 s and the tuning
+  reference (435–445 Hz) adjusts so "in tune" means your instrument. More
+  importantly, chord practice on the mic now uses a fused mode by default: the
+  10 ms mono detector grades the most prominent note instantly while Basic Pitch
+  fills in the rest of the chord ~1 s later, with a pure, unit-tested deduper
+  preventing double-grading. The old poly-only behavior stays available behind a
+  toggle.
+  4. Settings + PWA (15bf8b2) — New /settings screen (tuning, fusion toggle,
+  default hand for the libraries, voice miss-log viewer, offline status) and
+  full PWA support: the app is installable and works offline. The service worker
+  precaches only the app shell; the ~70 MB of models cache on first use, and
+  the Vosk archive is deliberately left to the existing progress-bar downloader
+  so nothing is stored twice. I verified offline reload works in the production
+  build.
+
+  One thing worth knowing: I generated the PWA icons (🎹 on the brand blue) with
+  a script since none existed — easy to swap if you want different artwork. The
+  survey also turned up gaps I didn't touch (no dynamics/pedal content, no
+  hands-independence drills, thin mobile/dark-mode support, and the Vosk grammar
+  silently falling back to open vocabulary on the shipped build) — noted in
+  memory as future candidates.
+
+✻ Worked for 1h 7m 44s
+
+❯ Hello                                                                         
+
+⏺ Hi! Quick recap of where things stand: all four improvement areas from the
+  plan are done and committed on the worktree-general-improvements branch — song
+  practice tools (tempo/metronome/loop/timing grading), progress integration
+  (guide badges, persisted quiz/rhythm levels, Home streak), A4 calibration +
+  mono/poly fusion, and the settings screen + PWA offline support. Tests and
+  type checks are green.
+
+  The branch hasn't been merged to main yet. Want me to merge it, or is there
+  something else you'd like to look at first?
+
+✻ Churned for 44m 30s
+
+❯ commit                                                                        
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Everything is already committed — the working tree is clean. The four phases
+  sit on worktree-general-improvements as the top four commits:
+
+  - 15bf8b2 Add settings screen and PWA offline support
+  - 63a7030 Add A4 calibration and mono/poly fusion for instant chord grading
+  - 14a18b7 Add slow-practice tools to the song player
+  - a2d974d Persist quiz/rhythm levels and surface practice progress in guide
+  and Home
+
+  If you meant merging this branch into main, say the word and I'll do that.
+
+✻ Sautéed for 17s
+
+※ recap: All four planned app improvements (song practice tools, progress tracking, A4 calibration with detection fusion, settings screen plus PWA) are implemented, tested, and committed on worktree-general-improvements. Next action: merge that branch into main when you give the go-ahead. (disable recaps in /config)
+
+❯ merge into main                                                               
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Main has advanced since this branch was cut (two other worktree merges
+  landed). Let me check what they touched before merging:
+
+  Ran 2 shell commands (ctrl+o to expand)
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 4 lines, removed 5 lines
+      93      return new StepMatcher(steps, { lookahead: 2 })
+      94    })
+      95  
+      96 -<<<<<<< HEAD                                                   
+      96    // Wall-clock times of each step advance — graded against the
+           beat grid on
+      97    // completion when the metronome is on (same pattern as Lesso
+          nPlayer).
+      98    let advanceTimes: number[] = []
+     ...
+      116    $effect(() => {
+      117      if (metronomeOn) setMetronomeBpm(bpm)
+      118    })
+      120 -=======                                                       
+      121 -  // Wrong-note flash lasts one beat, clamped so it stays visi
+          -ble but snappy.                                               
+      122 -  const flashMs = $derived(Math.max(200, Math.min(600, 60000 /
+          - song.tempoBpm)))                                             
+      123 ->>>>>>> main                                                  
+      119  
+      120 +  // Wrong-note flash lasts one beat at the practice tempo, cl
+          +amped so it                                                   
+      121 +  // stays visible but snappy.                                
+      122 +  const flashMs = $derived(Math.max(200, Math.min(600, 60000 /
+          + bpm)))                                                       
+      123 +                                                              
+      124    $effect(() => {
+      125      return onInput((ev) => {
+      126        if (ev.kind !== 'on' || matcher.done) return
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 3 lines, removed 5 lines
+      386      <div class="complete">
+      387        🎉 Passage complete — {steps.length} steps,
+      388        {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong
+            note${mistakes === 1 ? '' : 's'} along the way.`}
+      389 -<<<<<<< HEAD                                                  
+      389 +      {#if skips > 0}                                         
+      390 +        {skips} note{skips === 1 ? '' : 's'} slipped by — miss
+          +ed: {missedLabel} (shown in gray on the score).               
+      391 +      {/if}                                                   
+      392        {#if timingPct !== null}
+      393          <span class="timing">Timing: {timingPct}% in the pocke
+           t at ♩={bpm}.</span>
+      394        {/if}
+      395        {#if loop}
+      396          <span class="timing">Looping — starting again…</span>
+      395 -=======                                                       
+      396 -      {#if skips > 0}                                         
+      397 -        {skips} note{skips === 1 ? '' : 's'} slipped by — miss
+          -ed: {missedLabel} (shown in gray on the score).               
+      398 ->>>>>>> main                                                  
+      397        {/if}
+      398        <button
+      399          class="primary"
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/components/SongPlayer.svelte)
+  ⎿  Added 3 lines, removed 2 lines
+      233      if (demoPlaying) return
+      234      demoPlaying = true
+      235      try {
+      236 -      const bpm = beatsPerMeasure(song)                       
+      236 +      const beatsPerBar = beatsPerMeasure(song)               
+      237        const notes = []
+      238        for (let m = fromMeasure; m <= toMeasure; m++) {
+      239          for (const n of song.measures[m].notes) {
+      240            if (hands !== 'both' && n.hand !== hands) continue
+      241 -          notes.push({ midi: n.midi, startBeat: (m - fromMeasu
+          -re) * bpm + n.startBeat, durationBeats: n.durationBeats, hand:
+          - n.hand })                                                    
+      241 +          notes.push({ midi: n.midi, startBeat: (m - fromMeasu
+          +re) * beatsPerBar + n.startBeat, durationBeats: n.durationBeat
+          +s, hand: n.hand })                                            
+      242          }
+      243        }
+      244 +      // Demo at the chosen practice tempo (state `bpm`), not 
+          +the score tempo.                                              
+      245        await playSong(notes, bpm, song.swing)
+      246      } finally {
+      247        demoPlaying = false
+
+⏺ Also verifying the rest of the auto-merged sections, then running the suite:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ All 789 tests and the type check pass. Committing the merge, then a quick
+  smoke of the song player before pushing to main:
+
+  Committed 4c3d4c8, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Post-merge smoke is clean. Now merging into main:
+
+  Merged worktree-general-improvements (ctrl+o to expand)
+
+⏺ Merged into main cleanly. Because I first merged main's recent
+  playback-scheduler work into the branch and resolved everything there, the
+  final merge was conflict-free and the resulting tree is exactly the one that
+  passed the full suite (789 tests, 0 type errors) and the browser smoke test.
+
+  Two things surfaced during the merge worth knowing:
+
+  - Fixed a real bug from Phase 1: in demo(), a local const bpm = 
+  beatsPerMeasure(song) was shadowing the practice-tempo state, so the demo
+  button would have played at ~4 BPM instead of your chosen tempo. The merge
+  resolution renames the local and the demo now genuinely plays at the slider
+  tempo.
+  - Fixed a latent type error that came in from main: SightReadPlayer passed
+  lookahead: true to the matcher, whose option type is now 0 | 1 | 2 — changed
+  to lookahead: 1, which matches its previous runtime behavior.
+
+  main is now at af7557f with all four improvement areas: song slow-practice
+  tools, progress/guide integration, A4 calibration + mono/poly fusion, and the
+  settings screen + installable offline PWA. The main checkout's working tree is
+  untouched apart from its pre-existing untracked files.
+
+✻ Brewed for 4m 51s

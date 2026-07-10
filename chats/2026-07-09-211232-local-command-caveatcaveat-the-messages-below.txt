@@ -1,0 +1,901 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.205
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+
+❯ /color 
+  ⎿  Session color set to: orange
+
+❯ /model                                                                        
+  ⎿  Set model to Fable 5 and saved as your default for new sessions
+
+❯ The behaviour of monitoring the missed notes and continuing onto the next     
+  notes is working well, but I think it could still be made smoother. what      
+  improvements could be made?                                                   
+
+⏺ I'll explore the current missed-notes behavior to understand what's there
+  before suggesting improvements.
+
+⏺ Explore(Explore missed-notes handling)
+  ⎿  Done (12 tool uses · 32.8k tokens · 1m 49s)
+  (ctrl+o to expand)
+
+⏺ User answered Claude's questions:
+  ⎿  · Which improvements should the plan include? → Show misses on the score 
+     (Recommended), Count & report misses, Deeper lookahead (depth 2), Polish: 
+     flash & grading, When the app listens in the song player but also the other
+     areas of the app that listen to playing, the app might say how you were 
+     correct with some misses. Would be good to show which those misses were?
+
+⏺ Plan(Design missed-notes improvements)
+  ⎿  Done (14 tool uses · 55.3k tokens · 3m 23s)
+  (ctrl+o to expand)
+
+⏺ The Plan agent returned a solid design. Let me verify the critical files
+  myself before writing the final plan.
+
+  Read 4 files (ctrl+o to expand)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/the-behaviour-of-monitoring-gentle-cray.md ·
+     /plan to edit
+     Smoother missed-notes experience (lookahead/skip)
+
+     Context
+
+     Commit afa3d87 added depth-1 lookahead to StepMatcher: when the mic drops a
+     note-on (common on fast playing), playing the next expected note marks the
+     current step skipped and continues instead of derailing the run. This
+     works well, but the experience is rough around it:
+
+     - Skipped notes render in the same blue as normally-played notes — the
+     player can't see what they missed.
+     - The completion card says "no wrong notes!" even after 5 misses; skips
+     aren't in the progress hint or practice history.
+     - Depth is fixed at 1, so two consecutive dropped detections still cause a
+     wall of wrong-note flashes.
+     - The wrong-note keyboard flash is a fixed 350 ms regardless of tempo, and
+     runs containing skips are silently excluded from timing grading with no
+     explanation.
+
+     User confirmed all of the above in scope, plus: at the end of a run, show
+     which notes were missed (by name, and visibly on the score). EchoPlayer
+     stays strict (no lookahead) — it deliberately grades exact reproduction.
+
+     Changes
+
+     1. src/lib/practice/matcher.ts — depth-2 lookahead + missed-note surface 
+     (stays pure)
+
+     - Change StepMatcherOptions.lookahead from boolean to 0 | 1 | 2
+     (default 0). Only 3 call sites + tests; no compat shim. Update the doc
+     comment (currently says "Depth is exactly 1").
+     - Replace the single cursor+1 check in onOnset (matcher.ts:68) with a
+     shallowest-match-first loop for d = 1..lookahead: on match at depth d, mark
+     the d intervening steps 'skipped' (incrementing skips per step), advance
+     cursor, clear collected/stumbled, then collect(midi) and return { 
+     ...outcome, skipped: d }.
+       - Current-step check stays first → repeated notes never skip (preserves
+     test at matcher.test.ts:82).
+       - Shallowest match wins → a note in both cursor+1 and cursor+2 skips
+     only 1.
+       - Chord steps: skipping into a chord collects one tone without advancing,
+     same as existing depth-1 semantics.
+     - Add getter get skippedMidis(): number[] — steps.flatMap((s, i) => 
+     results[i] === 'skipped' ? s.midis : []). (Known simplification: a
+     partially-collected chord that gets skipped reports all its midis; fine for
+     v1.)
+
+     2. src/lib/notation/vexScore.ts — 'missed' highlight + note-name helper
+
+     - HighlightState (line 78): add 'missed'; HIGHLIGHT_COLORS: missed: 
+     '#94a3b8' (slate-400 — muted gray, matches the app's slate hint palette).
+     buildNote applies fill/stroke generically; no other rendering change.
+     GrandSheetMusic.svelte forwards HighlightState opaquely.
+     - Add export function midiToNameInKey(midi: number, keySignature: string): 
+     string using the existing FLAT_KEYS set (line 97) — FLAT_KEYS.has(key) ? 
+     Note.fromMidi(midi) : Note.fromMidiSharps(midi) — and refactor
+     midiToVexKeyInKey (line 103) to noteNameToVexKey(midiToNameInKey(...)).
+
+     3. src/lib/practice/history.svelte.ts — record skips
+
+     - Add optional skips?: number to PracticeRecord (optional ⇒ existing
+     localStorage records parse unchanged; readers use ?? 0).
+     - src/screens/Home.svelte (~line 123, recent-practice line): append · 
+     {r.skips} slipped by when (r.skips ?? 0) > 0.
+
+     4. src/components/SongPlayer.svelte
+
+     - Line 42: { lookahead: 2 }.
+     - Highlights (line 65): split the collapsed branch — 'corrected' →
+     'played', 'skipped' → 'missed'. This shows gray both live and on the
+     finished score (the map rebuilds from results each version bump).
+     - New deriveds (existing void version pattern): skips = matcher.skips;
+     missedNames = deduped matcher.skippedMidis.map(m => midiToNameInKey(m, 
+     song.keySignature)), display capped at ~8 names + "…".
+     - Completion card (line 207–208): when skips > 0 add a sentence like
+     {skips} note(s) slipped by — missed: {missedNames.join(', ')} (gray on the 
+     score). Wrong-notes sentence unchanged.
+     - Progress hint (line 240–244): add {#if skips > 0}Missed so far: 
+     {skips}.{/if}.
+     - addRecord (line 88): add skips: matcher.skips.
+     - Tempo-relative flash (line 55): replace 350 with flashMs = Math.max(200, 
+     Math.min(600, 60000 / song.tempoBpm)) (one beat, clamped). Note: sections
+     have no per-section tempi; song.tempoBpm is the only tempo.
+
+     5. src/components/LessonPlayer.svelte
+
+     Mirror SongPlayer: { lookahead: 2 } (line 52), highlight split (line 119),
+     skips/missedNames deriveds (spell with lesson.keySignature),
+     completion-card sentence (~line 310), progress-hint line (~line 330),
+     addRecord skips (line 177), flash using the user-adjustable bpm state (line
+     84: Math.max(200, Math.min(600, 60000 / bpm))).
+
+     Plus the timing-grade hint: in the done effect (line 159–188), when the
+     metronome/startBeat preconditions hold but advanceTimes.length !== 
+     steps.length and matcher.skips > 0, set timingUngraded = true ($state,
+     reset alongside timingPct in the effect at line 59). Completion card: {#if 
+     timingUngraded} show hint "Timing not graded — some notes slipped by; play
+     it again for a rhythm score."
+
+     Deliberately unchanged: oncomplete stays { mistakes } — skips are mostly
+     detection artifacts, so they shouldn't block sight-reading auto-advance in
+     Practice.svelte. EchoPlayer passes no options → lookahead: 0, unaffected.
+
+     6. src/tests/matcher.test.ts
+
+     - Mechanical: { lookahead: true } → { lookahead: 1 } (lines 44, 55, 61, 68,
+     76, 83, 92).
+     - Keep the "does not look ahead more than one step" test (line 60) as the
+     depth-1 boundary case.
+     - New depth-2 describe block: double skip (skipped: 2, results
+     ['skipped','skipped','correct',…], skips === 2, mistakes === 0); depth-3
+     note is still wrong; shallowest-wins (steps [60],[62],[62], onset 62 skips
+     exactly 1); repeated notes never skip at depth 2; double-skip into a chord
+     step collects without advancing; double-skip into last step completes;
+     skippedMidis contents/order and empty case.
+
+     Verification
+
+     1. npm test — matcher suite + untouched lesson-content tests.
+     2. npm run check — svelte-check catches any HighlightState narrowing misses
+     and the PracticeRecord change.
+     3. Eyeball via the project's verify skill (dev server + Playwright): open a
+     song, play note 1, skip note 2, play note 3 → skipped notehead turns gray
+     immediately, hint shows "Missed so far: 1"; finish → completion card names
+     the missed note and the gray mark persists on the score. Repeat in a lesson
+     with metronome on → "Timing not graded…" hint appears. Check Home shows
+     "slipped by" on the new record and old history rows still render.
+
+     Risks
+
+     - Depth-2 false skips: a genuinely wrong note equal to the note two steps
+     ahead grays out two steps instead of flashing red. Mitigated by
+     shallowest-first ordering; accepted for songs and lessons since fast lesson
+     material (Hanon, scales) is where detections drop most. Easy to dial back
+     per-player later since depth is now an option.
+     - Chord steps skipped mid-collection report all their midis as missed
+     (slight over-report; acceptable).
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/practice/matcher.t
+        s)
+  ⎿  Added 8 lines, removed 7 lines
+      15  
+      16  export interface StepMatcherOptions {
+      17    /**
+      18 -   * When the onset misses the current step but matches the NEX
+         -T one, mark the                                                
+      19 -   * current step 'skipped' and move on instead of flagging a w
+         -rong note — a                                                  
+      20 -   * single missed detection (mic detection is lossy on fast pl
+         -aying) then                                                    
+      21 -   * costs one grey step instead of derailing the rest of the r
+         -un. Depth is                                                   
+      22 -   * exactly 1; a wrong-octave detection advancing is mitigated
+         - by the                                                        
+      23 -   * tracker's octave hysteresis.                              
+      18 +   * When the onset misses the current step but matches an upco
+         +ming one within                                                
+      19 +   * this many steps, mark the intervening steps 'skipped' and 
+         +move on instead                                                
+      20 +   * of flagging a wrong note — a missed detection (mic detecti
+         +on is lossy on                                                 
+      21 +   * fast playing) then costs grey steps instead of derailing t
+         +he rest of the                                                 
+      22 +   * run. The shallowest match wins, and the current step is al
+         +ways checked                                                   
+      23 +   * first, so repeated notes never skip; a wrong-octave detect
+         +ion advancing                                                  
+      24 +   * is mitigated by the tracker's octave hysteresis. 0 (defaul
+         +t) disables.                                                   
+      25     */
+      25 -  lookahead?: boolean                                          
+      26 +  lookahead?: 0 | 1 | 2                                        
+      27  }
+      28  
+      29  /**
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/practice/matcher.t
+        s)
+  ⎿  Added 2 lines, removed 2 lines
+      40    skips = 0
+      41    private collected = new Set<number>()
+      42    private stumbled = false
+      43 -  private lookahead: boolean                                   
+      43 +  private lookahead: number                                    
+      44  
+      45    constructor(steps: LessonStep[], opts: StepMatcherOptions = {
+          }) {
+      46      this.steps = steps
+      47      this.results = steps.map(() => 'pending')
+      48 -    this.lookahead = opts.lookahead ?? false                   
+      48 +    this.lookahead = opts.lookahead ?? 0                       
+      49    }
+      50  
+      51    get done(): boolean {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/practice/matcher.t
+        s)
+  ⎿  Added 13 lines, removed 5 lines
+      63      return new Set(cur.midis.filter((m) => !this.collected.has(
+          m)))
+      64    }
+      65  
+      66 +  /** Midis of every step marked 'skipped', in step order. */  
+      67 +  get skippedMidis(): number[] {                               
+      68 +    return this.steps.flatMap((s, i) => (this.results[i] === 's
+         +kipped' ? s.midis : []))                                       
+      69 +  }                                                            
+      70 +                                                               
+      71    onOnset(midi: number): OnsetOutcome {
+      72      if (this.done) return { advanced: false, wrong: false, done
+          : true }
+      73      if (this.current!.midis.includes(midi)) return this.collect
+          (midi)
+      69 -    if (this.lookahead && this.steps[this.cursor + 1]?.midis.in
+         -cludes(midi)) {                                                
+      70 -      this.results[this.cursor] = 'skipped'                    
+      71 -      this.skips++                                             
+      72 -      this.cursor++                                            
+      74 +    for (let d = 1; d <= this.lookahead; d++) {                
+      75 +      if (!this.steps[this.cursor + d]?.midis.includes(midi)) c
+         +ontinue                                                        
+      76 +      for (let i = 0; i < d; i++) {                            
+      77 +        this.results[this.cursor] = 'skipped'                  
+      78 +        this.skips++                                           
+      79 +        this.cursor++                                          
+      80 +      }                                                        
+      81        this.collected.clear()
+      82        this.stumbled = false
+      75 -      return { ...this.collect(midi), skipped: 1 }             
+      83 +      return { ...this.collect(midi), skipped: d }             
+      84      }
+      85      this.mistakes++
+      86      this.stumbled = true
+
+⏺ Now the notation layer:
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/notation/vexScore.
+        ts)
+  ⎿  Added 2 lines, removed 1 line
+      75    return { duration: 'q', dots: 0 }
+      76  }
+      77  
+      78 -export type HighlightState = 'played' | 'correct' | 'wrong' | '
+         -next'                                                          
+      78 +export type HighlightState = 'played' | 'correct' | 'wrong' | '
+         +next' | 'missed'                                               
+      79  
+      80  const HIGHLIGHT_COLORS: Record<HighlightState, string> = {
+      81    played: '#2563eb',
+      82    correct: '#16a34a',
+      83    wrong: '#dc2626',
+      84    next: '#d97706',
+      85 +  missed: '#94a3b8',                                           
+      86  }
+      87  
+      88  export function noteNameToVexKey(name: string): string {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/notation/vexScore.
+        ts)
+  ⎿  Added 6 lines, removed 2 lines
+      100    'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm',
+      101  ])
+      102  
+      103 +/** Human-readable note name spelled to suit the key signature
+          + (e.g. 'Bb4' in F). */                                        
+      104 +export function midiToNameInKey(midi: number, keySignature: st
+          +ring): string {                                               
+      105 +  return FLAT_KEYS.has(keySignature) ? Note.fromMidi(midi) : N
+          +ote.fromMidiSharps(midi)                                      
+      106 +}                                                             
+      107 +                                                              
+      108  /** Spell a midi note to suit the key signature (flats in flat
+            keys). */
+      109  export function midiToVexKeyInKey(midi: number, keySignature: 
+           string): string {
+      105 -  const name = FLAT_KEYS.has(keySignature) ? Note.fromMidi(mid
+          -i) : Note.fromMidiSharps(midi)                                
+      106 -  return noteNameToVexKey(name)                               
+      110 +  return noteNameToVexKey(midiToNameInKey(midi, keySignature))
+      111  }
+      112  
+      113  function buildNote(
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/lib/practice/history.s
+        velte.ts)
+  ⎿  Added 2 lines
+       4    segment: string
+       5    mistakes: number
+       6    steps: number
+       7 +  /** Steps skipped by lookahead (missed detections); older rec
+         +ords have none (= 0). */                                       
+       8 +  skips?: number                                               
+       9    /** What kind of practice this was; older records have none (
+          = 'lesson'). */
+      10    kind?: 'lesson' | 'ear' | 'rhythm' | 'song'
+      11    /** Quiz-style activities: questions answered correctly out o
+          f total. */
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/screens/Home.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      120            {#if r.score}
+      121              {r.score.correct}/{r.score.total} correct{r.score.
+           correct === r.score.total ? ' ✨' : ''}
+      122            {:else}
+      123 -            {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes}
+          - wrong note${r.mistakes === 1 ? '' : 's'}`}                   
+      123 +            {r.mistakes === 0 ? 'flawless ✨' : `${r.mistakes}
+          + wrong note${r.mistakes === 1 ? '' : 's'}`}{(r.skips ?? 0) > 0
+      124 +              ? ` · ${r.skips} slipped by`                    
+      125 +              : ''}                                           
+      126            {/if}
+      127            <span class="when">{new Date(r.at).toLocaleString()}
+           </span>
+      128          </li>
+
+⏺ Now SongPlayer:
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 7 lines, removed 3 lines
+      39  
+      40    const matcher = $derived.by(() => {
+      41      void resetKey
+      42 -    return new StepMatcher(steps, { lookahead: true })         
+      42 +    return new StepMatcher(steps, { lookahead: 2 })            
+      43    })
+      44  
+      45 +  // Wrong-note flash lasts one beat, clamped so it stays visib
+         +le but snappy.                                                 
+      46 +  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / 
+         +song.tempoBpm)))                                               
+      47 +                                                               
+      48    $effect(() => {
+      49      return onInput((ev) => {
+      50        if (ev.kind !== 'on' || matcher.done) return
+     ...
+      55          wrongFlash = new Set([...wrongFlash, flashed])
+      56          setTimeout(() => {
+      57            wrongFlash = new Set([...wrongFlash].filter((m) => m 
+          !== flashed))
+      55 -        }, 350)                                                
+      58 +        }, flashMs)                                            
+      59        }
+      60      })
+      61    })
+     ...
+      65      const map = new Map<number, HighlightState>()
+      66      matcher.results.forEach((r, i) => {
+      67        if (r === 'correct') map.set(i, 'correct')
+      65 -      else if (r === 'corrected' || r === 'skipped') map.set(i,
+         - 'played')                                                     
+      68 +      else if (r === 'corrected') map.set(i, 'played')         
+      69 +      else if (r === 'skipped') map.set(i, 'missed')           
+      70      })
+      71      if (!matcher.done) map.set(matcher.cursor, 'next')
+      72      return map
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 11 lines
+      80      void version
+      81      return matcher.mistakes
+      82    })
+      83 +  const skips = $derived.by(() => {                            
+      84 +    void version                                               
+      85 +    return matcher.skips                                       
+      86 +  })                                                           
+      87 +  const missedNames = $derived.by(() => {                      
+      88 +    void version                                               
+      89 +    return [...new Set(matcher.skippedMidis.map((m) => midiToNa
+         +meInKey(m, song.keySignature)))]                               
+      90 +  })                                                           
+      91 +  const missedLabel = $derived(                                
+      92 +    missedNames.length > 8 ? `${missedNames.slice(0, 8).join(',
+         + ')}…` : missedNames.join(', '),                               
+      93 +  )                                                            
+      94    const progress = $derived.by(() => {
+      95      void version
+      96      return matcher.cursor
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 1 line, removed 1 line
+       5    import { playSong } from '../lib/audio/playback'
+       6    import { beatsPerMeasure, type Song } from '../lib/data/songs
+          /types'
+       7    import { noteInput, onInput } from '../lib/input/noteInput.sv
+          elte'
+       8 -  import type { HighlightState } from '../lib/notation/vexScore
+         -'                                                              
+       8 +  import { midiToNameInKey, type HighlightState } from '../lib/
+         +notation/vexScore'                                             
+       9    import { addRecord } from '../lib/practice/history.svelte'
+      10    import { StepMatcher } from '../lib/practice/matcher'
+      11    import { stepsFromSong } from '../lib/practice/songSteps'
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Both types have keySignature. Now the SongPlayer completion card, hint, and
+  record:
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 1 line
+      106          segment: `bars ${fromMeasure + 1}–${toMeasure + 1}${ha
+           nds === 'both' ? '' : hands === 'R' ? ' (RH)' : ' (LH)'}`,
+      107          mistakes: matcher.mistakes,
+      108          steps: steps.length,
+      109 +        skips: matcher.skips,                                 
+      110          kind: 'song',
+      111        })
+      112      } else if (!done) {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 3 lines
+      222      <div class="complete">
+      223        🎉 Passage complete — {steps.length} steps,
+      224        {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong
+            note${mistakes === 1 ? '' : 's'} along the way.`}
+      225 +      {#if skips > 0}                                         
+      226 +        {skips} note{skips === 1 ? '' : 's'} slipped by — miss
+          +ed: {missedLabel} (shown in gray on the score).               
+      227 +      {/if}                                                   
+      228        <button
+      229          class="primary"
+      230          onclick={() => {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/SongPlayer.
+        svelte)
+  ⎿  Added 1 line
+      260        Wait-mode: the orange note is next; the score waits unti
+           l you play it. Progress: {progress} /
+      261        {steps.length}.
+      262        {#if mistakes > 0}Wrong notes so far: {mistakes}.{/if}
+      263 +      {#if skips > 0}Missed so far: {skips}.{/if}             
+      264      </p>
+      265    {/if}
+      266  
+
+⏺ Now LessonPlayer — let me see its imports and completion card:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 1 line, removed 1 line
+       7    import { playChord, playChordSequence, playSequence } from '.
+          ./lib/audio/playback'
+       8    import { noteInput, onInput } from '../lib/input/noteInput.sv
+          elte'
+       9    import type { Lesson } from '../lib/data/lessons'
+      10 -  import { scoreFromSteps, type HighlightState } from '../lib/n
+         -otation/vexScore'                                              
+      10 +  import { midiToNameInKey, scoreFromSteps, type HighlightState
+         + } from '../lib/notation/vexScore'                             
+      11    import { addRecord } from '../lib/practice/history.svelte'
+      12    import { StepMatcher } from '../lib/practice/matcher'
+      13    import { gradeTiming } from '../lib/practice/timingGrader'
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      49    // Recreated whenever the lesson, segment, or resetKey change
+          s.
+      50    const matcher = $derived.by(() => {
+      51      void resetKey
+      52 -    return new StepMatcher(lesson.segments[segIndex].steps, { l
+         -ookahead: true })                                              
+      52 +    return new StepMatcher(lesson.segments[segIndex].steps, { l
+         +ookahead: 2 })                                                 
+      53    })
+      54  
+      55    // Wall-clock times of each step advance — graded against the
+           beat grid
+      56    // when the metronome is on and the material carries startBea
+          ts.
+      57    let advanceTimes: number[] = []
+      58    let timingPct = $state<number | null>(null)
+      59 +  let timingUngraded = $state(false)                           
+      60    $effect(() => {
+      61      void matcher
+      62      advanceTimes = []
+      63      timingPct = null
+      64 +    timingUngraded = false                                     
+      65    })
+      66  
+      67    function restartSegment(index = segIndex) {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 1 line, removed 1 line
+      83          wrongFlash = new Set([...wrongFlash, flashed])
+      84          setTimeout(() => {
+      85            wrongFlash = new Set([...wrongFlash].filter((m) => m 
+          !== flashed))
+      86 -        }, 350)                                                
+      86 +        }, flashMs)                                            
+      87        }
+      88      })
+      89    })
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 4 lines
+      70      version++
+      71    }
+      72  
+      73 +  // Wrong-note flash lasts one beat at the current tempo, clam
+         +ped so it                                                      
+      74 +  // stays visible but snappy.                                 
+      75 +  const flashMs = $derived(Math.max(200, Math.min(600, 60000 / 
+         +bpm)))                                                         
+      76 +                                                               
+      77    $effect(() => {
+      78      // Grading hears the hub's active source: MIDI when a keybo
+          ard is
+      79      // connected, otherwise the lesson's designated mic detecto
+          r.
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)  ⎿  Added 2 lines, removed 1 line
+      122      const map = new Map<number, HighlightState>()
+      123      matcher.results.forEach((r, i) => {
+      124        if (r === 'correct') map.set(i, 'correct')
+      125 -      else if (r === 'corrected' || r === 'skipped') map.set(i
+          -, 'played')                                                   
+      125 +      else if (r === 'corrected') map.set(i, 'played')        
+      126 +      else if (r === 'skipped') map.set(i, 'missed')          
+      127      })
+      128      if (!matcher.done) map.set(matcher.cursor, 'next')
+      129      return map
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 11 lines
+      156      void version
+      157      return matcher.mistakes
+      158    })
+      159 +  const skips = $derived.by(() => {                           
+      160 +    void version                                              
+      161 +    return matcher.skips                                      
+      162 +  })                                                          
+      163 +  const missedNames = $derived.by(() => {                     
+      164 +    void version                                              
+      165 +    return [...new Set(matcher.skippedMidis.map((m) => midiToN
+          +ameInKey(m, lesson.keySignature)))]                           
+      166 +  })                                                          
+      167 +  const missedLabel = $derived(                               
+      168 +    missedNames.length > 8 ? `${missedNames.slice(0, 8).join('
+          +, ')}…` : missedNames.join(', '),                             
+      169 +  )                                                           
+      170    const progress = $derived.by(() => {
+      171      void version
+      172      return matcher.cursor
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 15 lines, removed 10 lines
+      181        // A lookahead-skipped step advances the cursor twice on
+            one onset, so
+      182        // the length check fails and the run simply isn't timin
+           g-graded.
+      183        const steps = segment.steps
+      184 -      if (metronomeOn && steps.length > 1 && steps.every((s) =
+          -> s.startBeat !== undefined) && advanceTimes.length === steps.
+          -length) {                                                     
+      185 -        const beatMs = 60000 / bpm                            
+      186 -        const anchor = advanceTimes[0] - steps[0].startBeat! *
+          - beatMs                                                       
+      187 -        const result = gradeTiming(                           
+      188 -          steps.map((s) => ({ startBeat: s.startBeat! })),    
+      189 -          advanceTimes.map((tMs) => ({ tMs })),               
+      190 -          bpm,                                                
+      191 -          anchor,                                             
+      192 -        )                                                     
+      193 -        timingPct = Math.round(result.accuracy * 100)         
+      184 +      if (metronomeOn && steps.length > 1 && steps.every((s) =
+          +> s.startBeat !== undefined)) {                               
+      185 +        if (advanceTimes.length === steps.length) {           
+      186 +          const beatMs = 60000 / bpm                          
+      187 +          const anchor = advanceTimes[0] - steps[0].startBeat!
+          + * beatMs                                                     
+      188 +          const result = gradeTiming(                         
+      189 +            steps.map((s) => ({ startBeat: s.startBeat! })),  
+      190 +            advanceTimes.map((tMs) => ({ tMs })),             
+      191 +            bpm,                                              
+      192 +            anchor,                                           
+      193 +          )                                                   
+      194 +          timingPct = Math.round(result.accuracy * 100)       
+      195 +        } else if (matcher.skips > 0) {                       
+      196 +          timingUngraded = true                               
+      197 +        }                                                     
+      198        }
+      199        addRecord({
+      200          lessonId: lesson.id,
+     ...
+      202          segment: segment.label,
+      203          mistakes: matcher.mistakes,
+      204          steps: segment.steps.length,
+      205 +        skips: matcher.skips,                                 
+      206        })
+      207        oncomplete?.({ mistakes: matcher.mistakes })
+      208      } else if (!done) {
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 5 lines
+      331      <div class="complete">
+      332        🎉 Segment complete — {segment.steps.length} notes,
+      333        {mistakes === 0 ? 'no wrong notes!' : `${mistakes} wrong
+            note${mistakes === 1 ? '' : 's'} along the way.`}
+      334 +      {#if skips > 0}                                         
+      335 +        {skips} note{skips === 1 ? '' : 's'} slipped by — miss
+          +ed: {missedLabel} (shown in gray on the score).               
+      336 +      {/if}                                                   
+      337        {#if timingPct !== null}
+      338          Timing: {timingPct}% in the pocket.
+      339 +      {:else if timingUngraded}                               
+      340 +        Timing not graded — some notes slipped by; play it aga
+          +in for a rhythm score.                                        
+      341        {/if}
+      342        {#if segIndex < lesson.segments.length - 1}
+      343          <button class="primary" onclick={() => restartSegment(
+           segIndex + 1)}>
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/components/LessonPlaye
+        r.svelte)
+  ⎿  Added 2 lines
+      363        {/if}
+      364        {#if mistakes > 0}
+      365          Wrong notes so far: {mistakes}.{/if}
+      366 +      {#if skips > 0}                                         
+      367 +        Missed so far: {skips}.{/if}                          
+      368      </p>
+      369    {/if}
+      370  
+
+⏺ Now the tests. Let me read the existing matcher test file:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/tests/matcher.test.ts)
+  ⎿  Error editing file
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/tests/matcher.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      57      expect(m.results).toEqual(['skipped', 'correct'])
+      58    })
+      59  
+      60 -  it('does not look ahead more than one step', () => {         
+      60 +  it('depth 1 does not look ahead more than one step', () => { 
+      61      const m = new StepMatcher(mel(60, 62, 64), { lookahead: 1 }
+          )
+      62      expect(m.onOnset(64)).toEqual({ advanced: false, wrong: tru
+          e, done: false })
+      63      expect(m.cursor).toBe(0)
+
+⏺ Update(.claude/worktrees/better-missed-notes-review/src/tests/matcher.test.ts)
+  ⎿  Added 82 lines
+      100    })
+      101  })
+      102  
+      103 +describe('StepMatcher lookahead depth 2', () => {             
+      104 +  it('recovers two consecutive missed detections in one onset'
+          +, () => {                                                     
+      105 +    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead
+          +: 2 })                                                        
+      106 +    expect(m.onOnset(64)).toEqual({ advanced: true, wrong: fal
+          +se, done: false, skipped: 2 })                                
+      107 +    expect(m.results).toEqual(['skipped', 'skipped', 'correct'
+          +, 'pending'])                                                 
+      108 +    expect(m.skips).toBe(2)                                   
+      109 +    expect(m.mistakes).toBe(0)                                
+      110 +  })                                                          
+      111 +                                                              
+      112 +  it('does not look ahead more than two steps', () => {       
+      113 +    const m = new StepMatcher(mel(60, 62, 64, 65), { lookahead
+          +: 2 })                                                        
+      114 +    expect(m.onOnset(65)).toEqual({ advanced: false, wrong: tr
+          +ue, done: false })                                            
+      115 +    expect(m.cursor).toBe(0)                                  
+      116 +    expect(m.mistakes).toBe(1)                                
+      117 +    expect(m.skips).toBe(0)                                   
+      118 +  })                                                          
+      119 +                                                              
+      120 +  it('the shallowest match wins when a note appears at both de
+          +pths', () => {                                                
+      121 +    const m = new StepMatcher(mel(60, 62, 62), { lookahead: 2 
+          +})                                                            
+      122 +    expect(m.onOnset(62)).toEqual({ advanced: true, wrong: fal
+          +se, done: false, skipped: 1 })                                
+      123 +    expect(m.results).toEqual(['skipped', 'correct', 'pending'
+          +])                                                            
+      124 +    expect(m.skips).toBe(1)                                   
+      125 +  })                                                          
+      126 +                                                              
+      127 +  it('a repeated note matches the current step, never skips', 
+          +() => {                                                       
+      128 +    const m = new StepMatcher(mel(67, 67, 67), { lookahead: 2 
+          +})                                                            
+      129 +    expect(m.onOnset(67)).toEqual({ advanced: true, wrong: fal
+          +se, done: false })                                            
+      130 +    expect(m.results[0]).toBe('correct')                      
+      131 +    expect(m.skips).toBe(0)                                   
+      132 +  })                                                          
+      133 +                                                              
+      134 +  it('double-skips into a chord step and collects one tone wit
+          +hout advancing', () => {                                      
+      135 +    const m = new StepMatcher(                                
+      136 +      [                                                       
+      137 +        { midis: [60], fingers: [1] },                        
+      138 +        { midis: [62], fingers: [2] },                        
+      139 +        { midis: [64, 67, 71], fingers: [1, 3, 5] },          
+      140 +      ],                                                      
+      141 +      { lookahead: 2 },                                       
+      142 +    )                                                         
+      143 +    expect(m.onOnset(67)).toEqual({ advanced: false, wrong: fa
+          +lse, done: false, skipped: 2 })                               
+      144 +    expect(m.results).toEqual(['skipped', 'skipped', 'pending'
+          +])                                                            
+      145 +    expect(m.remaining).toEqual(new Set([64, 71]))            
+      146 +  })                                                          
+      147 +                                                              
+      148 +  it('double-skipping into the last step completes the lesson'
+          +, () => {                                                     
+      149 +    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 2 
+          +})                                                            
+      150 +    expect(m.onOnset(64)).toEqual({ advanced: true, wrong: fal
+          +se, done: true, skipped: 2 })                                 
+      151 +    expect(m.results).toEqual(['skipped', 'skipped', 'correct'
+          +])                                                            
+      152 +  })                                                          
+      153 +                                                              
+      154 +  it('lookahead: 0 never skips', () => {                      
+      155 +    const m = new StepMatcher(mel(60, 62, 64), { lookahead: 0 
+          +})                                                            
+      156 +    expect(m.onOnset(62)).toEqual({ advanced: false, wrong: tr
+          +ue, done: false })                                            
+      157 +    expect(m.skips).toBe(0)                                   
+      158 +  })                                                          
+      159 +})                                                            
+      160 +                                                              
+      161 +describe('StepMatcher skippedMidis', () => {                  
+      162 +  it('is empty when nothing was skipped', () => {             
+      163 +    const m = new StepMatcher(mel(60, 62), { lookahead: 2 })  
+      164 +    m.onOnset(60)                                             
+      165 +    expect(m.skippedMidis).toEqual([])                        
+      166 +  })                                                          
+      167 +                                                              
+      168 +  it('returns the midis of skipped steps in step order, includ
+          +ing chord tones', () => {                                     
+      169 +    const m = new StepMatcher(                                
+      170 +      [                                                       
+      171 +        { midis: [60], fingers: [1] },                        
+      172 +        { midis: [62, 65], fingers: [1, 3] },                 
+      173 +        { midis: [67], fingers: [5] },                        
+      174 +        { midis: [69], fingers: [5] },                        
+      175 +      ],                                                      
+      176 +      { lookahead: 2 },                                       
+      177 +    )                                                         
+      178 +    expect(m.onOnset(67).skipped).toBe(2)                     
+      179 +    m.onOnset(69)                                             
+      180 +    expect(m.done).toBe(true)                                 
+      181 +    expect(m.skippedMidis).toEqual([60, 62, 65])              
+      182 +  })                                                          
+      183 +})                                                            
+      184 +                                                              
+      185  describe('StepMatcher (chords)', () => {
+      186    const chord: LessonStep[] = [{ midis: [60, 64, 67], fingers:
+            [1, 3, 5] }]
+      187  
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All 736 tests pass. Now the type check:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Made 2 scratchpad edits +119, searched for 2 patterns, read 5 files, ran 6 shell commands (ctrl+o to expand)
+⏺ Done — all five improvements are implemented, tested, and verified in the real
+  app.
+
+  What changed:
+
+  - Missed notes now show in gray on the score (#94a3b8), both live and on the
+  finished score — a new 'missed' highlight state in vexScore.ts, mapped from
+  the matcher's skipped result in both SongPlayer and LessonPlayer. Previously
+  they were indistinguishable from played notes.
+  - Misses are counted and named. The progress hint shows "Missed so far: N",
+  and the completion card now says e.g. "3 notes slipped by — missed: E4, G4 
+  (shown in gray on the score)" — a deduped list of missed note names spelled to
+  suit the key signature (capped at 8). Skips are also recorded to practice
+  history (new optional skips field, backward-compatible with existing
+  localStorage records), and Home's recent-practice line shows "· 3 slipped by".
+  - Lookahead deepened to 2 in matcher.ts — the option is now lookahead: 0 | 1 |
+  2 and a shallowest-match-first loop replaces the single next-step check, so
+  two consecutive dropped detections recover in one onset. The current step is
+  still checked first (repeated notes never skip), and a note present at both
+  depths skips only one step. EchoPlayer stays strict (depth 0).
+  - Wrong-note flash is tempo-relative: one beat clamped to 200–600 ms, using
+  song.tempoBpm in songs and the live metronome bpm in lessons, instead of a
+  fixed 350 ms.
+  - Timing-grade exclusion is now explained: when a metronome run isn't
+  rhythm-graded because notes were skipped, the lesson completion card says
+  "Timing not graded — some notes slipped by; play it again for a rhythm score"
+  instead of silently omitting the percentage.
+
+  Verification: all 736 unit tests pass (including ~10 new matcher tests for
+  depth-2, shallowest-wins, chord skips, and skippedMidis), npm run check is
+  clean, and I drove both players headless via a faked Web MIDI device: playing
+  Ode to Joy with one depth-1 skip, one depth-2 skip, and one wrong note
+  produced exactly the expected gray noteheads, hint text, completion message,
+  and Home history line; a Hanon lesson run confirmed the same in LessonPlayer.
+
+  One known simplification, as planned: if a chord step is skipped after you'd
+  sounded some of its tones, the whole chord is reported as missed. The changes
+  are uncommitted in this worktree — say the word if you'd like them committed.
+
+✻ Sautéed for 15m 58s
+
+※ recap: We smoothed the missed-notes experience: skipped notes now show gray on the score, get counted and named in summaries and history, lookahead deepened to 2, all tested and verified. Next action: commit the changes if you want them kept. (disable recaps in /config)
+
+❯ commit                                                                        
+
+  Committed 5dbc406, ran 2 shell commands (ctrl+o to expand)
+
+❯ merge this worktree                                                           
+
+  Merged worktree-better-missed-notes-review, ran 1 shell command (ctrl+o to expand)
+
+⏺ Merged cleanly — note that main had moved on since I branched (a
+  sheet-reading-quizzes merge landed at 488bc5f), so let me run the tests on the
+  merged result to be safe:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Committed and merged. The missed-notes improvements are on main as commit
+  5dbc406, merged via cfb882b following the repo's usual worktree-merge pattern.
+  Main had picked up the sheet-reading-quizzes merge in the meantime, so I ran
+  the full suite on the merged result — all 742 tests pass.
+
+  I left the worktree directory in place since this session is running inside
+  it; once you're done here, git worktree remove 
+  .claude/worktrees/better-missed-notes-review (and deleting the
+  worktree-better-missed-notes-review branch) from the main checkout will tidy
+  it up.
+
+✻ Churned for 3m 19s

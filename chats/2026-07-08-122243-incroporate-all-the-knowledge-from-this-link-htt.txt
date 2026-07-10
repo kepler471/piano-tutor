@@ -1,0 +1,1327 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.204
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+
+❯ Incroporate all the knowledge from this link:                                 
+  https://pianofs.com/the-best-scales-to-learn-first-on-piano-a-helpful-guide/  
+
+⏺ I'll start by fetching that article to see what knowledge it contains, and in
+  parallel explore how the app currently handles scales and learning guidance.
+
+⏺ Fetch(https://pianofs.com/the-best-scales-to-learn-first-on-piano-a-helpful-gu
+       ide/)
+  ⎿  Received 232.4KB (200 OK)
+
+⏺ Explore(Explore scales/guide/lessons code)
+  ⎿  Done (16 tool uses · 56.7k tokens · 1m 41s)
+  (ctrl+o to expand)
+
+⏺ User answered Claude's questions:
+  ⎿  · How deeply should the article's recommendations be incorporated? The 
+     app's guide/lessons already follow a similar circle-of-fifths order, but 
+     the article also recommends things the app doesn't have: natural minor 
+     scales practiced first (the scale routine only has harmonic minor lessons),
+     minor pentatonic scales, blues in A, and the remaining modes (Lydian, 
+     Phrygian, Locrian). → Everything incl. all modes
+     · The article stresses 'staggering' (start minors after 3–4 majors instead 
+     of finishing all 12 majors first) and per-family practice advice (e.g. 
+     pentatonic/blues/modes need understanding, not up-and-down drilling). Where
+     should this guidance surface? → Guide theory sections (Recommended), 
+     Lesson tips (Recommended), Scales screen prose
+
+⏺ Plan(Design pianofs scales plan)
+  ⎿  Initializing…
+  ⎿  Error: Agent terminated early due to an API error: You've hit your session 
+     limit · resets 2:40am (Europe/London)
+  ⎿  You've hit your session limit · resets 2:40am (Europe/London)
+     /upgrade or /usage-credits to finish what you’re working on.
+
+✻ Cooked for 9m 15s
+
+❯ /loop                                                                         
+  ⎿  You've hit your session limit · resets 2:40am (Europe/London)
+     /upgrade or /usage-credits to finish what you’re working on.
+
+✻ Baked for 0s
+
+❯ continue                                                                      
+
+⏺ Plan(Design pianofs scales plan)
+  ⎿  Done (29 tool uses · 114.6k tokens · 6m 29s)
+  (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ The Plan agent's claims check out against the source. Now I'll write the final
+  plan file.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ PushNotification(Plan ready for review: pianofs scales guide → new scale types
+                  (minor pentatonic, lydian/phrygian/locrian, A blues),
+                  natural-minor lessons, guide/tips prose. Awaiting your
+                  approval.)
+  ⎿  Not sent because you're active in this terminal.
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: 
+     ~/.claude/plans/incroporate-all-the-knowledge-abundant-trinket.md · /plan 
+     to edit
+     Incorporate pianofs.com "Best Scales to Learn First" into Piano Tutor
+
+     Context
+
+     The user wants the pedagogical knowledge from https://pianofs.com/the-best-
+     scales-to-learn-first-on-piano-a-helpful-guide/ folded into the app. The
+     article prescribes a learning order across scale families (major → natural
+     minor → harmonic+melodic minor → pentatonic → blues → chromatic → modes), a
+     key order within each family (C first; sharps by circle of fifths
+     C,G,D,A,E,B — which share one finger pattern — then flats; minors starting
+     A and C), a "staggering" principle (start minors after 3–4 majors, don't
+     finish a family first), and per-family practice advice
+     (pentatonic/blues/modes are for understanding and improvising, not
+     up-and-down drilling).
+
+     User-chosen scope (full): guide prose + lesson tips + a new per-family
+     guidance slot on the Scales screen, and the content the article recommends
+     that the app lacks: natural-minor scale lessons (routine currently only
+     generates harmonic minor), a minor pentatonic scale type, blues in A, and
+     the remaining modes lydian / phrygian / locrian with fingerings.
+
+     All paths relative to the worktree
+     /Users/steli/src/piano-tutor/.claude/worktrees/implement-pianofs-scales/.
+
+     Verified: tonal builds minor pentatonic, lydian, phrygian, locrian, and A 
+     blues correctly. MINOR[root] in scaleFingerings.ts already registers all 12
+     ${root} natural minor entries, so natural-minor lessons need zero new
+     fingering data. Voice control's findScaleType only parses
+     major/natural/harmonic minor — blues/modes/pentatonic are already
+     voice-invisible, so new types cause no voice regression.
+
+     Step 1 — New scale types: src/lib/theory/types.ts + 
+     src/lib/theory/scales.ts
+
+     - Extend ScaleTypeId union: 'minor pentatonic' | 'lydian' | 'phrygian' | 
+     'locrian'.
+     - scales.ts roots lists (spellings MUST be keys of the MAJOR/MINOR
+     fingering tables — see Step 2):
+       - BLUES_ROOTS = ['C', 'A', 'F', 'G', 'Bb', 'Eb'] (adds A; C and A first
+     per article)
+       - MINOR_PENTATONIC_ROOTS = ['A', 'C', 'E', 'D', 'G']
+       - LYDIAN_ROOTS = ['F', 'C', 'G', 'D', 'Bb'] (F lydian = all white keys)
+       - PHRYGIAN_ROOTS = ['E', 'A', 'B', 'D', 'F#'] (E phrygian = all white
+     keys)
+       - LOCRIAN_ROOTS = ['B', 'E', 'F#', 'A', 'D'] (B locrian = all white keys)
+     - Add four SCALE_TYPES entries (tonalName = id string): minor pentatonic
+     after major pentatonic, then lydian, phrygian, locrian.
+     - keySignatureFor() (exhaustive switch, scales.ts:24 — won't compile
+     without new cases):
+       - 'minor pentatonic' → `${root}m`
+       - 'lydian' → transpose '5P' (F→C), 'phrygian' → '-3M', 'locrian' → '2m' —
+     same pattern as the existing dorian/mixolydian cases.
+       - 'blues' keeps the existing root-major-signature convention (A blues
+     renders C♮/G♮/E♭ as accidentals, same as Bb blues today — accepted, not a
+     bug).
+
+     Step 2 — Fingerings: src/lib/data/scaleFingerings.ts
+
+     - Register PENTATONIC_FINGERING for MINOR_PENTATONIC_ROOTS (shape checked:
+     thumbs land on white keys for all five roots).
+     - New modes borrow MAJOR[root] exactly like the existing dorian/mixolydian
+     loops (scaleFingerings.ts:74-76):
+     loops over LYDIAN_ROOTS / PHRYGIAN_ROOTS / LOCRIAN_ROOTS →
+     scaleFingerings[${root} lydian] = MAJOR[root] etc.
+     Thumb placement verified sound for every chosen root. Do not add mode roots
+     with spellings absent from MAJOR (e.g. C#, G#) without re-checking.
+     - A blues picks up BLUES_FINGERING automatically via the existing
+     BLUES_ROOTS loop.
+
+     Step 3 — Natural minor lessons: src/lib/data/lessons/scaleRoutine.ts
+
+     - Widen scaleSegments(root, type) to accept 'natural minor' (body
+     unchanged).
+     - NATURAL_MINOR_ORDER = ['A', 'C', 'G', 'F', 'D', 'E', 'B', 'F#', 'C#', 
+     'G#', 'Eb', 'Bb'] — the article's order (A first: white keys; C second: the
+     three flattened notes are all black keys and stand out). Same spellings as
+     MINOR_ROOTS.
+     - Generate all 12 between majors and harmonic minors: id
+     `scale-${root}-natural-minor` (matches melodicMinor's id style), title
+     `${root} natural minor scale`, method: 'Scale routine' (already in
+     METHOD_GUIDE_STAGE — no guide-map change), keySignature `${root}m`,
+     tempoBpm 66, same 6 segments (RH/LH/together × 1–2 octaves).
+     - Tips (article pedagogy): "Find it from the relative major: play X major
+     starting on its 6th note"; C-specific tip about the flattened notes being
+     the black keys; keep the shared wrist/slow tips.
+     - Enrich existing tips: C–E majors share one finger pattern — learn them as
+     a family; black-key tonics get a fresh pattern; harmonic minor: practice
+     alongside melodic minor in the same key.
+
+     Step 4 — Other lesson-family tips (prose only, plus one new lesson)
+
+     - src/lib/data/lessons/melodicMinor.ts: tip pairing it with harmonic minor,
+     start in C or A.
+     - src/lib/data/lessons/jazz.ts: BLUES_SCALE_KEYS = ['C', 'A', 'F', 'G'] →
+     new jazz-blues-scale-A lesson (fingering + scale now exist). Tips: "minor
+     pentatonic plus one blue note (the b5)"; "don't just run it up and down —
+     make phrases from it."
+     - src/lib/data/lessons/chromaticScale.ts: sharpen tip to "get comfortable
+     from one starting note, then try a few others — it transfers instantly."
+
+     Step 5 — Ear quiz: src/lib/ear/quiz.ts (REQUIRED for compilation)
+
+     - SCALE_TYPE_LABELS (~line 213) and SCALE_TYPE_EXPLANATIONS (~line 224) are
+     exhaustive Record<ScaleTypeId, string> — add the 4 new entries (minor
+     pentatonic: "blues scale without its blue note"; lydian: raised 4th,
+     bright; phrygian: lowered 2nd, Spanish; locrian: lowered 2nd and 5th,
+     unstable).
+     - Add 'minor pentatonic' to SCALE_TYPE_LEVELS level 4 only. Leave
+     lydian/phrygian/locrian OUT of the quiz pool (article: later modes are for
+     understanding, not drilling). QUIZ_LEVEL_COUNTS unchanged.
+
+     Step 6 — Glossary: src/lib/data/glossary.ts
+
+     Four entries, ids exactly the ScaleTypeId strings (short 21–240 chars,
+     enforced by glossary.test.ts), in the Scales & keys section: minor 
+     pentatonic (no pentatonic alias — that belongs to major pentatonic),
+     lydian, phrygian, locrian — mirror the existing dorian/mixolydian "all
+     white keys from X" phrasing.
+
+     Step 7 — New src/lib/data/scaleGuidance.ts + 
+     src/screens/ScalesLibrary.svelte
+
+     - New module exporting SCALE_GUIDANCE: Record<ScaleTypeId, { order: string;
+     practice: string }> (exhaustive record → future types can't be forgotten).
+     Content per family straight from the article: major (C first, sharps as a
+     family sharing C's fingering, flats later, staggering principle), natural
+     minor (A then C, derive from relative major), harmonic minor (learn
+     alongside melodic, start C/A, meet Dorian), blues (start C and A;
+     pentatonic + blue note; phrases not drilling), pentatonics (C and A in both
+     versions; improvise), dorian/mixolydian (first modes worth learning —
+     blues/rock/jazz/funk), lydian/phrygian/locrian (after Dorian/Mixolydian;
+     Ionian=major, Aeolian=natural minor, so five of seven are already known;
+     understand, don't drill).
+     - ScalesLibrary.svelte: after the existing glossary one-liner, render both
+     strings via the already-imported GlossText (auto-links terms like "relative
+     major", "circle of fifths").
+
+     Step 8 — Guide: src/lib/data/guide.ts + regenerate docs/GUIDE.md
+
+     - Shared PIANOFS_SCALE_ORDER: ExternalResource const (https URL above, note
+     >20 chars); add to stage-2 and stage-5 resources.
+     - Stage 2: key-signatures theory body + weekly plan gain the article
+     ordering (C first, sharps share finger numbers, flats later) and the
+     explicit staggering sentence ("after 3–4 major keys, start A natural minor
+     — don't wait to finish all twelve").
+     - Stage 3: add technique links scale-A-natural-minor and
+     scale-C-natural-minor before the harmonic minors; extend "Relative minors"
+     theory body with the derivation method and the C-minor black-keys
+     observation; weekly plan "rotate the natural and harmonic minors"; overview
+     mentions natural → harmonic progression.
+     - Stage 4: "Three flavours of minor" gains the
+     learn-harmonic-and-melodic-side-by-side sentence; NEW theory section
+     "Pentatonic: five notes that always work" (body >80 chars) with links
+     {root:'C', type:'major pentatonic'} and {root:'A', type:'minor 
+     pentatonic'}; chromatic prose gets "same from any starting note — try a
+     few".
+     - Stage 5: add technique link jazz-blues-scale-A; extend the "Modes" theory
+     body (Ionian=major, Aeolian=natural minor; Dorian/Mixolydian first; then
+     Lydian/Phrygian/Locrian; understand, don't drill; adjust order to the music
+     you play) with scale links F lydian, E phrygian, B locrian.
+     - Run npm run guide:md to regenerate docs/GUIDE.md (guideMarkdown.test.ts
+     asserts sync).
+
+     Step 9 — Test updates
+
+     - src/tests/theory.test.ts: allScales() count 56 → 77 (+20 new-type scales,
+     +1 A blues); add spot checks (C lydian contains F#; E phrygian/B locrian
+     all naturals; A minor pentatonic midi; new-mode key signatures → 'C').
+     - src/tests/fingerings.test.ts:78: scaleRoutineLessons() count 24 → 36;
+     rest of the file is data-driven and validates new fingerings automatically.
+     - No changes to guide/glossary/voice tests beyond regenerating GUIDE.md.
+
+     Verification
+
+     1. npm run check FIRST — catches every exhaustive-map/switch miss
+     (keySignatureFor, ear-quiz records, SCALE_GUIDANCE).
+     2. npx vitest run src/tests/theory.test.ts src/tests/fingerings.test.ts 
+     src/tests/glossary.test.ts src/tests/guide.test.ts.
+     3. npm run guide:md, then full npm test.
+     4. Smoke in the running app (npm run dev): Scales screen — each new type
+     renders (esp. A blues and D locrian accidentals), fingering overlay,
+     guidance prose shows; Practice — routine ordering majors → natural minors →
+     harmonic minors, open scale-C-natural-minor and jazz-blues-scale-A; Guide
+     — new links navigate.
+
+     Risks / non-goals
+
+     - Voice control intentionally untouched: new types are exactly as
+     voice-invisible as blues/dorian already are. Extending findScaleType +
+     grammar is a flagged follow-up (cascades into Vosk grammar and voice test
+     suites).
+     - A blues notation shows naturals against the 3-sharp signature —
+     consistent with existing Bb blues; only special-case keySignatureFor if
+     smoke testing shows it's ugly.
+     - Quiz pool deliberately excludes the three hard modes; labels/explanations
+     exist only for type-completeness.
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/theory/types.ts)
+  ⎿  Added 4 lines
+       9    | 'dorian'
+      10    | 'mixolydian'
+      11    | 'major pentatonic'
+      12 +  | 'minor pentatonic'                                         
+      13 +  | 'lydian'                                                   
+      14 +  | 'phrygian'                                                 
+      15 +  | 'locrian'                                                  
+      16  
+      17  export interface ScaleInfo {
+      18    /** e.g. 'C major', 'F# natural minor' — also the key into sc
+          aleFingerings */
+
+⏺ Now scales.ts — roots lists, SCALE_TYPES entries, and keySignatureFor cases:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/theory/scales.ts)
+  ⎿  Added 14 lines, removed 2 lines
+       5  export const MAJOR_ROOTS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#',
+           'Db', 'Ab', 'Eb', 'Bb', 'F']
+       6  export const MINOR_ROOTS = ['A', 'E', 'B', 'F#', 'C#', 'G#', 'E
+          b', 'Bb', 'F', 'C', 'G', 'D']
+       7  
+       8 -/** Jazz-relevant additions live on beginner-friendly roots (pa
+         -rents ≤ 2 accidentals). */                                     
+       9 -export const BLUES_ROOTS = ['C', 'F', 'G', 'Bb', 'Eb']         
+       8 +/**                                                            
+       9 + * Jazz-relevant additions live on beginner-friendly roots (par
+         +ents ≤ 2 accidentals).                                         
+      10 + * Root order is pedagogical (learn-first first) and every spel
+         +ling must exist in                                             
+      11 + * scaleFingerings' MAJOR/MINOR tables — modes borrow the paral
+         +lel major's pattern.                                           
+      12 + */                                                            
+      13 +export const BLUES_ROOTS = ['C', 'A', 'F', 'G', 'Bb', 'Eb']    
+      14  export const DORIAN_ROOTS = ['D', 'G', 'A', 'C', 'E']
+      15  export const MIXOLYDIAN_ROOTS = ['G', 'C', 'D', 'F', 'A']
+      16  export const PENTATONIC_ROOTS = ['C', 'G', 'F', 'D', 'A']
+      17 +export const MINOR_PENTATONIC_ROOTS = ['A', 'C', 'E', 'D', 'G']
+      18 +export const LYDIAN_ROOTS = ['F', 'C', 'G', 'D', 'Bb']         
+      19 +export const PHRYGIAN_ROOTS = ['E', 'A', 'B', 'D', 'F#']       
+      20 +export const LOCRIAN_ROOTS = ['B', 'E', 'F#', 'A', 'D']        
+      21  
+      22  export const SCALE_TYPES: { id: ScaleTypeId; tonalName: string;
+           roots: string[] }[] = [
+      23    { id: 'major', tonalName: 'major', roots: MAJOR_ROOTS },
+     ...
+      27    { id: 'dorian', tonalName: 'dorian', roots: DORIAN_ROOTS },
+      28    { id: 'mixolydian', tonalName: 'mixolydian', roots: MIXOLYDIA
+          N_ROOTS },
+      29    { id: 'major pentatonic', tonalName: 'major pentatonic', root
+          s: PENTATONIC_ROOTS },
+      30 +  { id: 'minor pentatonic', tonalName: 'minor pentatonic', root
+         +s: MINOR_PENTATONIC_ROOTS },                                   
+      31 +  { id: 'lydian', tonalName: 'lydian', roots: LYDIAN_ROOTS },  
+      32 +  { id: 'phrygian', tonalName: 'phrygian', roots: PHRYGIAN_ROOT
+         +S },                                                           
+      33 +  { id: 'locrian', tonalName: 'locrian', roots: LOCRIAN_ROOTS }
+         +,                                                              
+      34  ]
+      35  
+      36  function keySignatureFor(root: string, type: ScaleTypeId): stri
+          ng {
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/theory/scales.ts)
+  ⎿  Added 7 lines
+      40        return root
+      41      case 'natural minor':
+      42      case 'harmonic minor':
+      43 +    case 'minor pentatonic':                                   
+      44        return `${root}m`
+      45      // Modes take their parent major's signature (D dorian → C)
+          .
+      46      case 'dorian':
+      47        return Note.pitchClass(Note.transpose(`${root}4`, '-2M'))
+      48      case 'mixolydian':
+      49        return Note.pitchClass(Note.transpose(`${root}4`, '4P'))
+      50 +    case 'lydian':                                             
+      51 +      return Note.pitchClass(Note.transpose(`${root}4`, '5P')) 
+      52 +    case 'phrygian':                                           
+      53 +      return Note.pitchClass(Note.transpose(`${root}4`, '-3M'))
+      54 +    case 'locrian':                                            
+      55 +      return Note.pitchClass(Note.transpose(`${root}4`, '2m')) 
+      56      // Blues gets the root-major signature; the b3/b5/b7 render
+           as accidentals.
+      57      case 'blues':
+      58        return root
+
+⏺ Now the fingerings:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/scaleFingerings
+        .ts)
+  ⎿  Added 4 lines
+       1  import {
+       2    BLUES_ROOTS,
+       3    DORIAN_ROOTS,
+       4 +  LOCRIAN_ROOTS,                                               
+       5 +  LYDIAN_ROOTS,                                                
+       6    MAJOR_ROOTS,
+       7 +  MINOR_PENTATONIC_ROOTS,                                      
+       8    MINOR_ROOTS,
+       9    MIXOLYDIAN_ROOTS,
+      10    PENTATONIC_ROOTS,
+      11 +  PHRYGIAN_ROOTS,                                              
+      12  } from '../theory/scales'
+      13  import type { Finger } from '../theory/types'
+      14  
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/scaleFingerings
+        .ts)
+  ⎿  Added 1 line, removed 1 line
+      61    lh: [5, 4, 3, 2, 1, 2, 1],
+      62  }
+      63  
+      64 -/** Major pentatonic (5 notes + octave = 6 entries). */        
+      64 +/** Pentatonic (5 notes + octave = 6 entries) — same shape work
+         +s for major and minor roots. */                                
+      65  const PENTATONIC_FINGERING: ScaleFingering = {
+      66    rh: [1, 2, 3, 1, 2, 5],
+      67    lh: [5, 4, 3, 2, 1, 3],
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/scaleFingerings
+        .ts)
+  ⎿  Added 5 lines
+      76  }
+      77  for (const root of BLUES_ROOTS) scaleFingerings[`${root} blues`
+          ] = BLUES_FINGERING
+      78  // Modes borrow the parallel major's pattern — the standard jaz
+          z-pedagogy default.
+      79 +// (Roots lists are constrained to spellings that exist in MAJO
+         +R with sane thumb placement.)                                  
+      80  for (const root of DORIAN_ROOTS) scaleFingerings[`${root} doria
+          n`] = MAJOR[root]
+      81  for (const root of MIXOLYDIAN_ROOTS) scaleFingerings[`${root} m
+          ixolydian`] = MAJOR[root]
+      82 +for (const root of LYDIAN_ROOTS) scaleFingerings[`${root} lydia
+         +n`] = MAJOR[root]                                              
+      83 +for (const root of PHRYGIAN_ROOTS) scaleFingerings[`${root} phr
+         +ygian`] = MAJOR[root]                                          
+      84 +for (const root of LOCRIAN_ROOTS) scaleFingerings[`${root} locr
+         +ian`] = MAJOR[root]                                            
+      85  for (const root of PENTATONIC_ROOTS) scaleFingerings[`${root} m
+          ajor pentatonic`] = PENTATONIC_FINGERING
+      86 +for (const root of MINOR_PENTATONIC_ROOTS) scaleFingerings[`${r
+         +oot} minor pentatonic`] = PENTATONIC_FINGERING                 
+
+⏺ Task 1 done. Now the lessons (task 2) — scaleRoutine.ts first:
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/scaleRo
+        utine.ts)
+  ⎿  Added 1 line
+      1 +import { Note } from 'tonal'                                    
+      2  import { getScale, MAJOR_ROOTS, MINOR_ROOTS } from '../../theory
+         /scales'
+      3  import { scaleFingerings } from '../scaleFingerings'
+      4  import type { Finger } from '../../theory/types'
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/scaleRo
+        utine.ts)
+  ⎿  Added 1 line, removed 1 line
+      44    }))
+      45  }
+      46  
+      47 -function scaleSegments(root: string, type: 'major' | 'harmonic 
+         -minor'): LessonSegment[] {                                     
+      47 +function scaleSegments(root: string, type: 'major' | 'natural m
+         +inor' | 'harmonic minor'): LessonSegment[] {                   
+      48    const scale = getScale(root, type)
+      49    const fingering = scaleFingerings[scale.id]
+      50    const oneOct = scale.midi
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/scaleRo
+        utine.ts)
+  ⎿  Added 40 lines, removed 2 lines
+      79    F: 'Right hand uses 1-2-3-4 — the thumb passes under after fi
+          nger 4 (on Bb there is no thumb!).',
+      80  }
+      81  
+      82 +/** C–E majors share C major's finger numbers — learn them as a
+         + family (pianofs). */                                          
+      83 +const SHARED_PATTERN_ROOTS = new Set(['C', 'G', 'D', 'A', 'E'])
+      84 +const BLACK_KEY_ROOTS = new Set(['F#', 'Db', 'Ab', 'Eb', 'Bb'])
+      85 +                                                               
+      86 +/**                                                            
+      87 + * The natural minors in learn-first order (pianofs): A first (
+         +all white keys),                                               
+      88 + * then C — its three flattened notes are all black keys, so th
+         +ey stand out —                                                 
+      89 + * then the rest by increasing accidentals. Same 12 spellings a
+         +s MINOR_ROOTS.                                                 
+      90 + */                                                            
+      91 +export const NATURAL_MINOR_ORDER = ['A', 'C', 'G', 'F', 'D', 'E
+         +', 'B', 'F#', 'C#', 'G#', 'Eb', 'Bb']                          
+      92 +                                                               
+      93 +const relativeMajor = (minorRoot: string): string => Note.pitch
+         +Class(Note.transpose(`${minorRoot}4`, '3m'))                   
+      94 +                                                               
+      95  export function scaleRoutineLessons(): Lesson[] {
+      96    const majors: Lesson[] = MAJOR_ROOTS.map((root) => ({
+      97      id: `scale-${root}-major`,
+     ...
+      100      description: `Play the ${root} major scale up and down wit
+           h the standard fingering shown on the score — hands separate f
+           irst, then together.`,
+      101      tips: [
+      102        ...(THUMB_TIPS[root] ? [THUMB_TIPS[root]] : []),
+      103 +      ...(SHARED_PATTERN_ROOTS.has(root)                      
+      104 +        ? ['C, G, D, A and E major all share this exact finger
+          + pattern — learn them as a family.']                          
+      105 +        : []),                                                
+      106 +      ...(BLACK_KEY_ROOTS.has(root)                           
+      107 +        ? ['Starting on a black key means a different fingerin
+          +g — learn this pattern fresh rather than forcing the C major o
+          +ne.']                                                         
+      108 +        : []),                                                
+      109        'Keep the wrist level as the thumb passes under — no elb
+           ow flick.',
+      110        'Aim for a smooth, connected (legato) line at a steady p
+           ulse.',
+      111        'Hands together: start very slowly — accuracy first, spe
+           ed later.',
+     ...
+      115      tempoBpm: 72,
+      116      segments: scaleSegments(root, 'major'),
+      117    }))
+       99 -  const minors: Lesson[] = MINOR_ROOTS.map((root) => ({       
+      118 +  const naturalMinors: Lesson[] = NATURAL_MINOR_ORDER.map((roo
+          +t) => ({                                                      
+      119 +    id: `scale-${root}-natural-minor`,                        
+      120 +    title: `${root} natural minor scale`,                     
+      121 +    method: 'Scale routine',                                  
+      122 +    description: `Play the ${root} natural minor scale up and 
+          +down — only the notes of the key signature, the same notes as 
+          +${relativeMajor(root)} major starting from ${root}.`,         
+      123 +    tips: [                                                   
+      124 +      `Find it from the relative major: play ${relativeMajor(r
+          +oot)} major starting on its 6th note and you get this scale.`,
+      125 +      ...(root === 'C'                                        
+      126 +        ? ['The three notes flattened from C major (Eb, Ab, Bb
+          +) are all black keys — let your eyes find them.']             
+      127 +        : []),                                                
+      128 +      'Keep the wrist level as the thumb passes under — no elb
+          +ow flick.',                                                   
+      129 +      'Hands together: start very slowly — accuracy first, spe
+          +ed later.',                                                   
+      130 +    ],                                                        
+      131 +    detectionMode: 'mono',                                    
+      132 +    keySignature: `${root}m`,                                 
+      133 +    tempoBpm: 66,                                             
+      134 +    segments: scaleSegments(root, 'natural minor'),           
+      135 +  }))                                                         
+      136 +  const harmonicMinors: Lesson[] = MINOR_ROOTS.map((root) => (
+          +{                                                             
+      137      id: `scale-${root}-harmonic-minor`,
+      138      title: `${root} harmonic minor scale`,
+      139      method: 'Scale routine',
+      140      description: `Play the ${root} harmonic minor scale up and
+            down — note the raised 7th, which gives the scale its distinc
+           tive sound.`,
+      141      tips: [
+      142        'The raised 7th creates a wide step from the 6th degree 
+           — listen for it.',
+      143 +      'Practice this alongside the melodic minor in the same k
+          +ey — two answers to the same problem (a stronger pull home).',
+      144        'Keep the wrist level as the thumb passes under — no elb
+           ow flick.',
+      145        'Hands together: start very slowly — accuracy first, spe
+           ed later.',
+      146      ],
+     ...
+      149      tempoBpm: 66,
+      150      segments: scaleSegments(root, 'harmonic minor'),
+      151    }))
+      114 -  return [...majors, ...minors]                               
+      152 +  return [...majors, ...naturalMinors, ...harmonicMinors]     
+      153  }
+
+⏺ Now the other lesson files — reading them first:
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/melodic
+        Minor.ts)
+  ⎿  Added 1 line
+      63        'Up and down are different scales — say the changing note
+          s out loud at first.',
+      64        'The raised notes only exist on the way up; coming down, 
+          everything relaxes.',
+      65        'Same fingering as the other minor forms — only the notes
+           change.',
+      66 +      'Learn harmonic and melodic minor side by side — start in
+         + C or A, where the changed notes are easiest to see.',         
+      67      ],
+      68      detectionMode: 'mono' as const,
+      69      keySignature: `${root}m`,
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/chromat
+        icScale.ts)
+  ⎿  Added 1 line, removed 1 line
+      57        tips: [
+      58          'Stay close to the keys — the pattern is all about econ
+          omy of movement.',
+      59          'Keep it perfectly even; the thumb notes love to stick 
+          out.',
+      60 -        'Same fingering from any starting note — learn the rule
+         -, not the run.',                                               
+      60 +        'Get comfortable from one starting note, then try a few
+         + others — the fingering rule transfers instantly.',            
+      61        ],
+      62        detectionMode: 'mono' as const,
+      63        keySignature: 'C',
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/jazz.ts
+        )
+  ⎿  Added 1 line, removed 1 line
+      12  
+      13  const II_V_I_KEYS = ['C', 'F', 'Bb', 'G', 'Eb']
+      14  const BLUES_COMP_KEYS = ['C', 'F', 'Bb']
+      15 -const BLUES_SCALE_KEYS = ['C', 'F', 'G']                       
+      15 +const BLUES_SCALE_KEYS = ['C', 'A', 'F', 'G']                  
+      16  
+      17  const METHOD = 'Jazz & blues'
+      18  
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/lessons/jazz.ts
+        )
+  ⎿  Added 2 lines, removed 1 line
+      111        method: METHOD,
+      112        description: `The ${root} blues scale up and down — six 
+           notes with the "blue" flat 3rd, flat 5th and flat 7th that giv
+           e blues and jazz their colour.`,
+      113        tips: [
+      114 +        'This is the minor pentatonic plus one "blue" note — t
+          +he b5.',                                                      
+      115          'Lean into the b5 — it wants to resolve, that tension 
+           is the sound.',
+      116          'Try it swung once it is even: long-short, long-short.
+           ',
+      116 -        'Improvise! Any of these notes works over a blues in t
+          -his key.',                                                    
+      117 +        'Don\'t just run it up and down — the point is knowing
+          + what the notes are and making phrases from them.',           
+      118        ],
+      119        detectionMode: 'mono',
+      120        keySignature: scale.keySignature,
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/ear/quiz.ts)
+  ⎿  Added 4 lines
+      216    'harmonic minor': 'Harmonic minor',
+      217    blues: 'Blues',
+      218    'major pentatonic': 'Major pentatonic',
+      219 +  'minor pentatonic': 'Minor pentatonic',                     
+      220    dorian: 'Dorian',
+      221    mixolydian: 'Mixolydian',
+      222 +  lydian: 'Lydian',                                           
+      223 +  phrygian: 'Phrygian',                                       
+      224 +  locrian: 'Locrian',                                         
+      225  }
+      226  
+      227  /** What to listen for, per scale type. */
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/ear/quiz.ts)
+  ⎿  Added 5 lines
+      235      'Major pentatonic is five notes with no semitones at all —
+            open and folky, nothing clashes.',
+      236    dorian: 'Dorian sounds minor but with a brighter, raised 6th
+            — think "Scarborough Fair".',
+      237    mixolydian: 'Mixolydian sounds major until the lowered 7th n
+           ear the top — bluesy, never quite finishing.',
+      238 +  'minor pentatonic':                                         
+      239 +    'Minor pentatonic is five notes, minor and bluesy — the bl
+          +ues scale without its "blue" note.',                          
+      240 +  lydian: 'Lydian is major with a raised 4th — floating and fi
+          +lm-score bright, one step dreamier than major.',              
+      241 +  phrygian: 'Phrygian is minor with a lowered 2nd right at the
+          + start — dark and Spanish-sounding.',                         
+      242 +  locrian: 'Locrian lowers both the 2nd and the 5th — unstable
+          + and unresolved, it never quite lands.',                      
+      243  }
+      244  
+      245  /** Roots every scale type supports (kept to low-accidental ke
+           ys the library covers). */
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/ear/quiz.ts)
+  ⎿  Added 1 line, removed 1 line
+      249    ['major', 'natural minor'],
+      250    ['major', 'natural minor', 'harmonic minor'],
+      251    ['major', 'natural minor', 'harmonic minor', 'blues', 'major
+            pentatonic'],
+      252 -  ['major', 'natural minor', 'harmonic minor', 'blues', 'major
+          - pentatonic', 'dorian', 'mixolydian'],                        
+      252 +  ['major', 'natural minor', 'harmonic minor', 'blues', 'major
+          + pentatonic', 'minor pentatonic', 'dorian', 'mixolydian'],    
+      253  ]
+      254  
+      255  export function makeScaleTypeQuestion(level: number, rng: Rng 
+           = Math.random): ScaleTypeQuestion {
+
+⏺ Now the glossary — let me find the existing scale-type entries:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/glossary.ts)
+  ⎿  Added 24 lines
+      261      aliases: ['pentatonic'],
+      262    },
+      263    {
+      264 +    id: 'minor pentatonic',                                   
+      265 +    term: 'Minor pentatonic',                                 
+      266 +    short:                                                    
+      267 +      'Five notes — the natural minor scale minus its 2nd and 
+          +6th. The go-to improvising scale of rock and blues; add one "b
+          +lue" note and it becomes the blues scale.',                   
+      268 +  },                                                          
+      269 +  {                                                           
+      270 +    id: 'lydian',                                             
+      271 +    term: 'Lydian',                                           
+      272 +    short:                                                    
+      273 +      'A major-sounding mode with a raised 4th — floating, fil
+          +m-score bright. F lydian is all white keys from F to F.',     
+      274 +  },                                                          
+      275 +  {                                                           
+      276 +    id: 'phrygian',                                           
+      277 +    term: 'Phrygian',                                         
+      278 +    short:                                                    
+      279 +      'A minor-sounding mode with a lowered 2nd right at the s
+          +tart — dark and Spanish. E phrygian is all white keys from E t
+          +o E.',                                                        
+      280 +  },                                                          
+      281 +  {                                                           
+      282 +    id: 'locrian',                                            
+      283 +    term: 'Locrian',                                          
+      284 +    short:                                                    
+      285 +      'The rarest mode: lowered 2nd and 5th make it unstable a
+          +nd unresolved. B locrian is all white keys from B to B.',     
+      286 +  },                                                          
+      287 +  {                                                           
+      288      id: 'chromatic',
+      289      term: 'Chromatic',
+      290      short:
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now the scaleGuidance module and its rendering:
+
+⏺ Write(.claude/worktrees/implement-pianofs-scales/src/lib/data/scaleGuidance.ts
+       )
+  ⎿  Wrote 81 lines to .claude/worktrees/implement-pianofs-scales/src/lib/d
+     ata/scaleGuidance.ts
+       1 import type { ScaleTypeId } from '../theory/types'
+       3 /**
+       4  * Per-family learning guidance shown on the Scales screen: whic
+         h keys to learn
+         pianofs guide
+       6  * "The Best Scales to Learn First on Piano" — the same ordering
+       7  * guide's stages walk through. Exhaustive by ScaleTypeId so a n
+         ew scale type
+       8  * cannot ship without its guidance.
+      10 export interface ScaleGuidance {
+     … +111 lines (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/screens/ScalesLibrary.sv
+        elte)
+  ⎿  Added 1 line
+       7    import { playNote, playSequence } from '../lib/audio/playback
+          '
+       8    import { lookupTerm } from '../lib/data/glossary'
+       9    import { scaleFingerings } from '../lib/data/scaleFingerings'
+      10 +  import { SCALE_GUIDANCE } from '../lib/data/scaleGuidance'   
+      11    import { scoreFromScale } from '../lib/notation/vexScore'
+      12    import { SCALE_TYPES, getScale } from '../lib/theory/scales'
+      13    import type { Finger, Hand, ScaleTypeId } from '../lib/theory
+          /types'
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/screens/ScalesLibrary.sv
+        elte)
+  ⎿  Added 2 lines
+      127      {#if lookupTerm(typeId)}
+      128        <p class="hint">{lookupTerm(typeId)!.short}</p>
+      129      {/if}
+      130 +    <p class="hint"><GlossText text={SCALE_GUIDANCE[typeId].or
+          +der} /></p>                                                   
+      131 +    <p class="hint"><GlossText text={SCALE_GUIDANCE[typeId].pr
+          +actice} /></p>                                                
+      132      <p class="hint">
+      133        Notes: {scale.notes.join(' – ')} · Fingering shown {hand
+            === 'R' ? 'above' : 'below'} the staff
+      134        ({hand === 'R' ? 'right' : 'left'} hand, one octave up a
+           nd down)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now the guide edits. First the shared resource and stage 2:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 5 lines
+      172    url: 'https://www.reddit.com/r/pianolearning/',
+      173    note: 'Friendly community for feedback, practice questions a
+           nd motivation.',
+      174  }
+      175 +const PIANOFS_SCALE_ORDER: ExternalResource = {               
+      176 +  title: 'pianofs — The Best Scales to Learn First on Piano', 
+      177 +  url: 'https://pianofs.com/the-best-scales-to-learn-first-on-
+          +piano-a-helpful-guide/',                                      
+      178 +  note: 'The ordering this guide\'s scale path follows: which 
+          +keys to learn first in each scale family, why, and how much dr
+          +illing each family actually needs.',                          
+      179 +}                                                             
+      180  const GET_A_TEACHER: ExternalResource = {
+      181    title: 'Consider a human teacher',
+      182    url: 'https://www.abrsm.org/en-gb/find-a-music-teacher',
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 4 lines, removed 1 line
+      312            'A key signature at the start of each line tells you
+            which notes are always sharp or flat. ' +
+      313            'G major has one sharp (F♯); F major one flat (B♭); 
+           D major two sharps (F♯, C♯). Rather than ' +
+      314            'reading each accidental, think "I am in G, so every
+            F is sharp". Scales make key signatures ' +
+      315 -          'physical: your fingers learn where the black keys l
+          -ive in each key.',                                            
+      315 +          'physical: your fingers learn where the black keys l
+          +ive in each key. Learn them in this ' +                       
+      316 +          'order: C first (all white keys), then one sharp at 
+          +a time around the circle of fifths — ' +                      
+      317 +          'G, D, A and E even share C major\'s finger numbers,
+          + so they come as a family. Flat keys ' +                      
+      318 +          'and black-key scales can wait until a piece needs t
+          +hem.',                                                        
+      319          links: [
+      320            quiz('key-signature', 1, 'Quiz: read the key signatu
+           re'),
+      321            { kind: 'scale', root: 'G', type: 'major', label: 'G
+            major in the scale library' },
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      339      weeklyPlan: {
+      340        totalMinutes: 30,
+      341        items: [
+      342 -        '8 min — scales C/G/D/F (one key per day, hands separa
+          -te then together)',                                           
+      342 +        '8 min — scales C/G/D/F (one key per day, hands separa
+          +te then together); once three or four are secure, start A natu
+          +ral minor alongside them — don\'t wait to finish all twelve ma
+          +jors',                                                        
+      343          '4 min — arpeggios and the C cadence',
+      344          '10 min — your current piece, in sections, slow then a
+           t tempo',
+      345          '4 min — sight-reading level 2 (one new melody a day)'
+           ,
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      349      resources: [
+      350        FABER_1,
+      351        BILL_HILTON,
+      352 +      PIANOFS_SCALE_ORDER,                                    
+      353        ABRSM_SYLLABUS,
+      354        {
+      355          title: 'ABRSM Grade 1 piano pieces (current list)',
+
+⏺ Stage 3 — natural minor links, prose, weekly plan:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 5 lines, removed 4 lines
+      369      title: 'Stage 3 — Minor keys and independence',
+      370      gradeEquivalent: '≈ ABRSM Grade 2',
+      371      overview:
+      372 -      'Minor scales bring new colours; broken chords and two-o
+          -ctave scales stretch your technique; and ' +                  
+      373 -      'the repertoire starts demanding real independence betwe
+          -en the hands — a melody that sings over ' +                   
+      374 -      'an accompaniment that stays out of its way.',          
+      372 +      'Minor scales bring new colours — natural minor first (i
+          +t is just the key signature), then ' +                        
+      373 +      'harmonic minor with its raised 7th; broken chords and t
+          +wo-octave scales stretch your technique; ' +                  
+      374 +      'and the repertoire starts demanding real independence b
+          +etween the hands — a melody that sings ' +                    
+      375 +      'over an accompaniment that stays out of its way.',     
+      376      goals: [
+      376 -      'Play A, E and D harmonic minor scales, hands separately
+          - then together',                                              
+      377 +      'Play A and C natural minor, then A, E and D harmonic mi
+          +nor scales, hands separately then together',                  
+      378        'Play broken chords through all inversions in the common
+            keys',
+      379        'Play cadences in G and F as well as C',
+      380        'Play pieces where the hands do genuinely different thin
+           gs',
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 2 lines
+      381        'Recognize major, minor, diminished and augmented chords
+            by ear',
+      382      ],
+      383      technique: [
+      384 +      lesson('scale-A-natural-minor', 'A natural minor scale')
+          +,                                                             
+      385 +      lesson('scale-C-natural-minor', 'C natural minor scale —
+          + the flattened notes are the black keys'),                    
+      386        lesson('scale-A-harmonic-minor', 'A harmonic minor scale
+           '),
+      387        lesson('scale-E-harmonic-minor', 'E harmonic minor scale
+           '),
+      388        lesson('scale-D-harmonic-minor', 'D harmonic minor scale
+           '),
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 9 lines, removed 5 lines
+      416          title: 'Relative minors: two keys, one signature',
+      417          body:
+      418            'Every key signature serves two keys: a major and it
+           s relative minor, three semitones below ' +
+      419 -          '(C major / A minor share no sharps or flats). Minor
+          - pieces usually raise the 7th note as an ' +                  
+      420 -          'accidental in the score — that raised note is why t
+          -he harmonic minor scale sounds the way it ' +                 
+      421 -          'does, and why you practice it.',                   
+      419 +          '(C major / A minor share no sharps or flats). That 
+          +is also how to find any natural minor ' +                     
+      420 +          'scale: play a major scale starting from its 6th not
+          +e. Start with A minor (all white keys), ' +                   
+      421 +          'then C minor — the three notes flattened from C maj
+          +or are all black keys, so they stand ' +                      
+      422 +          'out under your fingers. Minor pieces usually raise 
+          +the 7th note as an accidental in the ' +                      
+      423 +          'score — that raised note is why the harmonic minor 
+          +scale sounds the way it does, and why ' +                     
+      424 +          'you practice it.',                                 
+      425          links: [
+      423 -          { kind: 'scale', root: 'A', type: 'harmonic minor', 
+          -label: 'A harmonic minor in the scale library' },             
+      424 -          { kind: 'scale', root: 'A', type: 'natural minor', l
+          -abel: 'A natural minor for comparison' },                     
+      426 +          { kind: 'scale', root: 'A', type: 'natural minor', l
+          +abel: 'A natural minor in the scale library' },               
+      427 +          { kind: 'scale', root: 'C', type: 'natural minor', l
+          +abel: 'C natural minor — spot the black keys' },              
+      428 +          { kind: 'scale', root: 'A', type: 'harmonic minor', 
+          +label: 'A harmonic minor for comparison' },                   
+      429          ],
+      430        },
+      431        {
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      446      weeklyPlan: {
+      447        totalMinutes: 40,
+      448        items: [
+      449 -        '10 min — scales: rotate the harmonic minors and keep 
+          -two majors warm',                                             
+      449 +        '10 min — scales: rotate the natural and harmonic mino
+          +rs and keep two majors warm',                                 
+      450          '5 min — broken chords and cadences (one key per day)'
+           ,
+      451          '15 min — repertoire: one classical piece and one blue
+           s/jazz piece in parallel',
+      452          '5 min — sight-reading level 3',
+
+⏺ Stage 4 — minor-flavours sentence, new pentatonic theory section, chromatic
+  phrasing:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 15 lines, removed 1 line
+      533            'you; harmonic minor raises the 7th so the dominant 
+           chord can pull home; melodic minor ' +
+      534            'also raises the 6th on the way up so the line climb
+           s smoothly, then relaxes back to ' +
+      535            'natural on the way down. Composers mix all three fr
+           eely inside a single minor-key ' +
+      536 -          'piece — that is why minor pieces are speckled with 
+          -accidentals.',                                                
+      536 +          'piece — that is why minor pieces are speckled with 
+          +accidentals. Learn harmonic and ' +                           
+      537 +          'melodic minor side by side, starting in C or A wher
+          +e the altered notes are easiest to see.',                     
+      538          links: [
+      539            lesson('scale-A-melodic-minor', 'A melodic minor — h
+           ear both directions'),
+      540            { kind: 'scale', root: 'A', type: 'harmonic minor', 
+           label: 'Compare in the scale library' },
+      541          ],
+      542        },
+      543 +      {                                                       
+      544 +        title: 'Pentatonic: five notes that always work',     
+      545 +        body:                                                 
+      546 +          'Drop the 4th and 7th from a major scale and you get
+          + the major pentatonic; drop the 2nd ' +                       
+      547 +          'and 6th from natural minor and you get the minor pe
+          +ntatonic. With no semitones left, ' +                         
+      548 +          'nothing clashes — which is why these five-note scal
+          +es power folk, pop, rock and blues. ' +                       
+      549 +          'Begin with C and A in both versions, and practice t
+          +hem differently from your majors and ' +                      
+      550 +          'minors: learn what the notes are and improvise with
+          + them rather than drilling up and down.',                     
+      551 +        links: [                                              
+      552 +          { kind: 'scale', root: 'C', type: 'major pentatonic'
+          +, label: 'C major pentatonic in the scale library' },         
+      553 +          { kind: 'scale', root: 'A', type: 'minor pentatonic'
+          +, label: 'A minor pentatonic in the scale library' },         
+      554 +        ],                                                    
+      555 +      },                                                      
+      556      ],
+      557      weeklyPlan: {
+      558        totalMinutes: 45,
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      476        'where daily technique practice starts to pay off audibl
+           y in the pieces.',
+      477      goals: [
+      478        'Play major scales with black-key tonics (B♭, E♭, A majo
+           r) and more minors',
+      479 -      'Play the chromatic scale and your first contrary-motion
+          - scales',                                                     
+      479 +      'Play the chromatic scale — once it is comfortable from 
+          +one note, try a few other starting notes; the fingering transf
+          +ers instantly',                                               
+      480        'Play melodic minor — different notes up and down',
+      481        'Play arpeggios from black-key roots (B♭, E♭ major)',
+      482        'Keep a walking bass steady under right-hand chords',
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      476        'where daily technique practice starts to pay off audibl
+           y in the pieces.',
+      477      goals: [
+      478        'Play major scales with black-key tonics (B♭, E♭, A majo
+           r) and more minors',
+      479 -      'Play the chromatic scale — once it is comfortable from 
+          -one note, try a few other starting notes; the fingering transf
+          -ers instantly',                                               
+      479 +      'Play the chromatic scale (from a few different starting
+          + notes — the fingering transfers instantly) and your first con
+          +trary-motion scales',                                         
+      480        'Play melodic minor — different notes up and down',
+      481        'Play arpeggios from black-key roots (B♭, E♭ major)',
+      482        'Keep a walking bass steady under right-hand chords',
+
+⏺ Stage 5 — A blues lesson link, modes section expansion, resource:
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      607        lesson('jazz-251-C', 'ii–V–I in C with guide tones'),
+      608        lesson('jazz-251-F', 'ii–V–I in F'),
+      609        lesson('jazz-blues-scale-C', 'C blues scale'),
+      610 +      lesson('jazz-blues-scale-A', 'A blues scale'),          
+      611        lesson('jazz-blues-comp-C', '12-bar blues comping in C')
+           ,
+      612      ],
+      613      repertoire: [
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 10 lines, removed 3 lines
+      645          body:
+      646            'Play the white keys from D to D and you get Dorian 
+           — a minor scale with a bright 6th, ' +
+      647            'the sound of Scarborough Fair and half of jazz. Fro
+           m G to G is Mixolydian: a major ' +
+      648 -          'scale with a lowered 7th, the sound of the blues an
+          -d rock. Modes are not new notes to ' +                        
+      649 -          'learn, just familiar keys heard from a different ho
+          -me base — which is why training ' +                           
+      650 -          'your ear to spot them matters more than memorizing 
+          -them.',                                                       
+      648 +          'scale with a lowered 7th, the sound of the blues an
+          +d rock. Learn those two first — they ' +                      
+      649 +          'are everywhere in blues, rock, jazz and funk. And y
+          +ou already know more modes than you ' +                       
+      650 +          'think: Ionian is just the major scale and Aeolian t
+          +he natural minor, so Lydian (raised ' +                       
+      651 +          '4th), Phrygian (lowered 2nd) and Locrian (lowered 2
+          +nd and 5th) complete the set of seven. ' +                    
+      652 +          'Modes are not new notes to learn, just familiar key
+          +s heard from a different home base — ' +                      
+      653 +          'do not drill them for speed; understand them, find 
+          +them on the keyboard, and adjust the ' +                      
+      654 +          'order you learn any scale to the music you are actu
+          +ally playing.',                                               
+      655          links: [
+      656            { kind: 'scale', root: 'D', type: 'dorian', label: '
+           D Dorian in the scale library' },
+      657            { kind: 'scale', root: 'G', type: 'mixolydian', labe
+           l: 'G Mixolydian in the scale library' },
+      658 +          { kind: 'scale', root: 'F', type: 'lydian', label: '
+          +F Lydian — all white keys from F' },                          
+      659 +          { kind: 'scale', root: 'E', type: 'phrygian', label:
+          + 'E Phrygian — all white keys from E' },                      
+      660 +          { kind: 'scale', root: 'B', type: 'locrian', label: 
+          +'B Locrian — all white keys from B' },                        
+      661            quiz('scale-type', 4, 'Quiz: name the scale type by 
+           ear'),
+      662          ],
+      663        },
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      684      resources: [
+      685        GET_A_TEACHER,
+      686        JOSH_WRIGHT,
+      687 +      PIANOFS_SCALE_ORDER,                                    
+      688        ABRSM_SYLLABUS,
+      689        RCM_SYLLABUS,
+      690        IMSLP,
+
+⏺ Now the test updates (task 6). Let me look at the assertions:
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/tests/theory.test.ts)
+  ⎿  Added 4 lines, removed 2 lines
+       3  import { CHORD_QUALITIES, CHORD_ROOTS, getChord, inversionsFor 
+          } from '../lib/theory/chords'
+       4  
+       5  describe('scales', () => {
+       6 -  it('builds the full library (36 classical + 20 jazz)', () => 
+         -{                                                              
+       7 -    expect(allScales()).toHaveLength(56)                       
+       6 +  it('builds the full library (36 classical + 41 jazz/modal)', 
+         +() => {                                                        
+       7 +    // 12 major + 12 natural minor + 12 harmonic minor         
+       8 +    // + 6 blues + 5 dorian + 5 mixolydian + 5+5 pentatonics + 
+         +5+5+5 lydian/phrygian/locrian                                  
+       9 +    expect(allScales()).toHaveLength(77)                       
+      10    })
+      11  
+      12    it('C major has the right notes', () => {
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/tests/theory.test.ts)
+  ⎿  Added 17 lines
+      47      expect(getScale('G', 'dorian').keySignature).toBe('F')
+      48      expect(getScale('G', 'mixolydian').keySignature).toBe('C')
+      49      expect(getScale('D', 'mixolydian').keySignature).toBe('G')
+      50 +    expect(getScale('F', 'lydian').keySignature).toBe('C')     
+      51 +    expect(getScale('Bb', 'lydian').keySignature).toBe('F')    
+      52 +    expect(getScale('E', 'phrygian').keySignature).toBe('C')   
+      53 +    expect(getScale('B', 'locrian').keySignature).toBe('C')    
+      54    })
+      55  
+      56 +  it('lydian, phrygian and locrian have the right character ton
+         +es', () => {                                                   
+      57 +    // C lydian: raised 4 (F#); E phrygian and B locrian: all n
+         +aturals                                                        
+      58 +    expect(getScale('C', 'lydian').notes).toEqual(['C', 'D', 'E
+         +', 'F#', 'G', 'A', 'B'])                                       
+      59 +    expect(getScale('E', 'phrygian').notes).toEqual(['E', 'F', 
+         +'G', 'A', 'B', 'C', 'D'])                                      
+      60 +    expect(getScale('B', 'locrian').notes).toEqual(['B', 'C', '
+         +D', 'E', 'F', 'G', 'A'])                                       
+      61 +  })                                                           
+      62 +                                                               
+      63 +  it('minor pentatonic is a five-note subset of the natural min
+         +or scale', () => {                                             
+      64 +    const s = getScale('A', 'minor pentatonic')                
+      65 +    expect(s.midi).toEqual([69, 72, 74, 76, 79, 81]) // A C D E
+         + G A                                                           
+      66 +    expect(s.keySignature).toBe('Am')                          
+      67 +  })                                                           
+      68 +                                                               
+      69    it('dorian and mixolydian have the right character tones', ()
+           => {
+      70      // D dorian: natural 6 (B); G mixolydian: flat 7 (F)
+      71      expect(getScale('D', 'dorian').notes).toEqual(['D', 'E', 'F
+          ', 'G', 'A', 'B', 'C'])
+
+⏺ Update(.claude/worktrees/implement-pianofs-scales/src/tests/fingerings.test.ts
+        )
+  ⎿  Added 2 lines, removed 2 lines
+      73  })
+      74  
+      75  describe('technique lesson generators', () => {
+      76 -  it('scale routine covers 12 majors and 12 harmonic minors wit
+         -h 6 segments each', () => {                                    
+      76 +  it('scale routine covers 12 majors, 12 natural minors and 12 
+         +harmonic minors with 6 segments each', () => {                 
+      77      const lessons = scaleRoutineLessons()
+      78 -    expect(lessons).toHaveLength(24)                           
+      78 +    expect(lessons).toHaveLength(36)                           
+      79      for (const l of lessons) {
+      80        expect(l.segments).toHaveLength(6)
+      81        const together = l.segments.filter((s) => s.hand === 'bot
+          h')
+
+⏺ Now the verification sequence — typecheck first to catch exhaustive-map
+  misses:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ All focused tests pass. Now the full suite:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Made 1 scratchpad edit +87, listed 2 directories, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Playwright can't be resolved from the scratchpad — I'll import it by absolute
+  path from the repo's node_modules:
+
+  Made 3 scratchpad edits +112 -1, searched for 1 pattern, read 1 file, listed 1 directory, ran 3 shell commands (ctrl+o to expand)
+⏺ The pentatonic section renders perfectly (the probe missed because CSS
+  uppercases the heading). Last check — quiz level 4 options:
+
+  Made 1 scratchpad edit +29, read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ The quiz shows options only after "Hear it" plays the scale. One more probe:
+
+  Made 1 scratchpad edit +28, searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+⏺ Source is correct. Let me diagnose — sampling the question generator through
+  the dev server's served module (200 draws) to see if the pool truly includes
+  it:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Background command "Start Vite dev server on port 5199" failed with exit code
+143
+
+⏺ The pianofs article's knowledge is now fully incorporated, implemented per the
+  approved plan across 14 files (+225/−42), with all 675 tests and typecheck
+  passing.
+
+  What changed:
+  - Four new scale types — minor pentatonic, Lydian, Phrygian, Locrian — in the
+  theory layer, scales library, glossary, and ear quiz, with roots ordered
+  learn-first (the all-white-key exemplars F Lydian / E Phrygian / B Locrian
+  lead) and fingerings borrowing the parallel major per the existing convention.
+  Blues gained A as its second key.
+  - 12 natural minor lessons in the scale routine, ordered per the article (A
+  first, then C "where the flattened notes are the black keys"), slotted between
+  the majors and harmonic minors — no new fingering data was needed.
+  - Article pedagogy as prose everywhere it's read: guide stages 2–5
+  (key-learning order, the staggering principle, relative-minor derivation, a
+  new "Pentatonic: five notes that always work" theory section, expanded modes
+  section, pianofs linked as a resource in stages 2 and 5), per-family tips in
+  the scale/melodic-minor/chromatic/blues lessons, and a new scaleGuidance.ts
+  module rendering "learn these keys first / how to practice" on the Scales
+  screen.
+  - Voice control deliberately untouched (new types are exactly as
+  voice-invisible as blues/dorian already were — flagged follow-up), and the
+  three hard modes stay out of the ear-quiz pool per the article's "understand,
+  don't drill."
+
+  Verification: pianofs scale-pedagogy incorporation
+
+  Verdict: PASS
+
+  Claim: New scale types/lessons appear and render correctly; article guidance
+  surfaces on the Scales screen, lesson tips, and guide.
+
+  Method: Cold start — Vite dev server on :5199, driven headless with the repo's
+  Playwright; ~7 scripted browser sessions with screenshots.
+
+  Steps
+
+  1. ✅ Scales screen → all 11 type buttons present; selected each new type →
+  correct heading, notes, fingering overlay, and the new order/practice guidance
+  prose (glossary-annotated) — zero console errors
+  2. ✅ Fresh load of /#/scales?root=A&type=blues → "A blues", keys C A F G Bb 
+  Eb, notes A–C–D–Eb–E–G
+  3. ✅ Practice screen lists A/C natural minor and A blues lessons; opened
+  scale-C-natural-minor → title, relative-major tip render; opened
+  jazz-blues-scale-A → renders
+  4. ✅ Guide (stages expanded) → natural-minor links, staggering sentence,
+  pentatonic section with both links (screenshot confirmed), F Lydian/E
+  Phrygian/B Locrian chips, pianofs resource all present; clicked "E Phrygian" →
+  navigated to the scale, rendered correctly
+  5. 🔍 Bogus deep link ?root=Zz&type=nonsense → clean fallback to C major, no
+  errors
+  6. 🔍 Scale-type quiz level 4: drove 10 questions through Hear-it → answer;
+  "Minor pentatonic" absent from that sample, so sampled the served generator
+  200× → answer 32/200 times. Pool is correct; the UI run was unlucky draws.
+
+  Findings
+
+  - ⚠️ Scales-screen deep-link params are read once at mount (pre-existing
+  design): navigating from #/scales to #/scales?root=A&type=blues while already
+  on the screen does nothing. Guide links work because they arrive from another
+  screen; an in-app "share this scale" link would not.
+  - 🔍 A blues renders with the 3-sharp signature and explicit naturals —
+  consistent with the existing Bb blues convention, and it reads fine in the
+  screenshot.
+  - The quiz's answer options only appear after "Hear it" finishes playing —
+  fine for users, worth knowing for future E2E scripts.
+
+✻ Brewed for 21m 53s
+
+※ recap: Incorporated the pianofs "best scales to learn first" article into the piano tutor: new scale types, natural minor lessons, guide/tips prose, all tests passing and app-verified. Work is complete in the worktree; next is your review and committing. (disable recaps in /config)
+
+❯ merge this worktree into main                                                 
+
+  Ran 1 shell command (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ merge this worktree into main                                                 
+
+⏺ The worktree branch is at fa6fda3 but main has moved ahead to 361c641, so I'll
+  commit here, check main's state, then merge.
+
+  Committed 3e709fa, ran 1 shell command (ctrl+o to expand)
+
+⏺ Main's only new commit is a gitignore change with no overlap with my files,
+  and the main checkout has no tracked modifications. Merging:
+
+  Merged worktree-implement-pianofs-scales (ctrl+o to expand)
+
+⏺ Merged cleanly at 4bb2da2. Quick sanity check that the merged main passes
+  tests:
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Merged into main and verified. Summary:
+
+  - Committed the work on worktree-implement-pianofs-scales as 3e709fa (15
+  files, +306/−42, including the new src/lib/data/scaleGuidance.ts).
+  - Main had moved ahead by one commit (a gitignore change, no overlap), so I
+  merged with --no-ff — clean merge, no conflicts, now at 4bb2da2 on main.
+  - Ran the theory, fingerings, and guide test files against the merged main
+  checkout: all 58 pass. (The full 675-test suite and typecheck already passed
+  on this exact code before the merge.)
+
+  The worktree and its branch still exist — I've left them since this session is
+  running inside the worktree. Once you're done here, you can clean up with git
+  worktree remove .claude/worktrees/implement-pianofs-scales and git branch -d 
+  worktree-implement-pianofs-scales from the main checkout.
+
+✻ Crunched for 1m 5s
+
+※ recap: Incorporated the pianofs scale-learning article into the app (new scale types, natural minor lessons, guide and Scales-screen guidance), all tested, verified in-browser, and merged into main. Nothing pending; optionally clean up the worktree and branch. (disable recaps in /config)
+
+❯ do worktrees work off the local main or the remote                            
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Off the local main — more precisely, off whatever commit the local checkout's
+  HEAD was at when the worktree was created. Nothing is fetched from the remote.
+
+  You can see it in this repo: this worktree's branch reflog says Created from 
+  fa6fda3, which was your local main's tip when the session started. If
+  origin/main had been ahead (or diverged) at that moment, the worktree would
+  neither know nor care — it never consulted origin.
+
+  Practical implications:
+
+  - If your local main is stale, worktree sessions start from stale code. Do a
+  git pull on main before spawning worktree sessions if you want them based on
+  the latest remote state.
+  - Merging back (like we just did) is also purely local — nothing has been
+  pushed. origin/main on GitHub still doesn't have today's merge until you git 
+  push.
+  - All worktrees share one object store and branch namespace with the main
+  checkout, so the moment you commit in a worktree, the main checkout can see
+  that branch — no remote round-trip involved.
+
+✻ Cogitated for 23s

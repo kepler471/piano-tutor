@@ -1,0 +1,3294 @@
+╭─── Claude Code v2.1.199 ─────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Stelios!               │ started                 │
+│                                                    │ ✔ Run /init to create … │
+│                      ▗ ▗   ▖ ▖                     │ ─────────────────────── │
+│                                                    │ What's new              │
+│                        ▘▘ ▝▝                       │ Stacked slash-skill in… │
+│    Fable 5 · Claude Max · steliosdg@gmail.com's    │ Fixed SSL certificate … │
+│    Organization                                    │ Fixed streaming respon… │
+│                  ~/src/piano-tutor                 │ /release-notes for more │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ ▎ Fable 5 is back.
+ ▎ Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ /clear                                                                        
+
+❯ What improvements could we make to the learning? can we make sure that this   
+  app can successfully take someone from beginner to intermediate. Obviously    
+  the user should be supplementing this app with other learning. Perhaps it     
+  could include a learning guide. We do not want to track user statistics or    
+  progress or anything. What other learning can the app point to                
+
+⏺ I'll start by exploring the current learning content and structure of the app
+  to understand what exists today, then plan improvements.
+
+⏺ Explore(Explore learning content structure)
+  ⎿  Done (33 tool uses · 80.4k tokens · 2m 38s)
+  (ctrl+o to expand)
+
+⏺ User answered Claude's questions:
+  ⎿  · The app already tracks practice history (recent-practice list on Home, 
+     completion records, sight-reading streaks) in localStorage. You said no 
+     stats/progress tracking — should I remove the existing tracking? → Keep 
+     what exists, add none
+     · How should the learning guide live in the app? → Both
+     · Beyond the guide itself, should this plan also fill content gaps so the 
+     beginner→intermediate path is actually complete? → Technique gaps 
+     (Recommended), More repertoire, Theory mini-lessons, The quiz was fun, and 
+     useful. Expand the quizzes to cover much more content
+     · What kinds of external learning should the guide point to? (It 
+     supplements, not replaces, other learning.) → All of the below 
+     (Recommended)
+
+⏺ Plan(Design learning-improvements plan)
+  ⎿  Done (28 tool uses · 91.9k tokens · 6m 11s)
+  (ctrl+o to expand)
+
+⏺ The plan agent returned a thorough design. Let me spot-check a few
+  load-bearing claims before writing the final plan.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/what-improvements-could-we-lovely-quiche.md 
+     · /plan to edit
+     Beginner → Intermediate Learning Path
+
+     Context
+
+     The app has strong raw material — 24 scale lessons, Hanon, arpeggios,
+     cadences, jazz drills, graded songs (1–7), ear/rhythm/sight-reading levels
+     — but no curriculum connecting them. A beginner lands on 8 equal Home tiles
+     with no path, no "start here", and no sense of what order to learn things
+     in. The goal: make the app able to guide someone from beginner to early
+     intermediate (~ABRSM Grade 3–4), with a learning guide that also points to
+     external resources the user should supplement with.
+
+     User decisions:
+     - Learning guide in both forms: in-app screen + docs/GUIDE.md (single
+     source of truth, generated).
+     - Fill technique gaps: chromatic scale, contrary motion, melodic minors,
+     black-key arpeggios.
+     - More repertoire: complete short public-domain pieces for grades 2–5.
+     - Theory mini-lessons in the guide, linking to existing libraries.
+     - Expand quizzes substantially (user loved the quiz format) — theory
+     quizzes + ear/rhythm expansion.
+     - External resources: method books, syllabi, YouTube teachers,
+     teacher/community advice.
+     - NO new tracking: keep existing history/streaks untouched, but the guide
+     is a static map — no checkboxes, no completion state, no stage persistence.
+
+     Phase 1 — Router params, guide data, GuideScreen
+
+     Router query params — src/router.svelte.ts
+
+     Currently bare hash strings. Add query support, keeping currentRoute()
+     returning path-only so all route === '/x' checks in App.svelte keep
+     working:
+     export function parseRoute(hash: string): { path: string; params:
+     Record<string, string> }  // pure, tested
+     export function currentRoute(): string           // path only
+     export function currentParams(): Record<string, string>
+     export function navigate(to: string, params?: Record<string, string>): void
+     Test: src/tests/router.test.ts.
+
+     Guide data — src/lib/data/guide.ts (new, pure)
+
+     Single source of truth for the curriculum. Shape:
+     type GuideLink =
+       | { kind: 'lesson'; lessonId: string; label: string }
+       | { kind: 'song'; songId: string; label: string }
+       | { kind: 'quiz'; mode: QuizModeId; level: number; label: string }
+       | { kind: 'rhythm'; level: 1|2|3|4; label: string }
+       | { kind: 'sight'; level: SightLevel; label: string }
+       | { kind: 'scale'; root: string; type: ScaleTypeId; label: string }
+       | { kind: 'chord'; root: string; quality: ChordQualityId; label: string }
+       | { kind: 'route'; route: string; label: string }
+
+     interface GuideStage {
+       id: string; title: string; gradeEquivalent: string; overview: string
+       goals: string[]
+       technique: GuideLink[]; repertoire: GuideLink[]
+       ear: GuideLink[]; rhythm: GuideLink[]; sight: GuideLink[]
+       theory: { title: string; body: string; links: GuideLink[] }[]
+       weeklyPlan: { totalMinutes: number; items: string[] }
+       resources: { title: string; url: string; note: string }[]
+       moveOnWhen: string[]   // self-assessment prose — NOT tracked
+     }
+     export const GUIDE_STAGES: GuideStage[]           // 5 stages
+     export function guideHref(link: GuideLink): string // → 
+     '#/practice?lesson=scale-C-major'
+
+     Five stages:
+     1. Foundations (pre-G1): five-finger lessons, Hanon 1, C/G/F majors HS, ear
+     intervals L1, rhythm L1, sight L1. Theory: staff, clefs, note names.
+     2. ≈ Grade 1: white-key majors HS+HT, C/G/F arpeggios, cadences, grade-1
+     songs, ear L2, rhythm L2, sight L2. Theory: key signatures to 1♯/1♭,
+     intervals.
+     3. ≈ Grade 2: harmonic minors, broken chords, 2-octave scales, grade-2/3
+     repertoire, chord-quality ear L2, rhythm L3, sight L3. Theory: relative
+     minors, I–IV–V.
+     4. ≈ Grade 3: chromatic, contrary motion, melodic minors, black-key
+     arpeggios, grade-3/4 repertoire, ear L3 + cadence ID, rhythm L4, sight L4.
+     Theory: 7th chords, functions, circle of fifths.
+     5. ≈ Grade 4 / early intermediate: all keys 2-octave HT, jazz ii–V–I
+     lessons, grade-4/5 repertoire, ear L4 + scale-type ID, sight L5. Theory:
+     modes, secondary chords, "when to get a teacher".
+
+     External resources per stage (static https:// links, never fetched): Faber
+     Adult Piano Adventures, Alfred's Adult All-in-One, ABRSM & RCM syllabi,
+     reputable YouTube channels (Bill Hilton, Piano Lessons on the Web, Josh
+     Wright etc.), IMSLP + MuseScore (PD scores), r/pianolearning, teacher
+     advice from stage 3.
+
+     GuideScreen + wiring
+
+     - src/screens/GuideScreen.svelte: expandable stage cards (open state =
+     transient $state, not persisted); every GuideLink renders as <a 
+     href={guideHref(link)}>.
+     - Register /guide in App.svelte; Home tile "Learning Guide — Start here"
+     prepended in Home.svelte.
+     - Voice: add '/guide' to the navigate union in src/lib/voice/intents.ts
+     (also fix the existing gap: /ear, /rhythm, /songs); parser words for
+     "guide"; { kind: 'show-stage'; stage: number } intent + ROUTE_FOR_KIND
+     entry so "piano, show stage two" works cross-screen; ONE new intentBank
+     template nav-guide. Must validate with 
+     src/tests/voiceEmbedding.integration.test.ts (real model) — "where do I
+     start" sits near the existing nav-practice examples; reword examples on
+     collision, never loosen thresholds.
+
+     Integrity test — src/tests/guide.test.ts (load-bearing)
+
+     Every lesson link id ∈ allLessons(), song id ∈ SONG_CATALOG, quiz
+     mode/level valid, sight 1–5, rhythm level non-empty in RHYTHM_PATTERNS,
+     scale/chord links resolve via getScale/getChord; resource URLs are https;
+     guideHref round-trips through parseRoute. This makes later phases safe —
+     broken links fail CI.
+
+     Phase 2 — Deep-link params in target screens
+
+     Read currentParams() once at init (not reactively) in each screen:
+     - Practice.svelte: ?lesson=<id> selects the lesson; ?sight=<level> calls
+     newMelody(level) only (NOT setLevel — deep links must not persist
+     progress).
+     - Songs.svelte: ?song=<id> from SONG_CATALOG.
+     - Quizzes screen: ?mode=&level=.
+     - RhythmTrainer.svelte: ?level=.
+     - Scales/Chords libraries: ?root=&type= — optional, lowest priority.
+
+     Phase 3 — Technique gap lessons (src/lib/data/lessons/)
+
+     All follow the existing scaleRoutine.ts structure (its upDown/handsTogether
+     pattern; HT segments use the existing per-segment detectionMode: 'poly'
+     override — no detection/player changes needed). Register in index.ts in
+     pedagogical order. Fingerings are hand-authored from the ABRSM Manual of
+     Scales (cite in docblocks) per project convention.
+
+     - chromaticScale.ts — chromatic from C, D, A; 1 octave HS then HT.
+     Hand-authored fingering table (1-3 alternation, 1-2 at the E–F and B–C
+     white pairs), keyed by start pitch class.
+     - contraryMotion.ts — C, E, F, G major (ABRSM G2–3 staples). Both hands
+     same finger numbers simultaneously in same-note contrary motion → build
+     from scaleFingerings[...].rh alone; steps {midis:[lh,rh], fingers:[f,f], 
+     hands:['L','R']}, poly, grand clef. Test the mirror invariant.
+     - melodicMinor.ts — start with A, D, E, G, C. Explicit asymmetric steps:
+     ascending = harmonic minor base with raised 6/7, descending = reversed
+     natural minor; reuse the existing minor fingering charts. Not added to
+     ScaleTypeId/ScalesLibrary (asymmetry breaks the symmetric ScaleInfo/upDown
+     model — note in docblock).
+     - Black-key arpeggios — extend arpeggios.ts: replace single
+     ARPEGGIO_FINGERING with a per-key ARPEGGIO_FINGERINGS table (white-key
+     roots keep 1-2-3-5/5-3-2-1); add D♭, E♭, A♭, B♭, F♯ major + B♭, E♭, C♯, F♯,
+     G♯ minor. Highest correctness risk — transcribe from one authoritative
+     source; tests enforce structure only (valid fingers, no adjacent repeats),
+     correctness is human review.
+
+     Phase 4 — Quizzes: unified screen + theory + ear/rhythm expansion
+
+     - Extract round scaffolding from EarTraining.svelte (round-of-10, level
+     buttons, "Level up →", existing addRecord call — reusing existing history
+     is fine, no new persistence) into src/components/QuizSession.svelte.
+     QuizCard.svelte unchanged.
+     - Evolve EarTraining.svelte → src/screens/Quizzes.svelte at /quizzes, keep
+     /ear as an alias route. Modes grouped: By ear / Reading & theory.
+     QuizModeId union in a pure module shared with guide.ts.
+     - Theory generators — src/lib/theory/quiz.ts (new, pure, mirrors
+     ear/quiz.ts: injectable RNG, LEVELS arrays):
+       a. Note naming (4 levels: treble → +bass → ledger lines → accidentals) —
+     one-note ScoreModel via existing scoreFromSteps/midiToVexKeyInKey, rendered
+     with SheetMusic.svelte.
+       b. Key-signature ID (4 levels: 0–1 → 3 → 5 → all 7; minors at top
+     levels).
+       c. Interval on staff — visual twin of the ear quiz, reuse
+     INTERVAL_LEVELS/INTERVAL_LABELS from ear/quiz.ts.
+       d. Chord spelling (3 levels: triads → inversions → 7ths) — symbol shown,
+     options from getChord(...).noteNames + wrong-quality distractors.
+       e. Chord function (text-only: "In G major, which chord is V?").
+     - Ear expansion — extend src/lib/ear/quiz.ts: scale-type ID (major/minor →
+     +harmonic → +blues/pentatonic → +dorian/mixolydian, reusing SCALE_TYPES)
+     and cadence ID (authentic/plagal/half, +deceptive at L3) built from
+     getChord.
+     - Rhythm dictation (the gap — hearing → notation; tap-along already covers
+     reading): play a pattern as clicks, pick the matching notation from 3
+     rendered options. Generator pure; new RhythmQuizCard.svelte renders options
+     as small SheetMusic scores (QuizCard stays string-only). Add 2–3 patterns
+     per level to rhythms.ts for distractor variety.
+     - Tests (theoryQuiz.test.ts, extend earQuiz.test.ts): mode × level × ~200
+     seeds — options unique, answer present exactly once, answers verifiably
+     correct against tonal/getChord.
+
+     Phase 5 — Repertoire (src/lib/data/songs/catalog.ts)
+
+     ~12 public-domain pieces, grades 2–5, mostly complete:
+
+     ┌─────────────────────────────────┬───────────────┬───────┬───────────┐
+     │              Piece              │   Composer    │ Grade │   Style   │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Melody Op. 68 No. 1             │ Schumann      │ 2     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Old French Song Op. 39 No. 16   │ Tchaikovsky   │ 2     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Scarborough Fair / Greensleeves │ Trad.         │ 2     │ folk      │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ La Candeur Op. 100 No. 1        │ Burgmüller    │ 2     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Arabesque Op. 100 No. 2         │ Burgmüller    │ 3     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Musette in D BWV Anh. 126       │ Bach notebook │ 3     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Sonatina Op. 36 No. 1 mvt 1     │ Clementi      │ 3     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Wild Rider Op. 68 No. 8         │ Schumann      │ 3     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Ballade Op. 100 No. 15          │ Burgmüller    │ 4     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ St. Louis Blues (1914, chorus)  │ W.C. Handy    │ 4     │ blues     │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Gymnopédie No. 1 (section)      │ Satie         │ 4     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Arietta Op. 12 No. 1            │ Grieg         │ 5     │ classical │
+     ├─────────────────────────────────┼───────────────┼───────┼───────────┤
+     │ Maple Leaf Rag (A strain)       │ Joplin        │ 5     │ jazz      │
+     └─────────────────────────────────┴───────────────┴───────┴───────────┘
+
+     Mitigate hand-authoring volume (~300 bars of tuples): one-off dev script
+     running PD MusicXML through the existing parseMusicXml
+     (src/lib/songs/musicxml.ts) to emit catalog-ready tuple code; hand-edit
+     fingerings/sections after. Source from IMSLP / own engraving only
+     (MuseScore user arrangements are not automatically PD). Land in batches of
+     2–3. Add a catalog invariant test (unique ids, notes fit measures, fingers
+     1–5, grades 1–7).
+
+     Phase 6 — Theory mini-lessons + resources prose
+
+     Pure authoring in guide.ts: reading notation (→ note-naming quiz + G1
+     songs), key signatures (→ key-sig quiz + ScalesLibrary), intervals (→ both
+     interval quizzes), chord functions/cadences (→ cadence lessons + cadence
+     ear quiz + ChordsLibrary). All links covered by the Phase 1 integrity test.
+
+     Phase 7 — docs/GUIDE.md export
+
+     - src/lib/data/guideMarkdown.ts: pure renderGuideMarkdown(GUIDE_STAGES): 
+     string.
+     - scripts/generateGuideMd.ts + "guide:md": "tsx scripts/generateGuideMd.ts"
+     (add tsx devDep).
+     - Staleness guard: src/tests/guideMarkdown.test.ts asserts docs/GUIDE.md
+     equals the rendered output, so the two forms can't drift.
+     - README pointer to docs/GUIDE.md.
+
+     Sequencing
+
+     Each phase lands independently, green on npm test + npm run check:
+     1. Router params + guide skeleton (links to existing content only) +
+     GuideScreen + Home tile + voice + tests
+     2. Deep-link params in target screens
+     3. Technique lessons (one module per PR)
+     4. Quizzes (scaffold extract → theory generators → ear expansion → rhythm
+     dictation)
+     5. Repertoire in batches (transcode script first)
+     6. Theory/resources prose
+     7. GUIDE.md export + staleness test
+
+     Guide links to not-yet-built content simply aren't added until their phase
+     lands — the integrity test enforces this.
+
+     Risks
+
+     - catalog.ts authoring volume — biggest cost; mitigated by MusicXML
+     transcode script + batching; verify PD sourcing.
+     - Fingering correctness (black-key arps, chromatic) — not derivable;
+     transcribe from ABRSM manual, cite source, human-review.
+     - Voice embedding collisions — nav-guide vs nav-practice examples; validate
+     with the real-model integration test, reword examples never thresholds.
+     Keep to one new bank template; watch "stage"/"page" confusability in the
+     small Vosk model.
+     - Router blast radius — currentRoute() must keep returning bare paths;
+     pinned by router.test.ts.
+     - No-tracking discipline — deep links must not call setLevel/addRecord;
+     only pre-existing history/streak call sites remain.
+
+     Verification
+
+     - npm test — all new pure modules covered (guide integrity, router parsing,
+     fingerings, quiz generators, catalog invariants, GUIDE.md staleness).
+     - npm run check — svelte-check + tsc.
+     - Manual: open /guide from the Home tile, click through stage links (each
+     lands on the right lesson/song/quiz/level), "piano, open the guide" /
+     "piano, show stage three" by voice, npm run guide:md regenerates
+     docs/GUIDE.md.
+
+  Ran 1 shell command (ctrl+o to expand)
+  Searched for 2 patterns, read 8 files (ctrl+o to expand)
+
+⏺ Write(src/router.svelte.ts)
+  ⎿  Added 43 lines, removed 9 lines
+       1  /**
+       2 - * Minimal hash router. Routes are plain strings like '/', '/sc
+         -ales', '/practice'.                                            
+       2 + * Minimal hash router. Routes are plain strings like '/', '/sc
+         +ales', '/practice',                                            
+       3 + * optionally followed by a query string: '#/practice?lesson=sc
+         +ale-C-major'.                                                  
+       4 + * currentRoute() always returns the bare path so exact-match c
+         +hecks keep working.                                            
+       5   */
+       6  
+       5 -function parseHash(): string {                                 
+       6 -  const h = window.location.hash.slice(1)                      
+       7 -  return h === '' ? '/' : h                                    
+       7 +export interface ParsedRoute {                                 
+       8 +  path: string                                                 
+       9 +  params: Readonly<Record<string, string>>                     
+      10  }
+      11  
+      10 -let current = $state(parseHash())                              
+      12 +/** Pure hash → {path, params} parser (exported for tests and g
+         +uideHref round-trips). */                                      
+      13 +export function parseRoute(hash: string): ParsedRoute {        
+      14 +  const h = hash.startsWith('#') ? hash.slice(1) : hash        
+      15 +  const qIndex = h.indexOf('?')                                
+      16 +  const rawPath = qIndex === -1 ? h : h.slice(0, qIndex)       
+      17 +  const query = qIndex === -1 ? '' : h.slice(qIndex + 1)       
+      18 +  const path = rawPath === '' ? '/' : rawPath                  
+      19 +  const params: Record<string, string> = {}                    
+      20 +  for (const pair of query.split('&')) {                       
+      21 +    if (!pair) continue                                        
+      22 +    const eq = pair.indexOf('=')                               
+      23 +    const key = eq === -1 ? pair : pair.slice(0, eq)           
+      24 +    const value = eq === -1 ? '' : pair.slice(eq + 1)          
+      25 +    params[decodeURIComponent(key)] = decodeURIComponent(value)
+      26 +  }                                                            
+      27 +  return { path, params }                                      
+      28 +}                                                              
+      29  
+      30 +/** Pure {path, params} → hash string (no leading '#'). */     
+      31 +export function buildHash(path: string, params?: Record<string,
+         + string>): string {                                            
+      32 +  const entries = Object.entries(params ?? {})                 
+      33 +  if (entries.length === 0) return path                        
+      34 +  const query = entries                                        
+      35 +    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURICompo
+         +nent(v)}`)                                                     
+      36 +    .join('&')                                                 
+      37 +  return `${path}?${query}`                                    
+      38 +}                                                              
+      39 +                                                               
+      40 +let current = $state(parseRoute(window.location.hash))         
+      41 +                                                               
+      42  window.addEventListener('hashchange', () => {
+      13 -  current = parseHash()                                        
+      43 +  current = parseRoute(window.location.hash)                   
+      44  })
+      45  
+      46  export function currentRoute(): string {
+      17 -  return current                                               
+      47 +  return current.path                                          
+      48  }
+      49  
+      20 -export function navigate(to: string): void {                   
+      21 -  window.location.hash = to                                    
+      50 +export function currentParams(): Readonly<Record<string, string
+         +>> {                                                           
+      51 +  return current.params                                        
+      52  }
+      53 +                                                               
+      54 +export function navigate(to: string, params?: Record<string, st
+         +ring>): void {                                                 
+      55 +  window.location.hash = buildHash(to, params)                 
+      56 +}                                                              
+
+⏺ Now the router test and a quick look at the scale/chord types for guide links.
+
+  Searched for 1 pattern, read 2 files, ran 1 shell command (ctrl+o to expand)
+
+⏺ Now I'll write the pure quiz-modes module and the guide data module — the
+  heart of Phase 1.
+
+⏺ Write(src/lib/quiz/modes.ts)
+  ⎿  Wrote 12 lines to src/lib/quiz/modes.ts
+       1 /**
+       2  * Quiz mode registry shared by the quiz screen and the learning
+          guide's
+       4  */
+       5 export type QuizModeId = 'intervals' | 'chords' | 'echo'
+       6 
+       7 /** Highest selectable level per mode (must match the LEVELS arr
+         ays in ear/quiz.ts). */
+       9   intervals: 4,
+      10   chords: 4,
+     … +4 lines (ctrl+o to expand)
+
+⏺ Write(src/lib/data/guide.ts)
+  ⎿  Wrote 557 lines to src/lib/data/guide.ts
+       1 import type { SightLevel } from '../sightread/generator'
+         s'
+       3 import type { QuizModeId } from '../quiz/modes'
+       4 import { buildHash } from '../../router.svelte'
+       6 /**
+       7  * The learning guide: a staged map from first notes to early in
+       8  * (~ABRSM Grade 3–4), organizing the app's lessons, songs and q
+         uizzes into a
+       9  * path and pointing to the outside learning that should supplem
+      10  *
+     … +692 lines (ctrl+o to expand)
+
+⏺ Write(src/lib/routing.ts)
+  ⎿  Wrote 38 lines to src/lib/routing.ts
+       1 /**
+       2  * Pure hash-route helpers shared by the reactive router (src/ro
+         uter.svelte.ts)
+         so vitest
+       4  * covers them directly.
+       5  */
+       6 
+       7 export interface ParsedRoute {
+       9   params: Readonly<Record<string, string>>
+      10 }
+     … +33 lines (ctrl+o to expand)
+
+⏺ Write(src/router.svelte.ts)
+  ⎿  Added 3 lines, removed 33 lines
+       1 +import { buildHash, parseRoute } from './lib/routing'          
+       2 +                                                               
+       3  /**
+       4   * Minimal hash router. Routes are plain strings like '/', '/sc
+          ales', '/practice',
+       5   * optionally followed by a query string: '#/practice?lesson=sc
+          ale-C-major'.
+       6   * currentRoute() always returns the bare path so exact-match c
+          hecks keep working.
+       7 + * Pure parsing/building lives in src/lib/routing.ts.          
+       8   */
+       9  
+       7 -export interface ParsedRoute {                                 
+       8 -  path: string                                                 
+       9 -  params: Readonly<Record<string, string>>                     
+      10 -}                                                              
+      11 -                                                               
+      12 -/** Pure hash → {path, params} parser (exported for tests and g
+         -uideHref round-trips). */                                      
+      13 -export function parseRoute(hash: string): ParsedRoute {        
+      14 -  const h = hash.startsWith('#') ? hash.slice(1) : hash        
+      15 -  const qIndex = h.indexOf('?')                                
+      16 -  const rawPath = qIndex === -1 ? h : h.slice(0, qIndex)       
+      17 -  const query = qIndex === -1 ? '' : h.slice(qIndex + 1)       
+      18 -  const path = rawPath === '' ? '/' : rawPath                  
+      19 -  const params: Record<string, string> = {}                    
+      20 -  for (const pair of query.split('&')) {                       
+      21 -    if (!pair) continue                                        
+      22 -    const eq = pair.indexOf('=')                               
+      23 -    const key = eq === -1 ? pair : pair.slice(0, eq)           
+      24 -    const value = eq === -1 ? '' : pair.slice(eq + 1)          
+      25 -    params[decodeURIComponent(key)] = decodeURIComponent(value)
+      26 -  }                                                            
+      27 -  return { path, params }                                      
+      28 -}                                                              
+      29 -                                                               
+      30 -/** Pure {path, params} → hash string (no leading '#'). */     
+      31 -export function buildHash(path: string, params?: Record<string,
+         - string>): string {                                            
+      32 -  const entries = Object.entries(params ?? {})                 
+      33 -  if (entries.length === 0) return path                        
+      34 -  const query = entries                                        
+      35 -    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURICompo
+         -nent(v)}`)                                                     
+      36 -    .join('&')                                                 
+      37 -  return `${path}?${query}`                                    
+      38 -}                                                              
+      39 -                                                               
+      10  let current = $state(parseRoute(window.location.hash))
+      11  
+      12  window.addEventListener('hashchange', () => {
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import type { SightLevel } from '../sightread/generator'
+      2  import type { ChordQualityId, ScaleTypeId } from '../theory/type
+         s'
+      3  import type { QuizModeId } from '../quiz/modes'
+      4 -import { buildHash } from '../../router.svelte'                 
+      4 +import { buildHash } from '../routing'                          
+      5  
+      6  /**
+      7   * The learning guide: a staged map from first notes to early in
+         termediate
+⏺ Now the GuideScreen component.
+
+⏺ Write(src/screens/GuideScreen.svelte)
+  ⎿  Wrote 229 lines to src/screens/GuideScreen.svelte
+       1 <script lang="ts">
+         age } from '../lib/data/guide'
+       3   import { registerVoiceCommands } from '../lib/voice/voice.svel
+         te'
+       5   // Which stages are expanded. Transient by design — the guide 
+         never
+       7   let open = $state<Record<string, boolean>>({ [GUIDE_STAGES[0].
+         id]: true })
+       8 
+      10     open[id] = !open[id]
+     … +236 lines (ctrl+o to expand)
+
+⏺ Now wiring: App.svelte route + nav, Home tile, and the voice modules.
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line
+      3    import VoiceButton from './components/VoiceButton.svelte'
+      4    import VoiceHud from './components/VoiceHud.svelte'
+      5    import Home from './screens/Home.svelte'
+      6 +  import GuideScreen from './screens/GuideScreen.svelte'        
+      7    import ScalesLibrary from './screens/ScalesLibrary.svelte'
+      8    import ChordsLibrary from './screens/ChordsLibrary.svelte'
+      9    import Practice from './screens/Practice.svelte'
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line
+      15  
+      16    const links = [
+      17      { route: '/', label: 'Home' },
+      18 +    { route: '/guide', label: 'Guide' },                       
+      19      { route: '/scales', label: 'Scales' },
+      20      { route: '/chords', label: 'Chords' },
+      21      { route: '/practice', label: 'Practice' },
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 3 lines, removed 1 line
+      40  </nav>
+      41  
+      42  <main>
+      43 -  {#if route === '/scales'}                                    
+      43 +  {#if route === '/guide'}                                     
+      44 +    <GuideScreen />                                            
+      45 +  {:else if route === '/scales'}                               
+      46      <ScalesLibrary />
+      47    {:else if route === '/chords'}
+      48      <ChordsLibrary />
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 6 lines
+       6  
+       7    const sections = [
+       8      {
+       9 +      route: '/guide',                                         
+      10 +      title: 'Learning Guide — start here',                    
+      11 +      desc: 'New to the piano, or unsure what to practice next?
+         + A staged path from first notes to intermediate playing, using 
+         +everything below.',                                            
+      12 +      highlight: true,                                         
+      13 +    },                                                         
+      14 +    {                                                          
+      15        route: '/scales',
+      16        title: 'Scales',
+      17        desc: 'All major and minor scales with sheet music and st
+          andard fingering, one octave up and down.',
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 1 line, removed 1 line
+       4  
+       5    const recent = $derived(practiceHistory.records.slice(0, 6))
+       6  
+       7 -  const sections = [                                           
+       7 +  const sections: { route: string; title: string; desc: string;
+         + highlight?: boolean }[] = [                                   
+       8      {
+       9        route: '/guide',
+      10        title: 'Learning Guide — start here',
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 1 line, removed 1 line
+      62    </p>
+      63    <div class="grid">
+      64      {#each sections as s (s.route)}
+      65 -      <button class="tile" onclick={() => navigate(s.route)}>  
+      65 +      <button class="tile" class:highlight={s.highlight} onclic
+         +k={() => navigate(s.route)}>                                   
+      66          <h2>{s.title}</h2>
+      67          <p>{s.desc}</p>
+      68        </button>
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 7 lines
+      111    .tile:hover {
+      112      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+      113    }
+      114 +  .tile.highlight {                                           
+      115 +    border-color: #93c5fd;                                    
+      116 +    background: #eff6ff;                                      
+      117 +  }                                                           
+      118 +  .tile.highlight h2 {                                        
+      119 +    color: #1d4ed8;                                           
+      120 +  }                                                           
+      121    .tile h2 {
+      122      margin: 0 0 8px;
+      123      font-size: 18px;
+
+⏺ Now the voice layer: intents, parser, dispatcher, and one intentBank template.
+
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 5 lines, removed 1 line
+       8  export type Intent =
+       9    // global
+      10    | { kind: 'wake' } // wake word alone — "Yes?" + armed window
+      11 -  | { kind: 'navigate'; route: '/' | '/scales' | '/chords' | '/
+         -practice' | '/play' | '/tuner' }                               
+      11 +  | {                                                          
+      12 +      kind: 'navigate'                                         
+      13 +      route: '/' | '/guide' | '/scales' | '/chords' | '/practic
+         +e' | '/ear' | '/rhythm' | '/songs' | '/play' | '/tuner'        
+      14 +    }                                                          
+      15 +  | { kind: 'show-stage'; stage: number } // "show stage two" —
+         + guide (cross-screen capable)                                  
+      16    | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number
+           }
+      17    | { kind: 'set-bpm'; bpm?: number; delta?: number } // scope 
+          decides which bpm; delta for "slower"/"faster"
+      18    | { kind: 'stop-all' } // "piano, stop"
+
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 1 line
+      42  
+      43  /** Where an intent can be fulfilled if no active scope handles
+           it. */
+      44  export const ROUTE_FOR_KIND: Partial<Record<Intent['kind'], str
+          ing>> = {
+      45 +  'show-stage': '/guide',                                      
+      46    'show-scale': '/scales',
+      47    'show-chord': '/chords',
+      48    'set-inversion': '/chords',
+
+⏺ Update(src/lib/voice/dispatcher.ts)
+  ⎿  Added 1 line
+      21  const PENDING_TTL_MS = 10_000
+      22  
+      23  const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
+      24 +  '/guide': 'the Guide',                                       
+      25    '/scales': 'Scales',
+      26    '/chords': 'Chords',
+      27    '/practice': 'Practice',
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 7 lines
+      186  
+      187  const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] =
+            [
+      188    ['home', { kind: 'navigate', route: '/' }],
+      189 +  ['guide', { kind: 'navigate', route: '/guide' }],           
+      190 +  ['learning guide', { kind: 'navigate', route: '/guide' }],  
+      191    ['scales', { kind: 'navigate', route: '/scales' }],
+      192    ['chords', { kind: 'navigate', route: '/chords' }],
+      193    ['practice', { kind: 'navigate', route: '/practice' }],
+      194 +  ['ear training', { kind: 'navigate', route: '/ear' }],      
+      195 +  ['quizzes', { kind: 'navigate', route: '/ear' }],           
+      196 +  ['rhythm', { kind: 'navigate', route: '/rhythm' }],         
+      197 +  ['rhythm trainer', { kind: 'navigate', route: '/rhythm' }], 
+      198 +  ['songs', { kind: 'navigate', route: '/songs' }],           
+      199    ['free play', { kind: 'navigate', route: '/play' }],
+      200    ['tuner', { kind: 'navigate', route: '/tuner' }],
+      201    ['note detector', { kind: 'navigate', route: '/tuner' }],
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 8 lines
+      240      if (navText === key) return intent
+      241    }
+      242  
+      243 +  // Guide stages: "show stage two", "stage three" (navigates 
+          +to the guide if needed).                                      
+      244 +  const stageIdx = tokens.indexOf('stage')                    
+      245 +  if (stageIdx !== -1) {                                      
+      246 +    const next = tokens[stageIdx + 1]                         
+      247 +    const stage = next && /^\d+$/.test(next) ? parseInt(next, 
+          +10) : next ? UNITS[next] : undefined                          
+      248 +    if (stage !== undefined) return { kind: 'show-stage', stag
+          +e }                                                           
+      249 +  }                                                           
+      250 +                                                              
+      251    // Metronome / tempo.
+      252    if (/\bmetronome\b/.test(text)) {
+      253      return { kind: 'metronome', action: 'start', bpm: trailing
+           Number(tokens) }
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 1 line
+      378      hey okay ok
+      379      go to open show me the a an of screen page
+      380      home scales chords practice free play tuner note detector
+      381 +    guide learning stage stages ear training rhythm songs quiz
+          +zes                                                           
+      382      start stop turn off on cancel quiet be help what can i say
+            you do commands
+      383      metronome tempo speed at set slower faster slow down up
+      384      record recording clear copy notes score
+
+⏺ Update(src/lib/voice/intentBank.ts)
+  ⎿  Added 5 lines
+      38      'lets go back to the main menu',
+      39      'back to the start screen please',
+      40    ], { kind: 'navigate', route: '/' }),
+      41 +  fixed('nav-guide', [                                         
+      42 +    'where do i start',                                        
+      43 +    'where should i begin',                                    
+      44 +    'show me the learning path',                               
+      45 +  ], { kind: 'navigate', route: '/guide' }),                   
+      46    fixed('nav-scales', [
+      47      'can you open up the scales for me',
+      48      'i would like to look at some scales',
+
+⏺ Now the tests. Let me check the rhythms export name and existing test
+  conventions first.
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(src/tests/router.test.ts)
+  ⎿  Wrote 54 lines to src/tests/router.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { buildHash, parseRoute } from '../lib/routing'
+       3 
+       4 describe('parseRoute', () => {
+       5   it('maps an empty hash to the home path', () => {
+       6     expect(parseRoute('')).toEqual({ path: '/', params: {} })
+       7     expect(parseRoute('#')).toEqual({ path: '/', params: {} })
+       8   })
+       9 
+      10   it('returns bare paths untouched', () => {
+     … +50 lines (ctrl+o to expand)
+
+⏺ Write(src/tests/guide.test.ts)
+  ⎿  Wrote 160 lines to src/tests/guide.test.ts
+      1 import { describe, expect, it } from 'vitest'
+      2 import { GUIDE_STAGES, guideHref, type GuideLink } from '../lib/d
+        ata/guide'
+      3 import { allLessons } from '../lib/data/lessons'
+      4 import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
+      5 import { SONG_CATALOG } from '../lib/data/songs/catalog'
+      6 import { QUIZ_LEVEL_COUNTS } from '../lib/quiz/modes'
+      7 import { parseRoute } from '../lib/routing'
+      8 import { getChord } from '../lib/theory/chords'
+      9 import { getScale } from '../lib/theory/scales'
+     … +176 lines (ctrl+o to expand)
+
+⏺ Update(src/tests/guide.test.ts)
+  ⎿  Added 4 lines, removed 7 lines
+      149      }
+      150    })
+      151  
+      152 -  it('voice feedback rule: guide prose never needs the wake wo
+          -rd spoken back', () => {                                      
+      153 -    // The TTS layer must never say "piano" (it would re-trigg
+          -er the wake word                                              
+      154 -    // check); the guide itself is rendered, not spoken, so no
+          - constraint here —                                            
+      155 -    // but stage titles are spoken by the show-stage confirmat
+          -ion, so keep them clean.                                      
+      156 -    for (const stage of GUIDE_STAGES) {                       
+      157 -      expect(stage.id).toMatch(/^stage-\d$/)                  
+      158 -    }                                                         
+      152 +  it('stage ids follow the stage-N pattern the voice show-stag
+          +e command relies on', () => {                                 
+      153 +    GUIDE_STAGES.forEach((stage, i) => {                      
+      154 +      expect(stage.id).toBe(`stage-${i + 1}`)                 
+      155 +    })                                                        
+      156    })
+      157  })
+
+⏺ Now let me run the test suite to see where things stand, and check the voice
+  parser tests to extend them.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Router and guide tests pass. The intentBank self-consistency test has an
+  expected-kind map that needs the new template registered:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/voiceIntentBank.test.ts)
+  ⎿  Added 1 line
+       7  /** What each template must resolve to (kind only; slots vary b
+          y transcript). */
+       8  const EXPECTED_KIND: Record<string, Intent['kind']> = {
+       9    'nav-home': 'navigate',
+      10 +  'nav-guide': 'navigate',                                     
+      11    'nav-scales': 'navigate',
+      12    'nav-chords': 'navigate',
+      13    'nav-practice': 'navigate',
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/voiceParser.test.ts)
+  ⎿  Added 21 lines
+      54      ['piano open free play', '/play'],
+      55      ['piano tuner', '/tuner'],
+      56      ['piano note detector', '/tuner'],
+      57 +    ['piano open the guide', '/guide'],                        
+      58 +    ['piano show me the learning guide', '/guide'],            
+      59 +    ['piano ear training', '/ear'],                            
+      60 +    ['piano open songs', '/songs'],                            
+      61 +    ['piano rhythm trainer', '/rhythm'],                       
+      62 +    ['piano go to rhythm', '/rhythm'],                         
+      63    ]
+      64    for (const [phrase, route] of cases) {
+      65      it(phrase, () => {
+     ...
+      68    }
+      69  })
+      70  
+      71 +describe('guide stages', () => {                               
+      72 +  it('show stage two', () => {                                 
+      73 +    expect(parseTranscript('piano show stage two')).toEqual({ k
+         +ind: 'show-stage', stage: 2 })                                 
+      74 +  })                                                           
+      75 +  it('open stage five', () => {                                
+      76 +    expect(parseTranscript('piano open stage five')).toEqual({ 
+         +kind: 'show-stage', stage: 5 })                                
+      77 +  })                                                           
+      78 +  it('bare "stage three" while armed', () => {                 
+      79 +    expect(parseTranscript('stage three', { armed: true })).toE
+         +qual({ kind: 'show-stage', stage: 3 })                         
+      80 +  })                                                           
+      81 +  it('stage without a number falls through to unknown', () => {
+      82 +    expect(parseTranscript('piano show the stage')).toEqual({ k
+         +ind: 'unknown', text: 'show the stage' })                      
+      83 +  })                                                           
+      84 +})                                                             
+      85 +                                                               
+      86  describe('scales', () => {
+      87    it('show me the d major scale', () => {
+      88      expect(parseTranscript('piano show me the d major scale')).
+          toEqual({
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All unit tests pass. Now the critical one — the real-model embedding
+  integration test that validates the new nav-guide template doesn't collide in
+  MiniLM space:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ That passed, but let me check whether the integration test auto-covers new
+  templates or needs a hand-written paraphrase case for nav-guide:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/voiceEmbedding.integration.test.ts)
+  ⎿  Added 2 lines
+      32  const POSITIVE_ROWS: [string, object][] = [
+      33    ['take us back home', { kind: 'navigate', route: '/' }],
+      34    ['back to the main menu please', { kind: 'navigate', route: '
+          /' }],
+      35 +  ['where should i start', { kind: 'navigate', route: '/guide' 
+         +}],                                                            
+      36 +  ['i do not know where to begin', { kind: 'navigate', route: '
+         +/guide' }],                                                    
+      37    ['could you open up the scales', { kind: 'navigate', route: '
+          /scales' }],
+      38    ['i would like to see some scales', { kind: 'navigate', route
+          : '/scales' }],
+      39    ['can i look at the chords', { kind: 'navigate', route: '/cho
+          rds' }],
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Both nav-guide paraphrases resolve correctly through the real model with
+  healthy headroom. Full suite + type check now:
+
+  Committed 04e2481, ran 1 shell command (ctrl+o to expand)
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 1 line
+       5    import { makeSightReading, SIGHT_LEVELS, type SightLevel } fr
+          om '../lib/sightread/generator'
+       6    import { matchLesson } from '../lib/voice/parser'
+       7    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+       8 +  import { currentParams } from '../router.svelte'             
+       9  
+      10    const POLY_AVAILABLE = true
+      11    const SIGHT_ACTIVITY = 'sight-reading'
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 10 lines
+      49  
+      50    const makeSightReadingLesson = () => makeSightReading(sightLe
+          vel)
+      51  
+      52 +  // Deep links from the learning guide, read once at mount. ?s
+         +ight= goes                                                     
+      53 +  // through newMelody (not chooseSightLevel) on purpose: a gui
+         +de link must                                                   
+      54 +  // never touch the persisted sight-reading level.            
+      55 +  {                                                            
+      56 +    const params = currentParams()                             
+      57 +    const linked = params.lesson && lessons.find((l) => l.id ==
+         += params.lesson)                                               
+      58 +    if (linked) selected = linked                              
+      59 +    else if (params.sight && /^[1-5]$/.test(params.sight)) newM
+         +elody(Number(params.sight) as SightLevel)                      
+      60 +  }                                                            
+      61 +                                                               
+      62    const visibleLessons = $derived(
+      63      keyFilter === 'All' ? lessons : lessons.filter((l) => l.key
+          Signature.replace(/m$/, '') === keyFilter),
+      64    )
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/Songs.svelte)
+  ⎿  Added 6 lines
+       5    import { parseMidiFile } from '../lib/songs/midiImport'
+       6    import { parseMusicXml } from '../lib/songs/musicxml'
+       7    import { addUserSong, removeUserSong, userSongs } from '../li
+          b/songs/userSongs.svelte'
+       8 +  import { currentParams } from '../router.svelte'             
+       9  
+      10    let selected = $state<Song | null>(null)
+      11 +  // Deep link from the learning guide, read once at mount.    
+      12 +  {                                                            
+      13 +    const linked = SONG_CATALOG.find((s) => s.id === currentPar
+         +ams().song)                                                    
+      14 +    if (linked) selected = linked                              
+      15 +  }                                                            
+      16    let importError = $state('')
+      17    let fileInput: HTMLInputElement | undefined = $state()
+      18  
+
+⏺ Update(src/screens/EarTraining.svelte)
+  ⎿  Added 1 line
+      15    } from '../lib/ear/quiz'
+      16    import { addRecord } from '../lib/practice/history.svelte'
+      17    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      18 +  import { currentParams } from '../router.svelte'             
+      19  
+      20    type Mode = 'intervals' | 'chords' | 'echo'
+      21    type Question = IntervalQuestion | ChordQuestion | EchoQuesti
+          on
+
+⏺ Update(src/screens/EarTraining.svelte)
+  ⎿  Added 9 lines
+      29    let mode = $state<Mode>('intervals')
+      30    let level = $state(1)
+      31  
+      32 +  // Deep link from the learning guide, read once at mount.    
+      33 +  {                                                            
+      34 +    const params = currentParams()                             
+      35 +    if (params.mode === 'intervals' || params.mode === 'chords'
+         + || params.mode === 'echo') mode = params.mode                 
+      36 +    const max = params.mode === 'chords' ? CHORD_LEVELS.length 
+         +: params.mode === 'echo' ? ECHO_LEVELS.length : INTERVAL_LEVELS
+         +.length                                                        
+      37 +    const linkedLevel = Number(params.level)                   
+      38 +    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && li
+         +nkedLevel <= max) level = linkedLevel                          
+      39 +  }                                                            
+      40 +                                                               
+      41    const maxLevel = $derived(
+      42      mode === 'intervals' ? INTERVAL_LEVELS.length : mode === 'c
+          hords' ? CHORD_LEVELS.length : ECHO_LEVELS.length,
+      43    )
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/screens/RhythmTrainer.svelte)
+  ⎿  Added 10 lines
+       7    import { durationFromBeats, type HighlightState, type ScoreMo
+          del } from '../lib/notation/vexScore'
+       8    import { addRecord } from '../lib/practice/history.svelte'
+       9    import { gradeTiming, type TimingResult } from '../lib/practi
+          ce/timingGrader'
+      10 +  import { currentParams } from '../router.svelte'             
+      11  
+      12    const SWING_RATIO = 2 / 3
+      13    const COUNT_IN = 4
+     ...
+      16    let patternId = $state(RHYTHM_PATTERNS[0].id)
+      17    let bpm = $state(80)
+      18  
+      19 +  // Deep link from the learning guide, read once at mount.    
+      20 +  {                                                            
+      21 +    const linked = Number(currentParams().level)               
+      22 +    if (linked === 1 || linked === 2 || linked === 3 || linked 
+         +=== 4) {                                                       
+      23 +      level = linked                                           
+      24 +      patternId = RHYTHM_PATTERNS.find((p) => p.level === linke
+         +d)!.id                                                         
+      25 +    }                                                          
+      26 +  }                                                            
+      27 +                                                               
+      28    const levelPatterns = $derived(RHYTHM_PATTERNS.filter((p) => 
+          p.level === level))
+      29    const pattern = $derived(RHYTHM_PATTERNS.find((p) => p.id ===
+           patternId) ?? levelPatterns[0])
+      30  
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/screens/ScalesLibrary.svelte)
+  ⎿  Added 10 lines
+       9    import type { Finger, Hand, ScaleTypeId } from '../lib/theory
+          /types'
+      10    import { matchRoot } from '../lib/voice/parser'
+      11    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      12 +  import { currentParams } from '../router.svelte'             
+      13  
+      14    let typeId: ScaleTypeId = $state('major')
+      15    let root = $state('C')
+      16    let hand: Hand = $state('R')
+      17    let playing = $state(false)
+      18  
+      19 +  // Deep link from the learning guide, read once at mount.    
+      20 +  {                                                            
+      21 +    const params = currentParams()                             
+      22 +    const typeDef = SCALE_TYPES.find((t) => t.id === params.typ
+         +e)                                                             
+      23 +    if (typeDef) typeId = typeDef.id                           
+      24 +    const roots = (typeDef ?? SCALE_TYPES.find((t) => t.id === 
+         +'major')!).roots                                               
+      25 +    if (params.root && roots.includes(params.root)) root = para
+         +ms.root                                                        
+      26 +  }                                                            
+      27 +                                                               
+      28    const typeDef = $derived(SCALE_TYPES.find((t) => t.id === typ
+          eId)!)
+      29  
+      30    function selectType(id: ScaleTypeId) {
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 1 line
+      14    import type { ChordQualityId, Finger, Hand } from '../lib/the
+          ory/types'
+      15    import { matchRoot } from '../lib/voice/parser'
+      16    import { registerVoiceCommands } from '../lib/voice/voice.sve
+          lte'
+      17 +  import { currentParams } from '../router.svelte'             
+      18  
+      19    let root = $state('C')
+      20    let quality: ChordQualityId = $state('major')
+
+⏺ Update(src/screens/ChordsLibrary.svelte)
+  ⎿  Added 7 lines
+      22    let hand: Hand = $state('R')
+      23    let playing = $state(false)
+      24  
+      25 +  // Deep link from the learning guide, read once at mount.    
+      26 +  {                                                            
+      27 +    const params = currentParams()                             
+      28 +    if (CHORD_QUALITIES.some((q) => q.id === params.quality)) q
+         +uality = params.quality as ChordQualityId                      
+      29 +    if (params.root && CHORD_ROOTS.includes(params.root)) root 
+         += params.root                                                  
+      30 +  }                                                            
+      31 +                                                               
+      32    const qualityDef = $derived(CHORD_QUALITIES.find((q) => q.id 
+          === quality)!)
+      33  
+      34    function selectQuality(id: ChordQualityId) {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Phase 2 green. Committing:
+
+  Committed 220be63 (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+⏺ Web Search("standard arpeggio fingerings Bb Eb Ab Db major two octaves piano
+            RH LH ABRSM 4121 chart")
+  ⎿  Did 1 search in 9s
+
+⏺ Fetch(https://faculty.evansville.edu/gu2/scales.htm)
+  ⎿  Received 0 bytes (404 Not Found)
+
+⏺ Fetch(https://robertkelleyphd.com/home/teaching/keyboard/keyboard-arpeggio-fin
+       gering-chart/)
+  ⎿  Received 110KB (200 OK)
+
+⏺ That chart is ambiguous. Let me try the more rigorous source:
+
+⏺ Fetch(https://www.wheaton.edu/media/migrated-images-amp-files/media/files/acad
+       emics/faculty/horn-dp/DPH-FINGERINGS-FOR-ARPEGGIOS.pdf)
+  ⎿  Received 0 bytes (403 Forbidden)
+
+⏺ Fetch(https://discover.hubpages.com/entertainment/Piano-Fingerings-For-Major-a
+       nd-Minor-Scales-and-Arpeggios)
+  ⎿  Received 0 bytes (403 Forbidden)
+
+⏺ Fetch(https://www.pianoscales.org/major-arpeggios.html)
+  ⎿  Received 8.7KB (200 OK)
+
+⏺ Fetch(https://www.piano-composer-teacher-london.co.uk/scales-and-arpeggios)
+  ⎿  Received 132.3KB (200 OK)
+
+⏺ Update(src/lib/data/lessons/scaleRoutine.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      25    return [...oneOctave, ...oneOctave.slice(1)]
+      26  }
+      27  
+      28 -const upDown = (midis: number[], fingers: (Finger | null)[]): L
+         -essonStep[] => {                                               
+      28 +export const upDown = (midis: number[], fingers: (Finger | null
+         +)[]): LessonStep[] => {                                        
+      29    const m = [...midis, ...midis.slice(0, -1).reverse()]
+      30    const f = [...fingers, ...fingers.slice(0, -1).reverse()]
+      31    return m.map((midi, i) => ({ midis: [midi], fingers: [f[i]] }
+          ))
+      32  }
+      33  
+      34  /** Parallel-motion steps: LH an octave below RH, both hands on
+           every step. */
+      35 -const handsTogether = (rhMidis: number[], rh: (Finger | null)[]
+         -, lh: (Finger | null)[]): LessonStep[] => {                    
+      35 +export const handsTogether = (rhMidis: number[], rh: (Finger | 
+         +null)[], lh: (Finger | null)[]): LessonStep[] => {             
+      36    const rhUpDown = [...rhMidis, ...rhMidis.slice(0, -1).reverse
+          ()]
+      37    const rhF = [...rh, ...rh.slice(0, -1).reverse()]
+      38    const lhF = [...lh, ...lh.slice(0, -1).reverse()]
+
+⏺ Write(src/lib/data/lessons/chromaticScale.ts)
+  ⎿  Wrote 68 lines to src/lib/data/lessons/chromaticScale.ts
+       1 import { Note } from 'tonal'
+       2 import type { Finger } from '../../theory/types'
+       3 import type { Lesson, LessonSegment } from './types'
+       5 
+       6 /**
+       7  * Chromatic scales from a few contrasting starting notes, one o
+         ctave, hands
+       8  * separate then together (ABRSM Grade 3 form).
+      10  * Fingering is the standard "French" chromatic fingering (ABRSM
+         /Hanon
+     … +77 lines (ctrl+o to expand)
+
+⏺ Write(src/lib/data/lessons/contraryMotion.ts)
+  ⎿  Wrote 65 lines to src/lib/data/lessons/contraryMotion.ts
+       1 import { getScale } from '../../theory/scales'
+       3 import type { Lesson, LessonStep } from './types'
+       4 
+       5 /**
+         art on the
+       7  * same tonic, the hands move apart one octave and come back. Th
+       8  * plays the descending scale with its normal fingering, so no n
+         ew fingering
+       9  * data is needed; in the mirror-symmetric keys (C, G, E) both h
+      10  * identical finger numbers throughout.
+     … +68 lines (ctrl+o to expand)
+
+⏺ Write(src/lib/data/lessons/melodicMinor.ts)
+  ⎿  Wrote 72 lines to src/lib/data/lessons/melodicMinor.ts
+       1 import { getScale } from '../../theory/scales'
+       3 import type { Lesson, LessonSegment } from './types'
+       4 
+       5 /**
+         al minor on
+       7  * the way down. The asymmetry is why these live as explicit les
+       8  * rather than a ScaleTypeId — ScaleInfo/upDown assume the desce
+         nt mirrors
+       9  * the ascent, and the scales library would need the same assump
+      10  *
+     … +79 lines (ctrl+o to expand)
+
+⏺ Now the arpeggios extension — read the full current module first:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(src/lib/data/lessons/arpeggios.ts)
+  ⎿  Added 74 lines, removed 14 lines
+       3  import type { Lesson, LessonSegment, LessonStep } from './types
+          '
+       4  
+       5  /**
+       6 - * Root-position triad arpeggios, one and two octaves, hands se
+         -parate.                                                        
+       7 - * Restricted to white-key roots where the universal 1-2-3-5 / 
+         -5-3-2-1                                                        
+       8 - * fingering applies — black-key arpeggio fingerings vary by ed
+         -ition and                                                      
+       9 - * deserve their own hand-authored table before we teach them. 
+       6 + * Root-position triad arpeggios, one and two octaves, hands se
+         +parate, in all                                                 
+       7 + * 24 major/minor keys.                                        
+       8 + *                                                             
+       9 + * Fingerings are hand-authored pedagogical convention (ABRSM M
+         +anual of                                                       
+      10 + * Scales, Arpeggios and Broken Chords; editions vary slightly 
+         +for black-key                                                  
+      11 + * roots — this table follows the common "thumb on the white ke
+         +y" rule):                                                      
+      12 + * - White-key roots: the universal 1-2-3-5 / 5-3-2-1 pattern. 
+      13 + * - Black-key roots with one or two white chord tones: the thu
+         +mb takes the                                                   
+      14 + *   first white note above the root — RH 2-1-2-4, LH 2-1-4-2 p
+         +er octave                                                      
+      15 + *   (B♭ minor's white note is the fifth, hence RH 2-3-1-4 / LH
+         + 3-2-1-3).                                                     
+      16 + * - All-black triads (F♯ major, E♭ minor): no white key to anc
+         +hor, so the                                                    
+      17 + *   universal white-key pattern applies with the thumb on the 
+         +(black) root.                                                  
+      18   */
+      19 +                                                               
+      20 +export interface ArpeggioFingering {                           
+      21 +  rh1: Finger[]                                                
+      22 +  lh1: Finger[]                                                
+      23 +  rh2: Finger[]                                                
+      24 +  lh2: Finger[]                                                
+      25 +}                                                              
+      26 +                                                               
+      27 +/** The universal white-key-root (and all-black-triad) pattern.
+         + */                                                            
+      28 +const WHITE_KEY_FINGERING: ArpeggioFingering = {               
+      29 +  rh1: [1, 2, 3, 5],                                           
+      30 +  lh1: [5, 3, 2, 1],                                           
+      31 +  rh2: [1, 2, 3, 1, 2, 3, 5],                                  
+      32 +  lh2: [5, 3, 2, 1, 3, 2, 1],                                  
+      33 +}                                                              
+      34 +                                                               
+      35 +/** Black-key root, thumb on the white second chord tone (e.g. 
+         +B♭ major: 2 on B♭, 1 on D). */                                 
+      36 +const BLACK_ROOT_FINGERING: ArpeggioFingering = {              
+      37 +  rh1: [2, 1, 2, 4],                                           
+      38 +  lh1: [2, 1, 4, 2],                                           
+      39 +  rh2: [2, 1, 2, 4, 1, 2, 4],                                  
+      40 +  lh2: [2, 1, 4, 2, 1, 4, 2],                                  
+      41 +}                                                              
+      42 +                                                               
+      43 +/** B♭ minor: the only white note (F) is the fifth, so the thum
+         +b lands there. */                                              
+      44 +const BB_MINOR_FINGERING: ArpeggioFingering = {                
+      45 +  rh1: [2, 3, 1, 4],                                           
+      46 +  lh1: [3, 2, 1, 3],                                           
+      47 +  rh2: [2, 3, 1, 2, 3, 1, 4],                                  
+      48 +  lh2: [3, 2, 1, 3, 2, 1, 3],                                  
+      49 +}                                                              
+      50 +                                                               
+      51  export const ARPEGGIO_KEYS: { root: string; quality: 'major' | 
+          'minor' }[] = [
+      52    { root: 'C', quality: 'major' },
+      53    { root: 'G', quality: 'major' },
+      54    { root: 'D', quality: 'major' },
+      55    { root: 'A', quality: 'major' },
+      56    { root: 'E', quality: 'major' },
+      57 +  { root: 'B', quality: 'major' },                             
+      58    { root: 'F', quality: 'major' },
+      59 +  { root: 'Bb', quality: 'major' },                            
+      60 +  { root: 'Eb', quality: 'major' },                            
+      61 +  { root: 'Ab', quality: 'major' },                            
+      62 +  { root: 'Db', quality: 'major' },                            
+      63 +  { root: 'F#', quality: 'major' },                            
+      64    { root: 'A', quality: 'minor' },
+      65    { root: 'E', quality: 'minor' },
+      66 +  { root: 'B', quality: 'minor' },                             
+      67    { root: 'D', quality: 'minor' },
+      68    { root: 'G', quality: 'minor' },
+      69    { root: 'C', quality: 'minor' },
+      70 +  { root: 'F', quality: 'minor' },                             
+      71 +  { root: 'F#', quality: 'minor' },                            
+      72 +  { root: 'C#', quality: 'minor' },                            
+      73 +  { root: 'G#', quality: 'minor' },                            
+      74 +  { root: 'Bb', quality: 'minor' },                            
+      75 +  { root: 'Eb', quality: 'minor' },                            
+      76  ]
+      77  
+      25 -export const ARPEGGIO_FINGERING = {                            
+      26 -  rh1: [1, 2, 3, 5] as Finger[],                               
+      27 -  lh1: [5, 3, 2, 1] as Finger[],                               
+      28 -  rh2: [1, 2, 3, 1, 2, 3, 5] as Finger[],                      
+      29 -  lh2: [5, 3, 2, 1, 3, 2, 1] as Finger[],                      
+      30 -}                                                              
+      78 +const BLACK_ROOTS = new Set(['Bb', 'Eb', 'Ab', 'Db', 'F#', 'C#'
+         +, 'G#'])                                                       
+      79  
+      80 +/** Keyed by `${root} ${quality}`. */                          
+      81 +export const ARPEGGIO_FINGERINGS: Record<string, ArpeggioFinger
+         +ing> = Object.fromEntries(                                     
+      82 +  ARPEGGIO_KEYS.map(({ root, quality }) => {                   
+      83 +    const key = `${root} ${quality}`                           
+      84 +    if (key === 'Bb minor') return [key, BB_MINOR_FINGERING]   
+      85 +    // All-black triads take the universal pattern despite the 
+         +black root.                                                    
+      86 +    if (key === 'F# major' || key === 'Eb minor') return [key, 
+         +WHITE_KEY_FINGERING]                                           
+      87 +    return [key, BLACK_ROOTS.has(root) ? BLACK_ROOT_FINGERING :
+         + WHITE_KEY_FINGERING]                                          
+      88 +  }),                                                          
+      89 +)                                                              
+      90 +                                                               
+      91  const upDown = (midis: number[], fingers: Finger[]): LessonStep
+          [] => {
+      92    const m = [...midis, ...midis.slice(0, -1).reverse()]
+      93    const f = [...fingers, ...fingers.slice(0, -1).reverse()]
+     ...
+       98    const triad = getChord(root, quality, 0).midi // root positi
+           on near octave 4
+       99    const oneOct = [...triad, triad[0] + 12]
+      100    const twoOct = [...triad, ...triad.map((m) => m + 12), triad
+           [0] + 24]
+      101 +  const fingering = ARPEGGIO_FINGERINGS[`${root} ${quality}`] 
+      102    return [
+       43 -    { label: 'Right hand', hand: 'R', clef: 'treble', steps: u
+          -pDown(oneOct, ARPEGGIO_FINGERING.rh1) },                      
+      103 +    { label: 'Right hand', hand: 'R', clef: 'treble', steps: u
+          +pDown(oneOct, fingering.rh1) },                               
+      104      {
+      105        label: 'Left hand',
+      106        hand: 'L',
+      107        clef: 'bass',
+       48 -      steps: upDown(oneOct.map((m) => m - 12), ARPEGGIO_FINGER
+          -ING.lh1),                                                     
+      108 +      steps: upDown(oneOct.map((m) => m - 12), fingering.lh1),
+      109      },
+       50 -    { label: 'RH · 2 octaves', hand: 'R', clef: 'treble', step
+          -s: upDown(twoOct, ARPEGGIO_FINGERING.rh2) },                  
+      110 +    { label: 'RH · 2 octaves', hand: 'R', clef: 'treble', step
+          +s: upDown(twoOct, fingering.rh2) },                           
+      111      {
+      112        label: 'LH · 2 octaves',
+      113        hand: 'L',
+      114        clef: 'bass',
+       55 -      steps: upDown(twoOct.map((m) => m - 24), ARPEGGIO_FINGER
+          -ING.lh2),                                                     
+      115 +      steps: upDown(twoOct.map((m) => m - 24), fingering.lh2),
+      116      },
+      117    ]
+      118  }
+
+⏺ Now register the new modules and add method blurbs:
+
+⏺ Update(src/lib/data/lessons/index.ts)
+  ⎿  Added 6 lines
+       1  import { arpeggioLessons } from './arpeggios'
+       2  import { brokenChordLessons } from './brokenChords'
+       3  import { cadenceLessons } from './cadences'
+       4 +import { chromaticScaleLessons } from './chromaticScale'       
+       5 +import { contraryMotionLessons } from './contraryMotion'       
+       6  import { fiveFingerLessons } from './fiveFinger'
+       7  import { hanon1Lesson } from './hanon1'
+       8  import { jazzLessons } from './jazz'
+       9 +import { melodicMinorLessons } from './melodicMinor'           
+      10  import { scaleRoutineLessons } from './scaleRoutine'
+      11  import { makeSightReadingLesson } from './sightReading'
+      12  import type { Lesson } from './types'
+     ...
+      20      ...fiveFingerLessons(),
+      21      hanon1Lesson(),
+      22      ...scaleRoutineLessons(),
+      23 +    ...melodicMinorLessons(),                                  
+      24 +    ...chromaticScaleLessons(),                                
+      25 +    ...contraryMotionLessons(),                                
+      26      ...arpeggioLessons(),
+      27      ...brokenChordLessons(),
+      28      ...cadenceLessons(),
+
+⏺ Update(src/screens/Practice.svelte)
+  ⎿  Added 4 lines
+      70        'Charles-Louis Hanon’s finger independence exercises (187
+          3) — still the most widely used technique drills in piano teach
+          ing.',
+      71      'Scale routine':
+      72        'Daily scales in every key with standard fingering — one 
+          and two octaves, hands separate and together.',
+      73 +    'Chromatic scale':                                         
+      74 +      'Every key in order — 3 on the blacks, thumb on the white
+         +s. The same fingering works from any starting note.',          
+      75 +    'Contrary motion':                                         
+      76 +      'Both thumbs on the same note, hands moving apart and bac
+         +k — the mirror image trains real hand independence.',          
+      77      Arpeggios:
+      78        'Triad arpeggios up and down — the wrist-lateral motion b
+          ehind accompaniment patterns and virtuosic passages alike.',
+      79      'Broken chords':
+
+⏺ Now the tests. Let me look at the existing fingerings test:
+
+  Read 1 file (ctrl+o to expand)
+⏺ Update(src/tests/fingerings.test.ts)
+  ⎿  Added 8 lines, removed 2 lines
+       1  import { describe, expect, it } from 'vitest'
+       2 -import { allScales } from '../lib/theory/scales'               
+       2 +import { Note } from 'tonal'                                   
+       3 +import { allScales, getScale } from '../lib/theory/scales'     
+       4  import { CHORD_QUALITIES, inversionsFor } from '../lib/theory/c
+          hords'
+       5  import { scaleFingerings } from '../lib/data/scaleFingerings'
+       6  import { chordFingering } from '../lib/data/chordFingerings'
+       7  import { scaleRoutineLessons, twoOctaveLh, twoOctaveRh } from '
+          ../lib/data/lessons/scaleRoutine'
+       7 -import { arpeggioLessons, ARPEGGIO_KEYS } from '../lib/data/les
+         -sons/arpeggios'                                                
+       8 +import { arpeggioLessons, ARPEGGIO_FINGERINGS, ARPEGGIO_KEYS } 
+         +from '../lib/data/lessons/arpeggios'                           
+       9  import { brokenChordLessons } from '../lib/data/lessons/brokenC
+          hords'
+      10 +import { chromaticFinger, chromaticScaleLessons } from '../lib/
+         +data/lessons/chromaticScale'                                   
+      11 +import { contraryMotionLessons, contrarySteps } from '../lib/da
+         +ta/lessons/contraryMotion'                                     
+      12 +import { melodicMinorLessons, MELODIC_MINOR_ROOTS } from '../li
+         +b/data/lessons/melodicMinor'                                   
+      13  
+      14 +const isBlackKey = (midi: number) => [1, 3, 6, 8, 10].includes(
+         +((midi % 12) + 12) % 12)                                       
+      15 +                                                               
+      16  describe('scale fingerings', () => {
+      17    it('every scale in the library has a fingering', () => {
+      18      for (const s of allScales()) {
+
+⏺ Update(src/tests/fingerings.test.ts)
+  ⎿  Added 154 lines
+      121    })
+      122  })
+      123  
+      124 +describe('chromatic scale fingering', () => {                 
+      125 +  it('RH from C matches the printed ABRSM chart', () => {     
+      126 +    const midis = Array.from({ length: 13 }, (_, i) => 60 + i)
+      127 +    expect(midis.map((m, i) => chromaticFinger(m, 'R', i === 0
+          +))).toEqual([                                                 
+      128 +      1, 3, 1, 3, 1, 2, 3, 1, 3, 1, 3, 1, 2,                  
+      129 +    ])                                                        
+      130 +  })                                                          
+      131 +                                                              
+      132 +  it('LH from C mirrors it (2 on E and B)', () => {           
+      133 +    const midis = Array.from({ length: 13 }, (_, i) => 60 + i)
+      134 +    expect(midis.map((m, i) => chromaticFinger(m, 'L', i === 0
+          +))).toEqual([                                                 
+      135 +      1, 3, 1, 3, 2, 1, 3, 1, 3, 1, 3, 2, 1,                  
+      136 +    ])                                                        
+      137 +  })                                                          
+      138 +                                                              
+      139 +  it('3 always on black keys, thumb never on black, from any s
+          +tart', () => {                                                
+      140 +    for (let start = 48; start < 60; start++) {               
+      141 +      for (const hand of ['R', 'L'] as const) {               
+      142 +        for (let i = 0; i < 13; i++) {                        
+      143 +          const f = chromaticFinger(start + i, hand, i === 0) 
+      144 +          if (isBlackKey(start + i)) expect(f).toBe(3)        
+      145 +          else expect(f).not.toBe(3)                          
+      146 +        }                                                     
+      147 +      }                                                       
+      148 +    }                                                         
+      149 +  })                                                          
+      150 +                                                              
+      151 +  it('lessons: hands separate then together, never repeating a
+          +djacent fingers', () => {                                     
+      152 +    const lessons = chromaticScaleLessons()                   
+      153 +    expect(lessons).toHaveLength(3)                           
+      154 +    for (const l of lessons) {                                
+      155 +      expect(l.segments).toHaveLength(3)                      
+      156 +      const together = l.segments[2]                          
+      157 +      expect(together.detectionMode).toBe('poly')             
+      158 +      for (const step of together.steps) expect(step.midis[1] 
+          +- step.midis[0]).toBe(12)                                     
+      159 +      for (const seg of l.segments.slice(0, 2)) {             
+      160 +        expect(seg.steps).toHaveLength(25) // 13 up + 12 down 
+      161 +        for (let i = 1; i < seg.steps.length; i++) {          
+      162 +          expect(seg.steps[i].fingers[0], `${l.id} ${seg.label
+          +} @${i}`).not.toBe(seg.steps[i - 1].fingers[0])               
+      163 +        }                                                     
+      164 +      }                                                       
+      165 +    }                                                         
+      166 +  })                                                          
+      167 +})                                                            
+      168 +                                                              
+      169 +describe('contrary-motion scales', () => {                    
+      170 +  it('LH plays the descending scale while RH ascends', () => {
+      171 +    const steps = contrarySteps('C')                          
+      172 +    expect(steps).toHaveLength(15)                            
+      173 +    // Unison first/last: one physical note.                  
+      174 +    expect(steps[0].midis).toEqual([60])                      
+      175 +    expect(steps[14].midis).toEqual([60])                     
+      176 +    const scale = getScale('C', 'major').midi                 
+      177 +    for (let i = 1; i < 8; i++) {                             
+      178 +      expect(steps[i].midis[1]).toBe(scale[i]) // RH up       
+      179 +      expect(steps[i].midis[0]).toBe([...scale].reverse()[i] -
+          + 12) // LH down                                               
+      180 +    }                                                         
+      181 +  })                                                          
+      182 +                                                              
+      183 +  it('mirror-symmetric keys use identical fingers in both hand
+          +s', () => {                                                   
+      184 +    for (const root of ['C', 'G', 'E']) {                     
+      185 +      for (const step of contrarySteps(root)) {               
+      186 +        if (step.midis.length === 2) {                        
+      187 +          expect(step.fingers[0], `${root} @${step.midis}`).to
+          +Be(step.fingers[1])                                           
+      188 +        }                                                     
+      189 +      }                                                       
+      190 +    }                                                         
+      191 +  })                                                          
+      192 +                                                              
+      193 +  it('every lesson is a single poly grand-staff segment', () =
+          +> {                                                           
+      194 +    for (const l of contraryMotionLessons()) {                
+      195 +      expect(l.detectionMode).toBe('poly')                    
+      196 +      expect(l.segments).toHaveLength(1)                      
+      197 +      expect(l.segments[0].clef).toBe('grand')                
+      198 +    }                                                         
+      199 +  })                                                          
+      200 +})                                                            
+      201 +                                                              
+      202 +describe('melodic minor scales', () => {                      
+      203 +  it('raises degrees 6 and 7 ascending and descends in natural
+          + minor', () => {                                              
+      204 +    for (const root of MELODIC_MINOR_ROOTS) {                 
+      205 +      const lesson = melodicMinorLessons().find((l) => l.id ==
+          += `scale-${root}-melodic-minor`)!                             
+      206 +      const rh = lesson.segments[0]                           
+      207 +      expect(rh.steps).toHaveLength(15)                       
+      208 +      const midis = rh.steps.map((s) => s.midis[0])           
+      209 +      const natural = getScale(root, 'natural minor').midi    
+      210 +      // Ascent: natural minor with 6th and 7th one semitone u
+          +p.                                                            
+      211 +      expect(midis.slice(0, 8)).toEqual(natural.map((m, i) => 
+          +(i === 5 || i === 6 ? m + 1 : m)))                            
+      212 +      // Descent: pure natural minor, mirrored.               
+      213 +      expect(midis.slice(8)).toEqual([...natural].reverse().sl
+          +ice(1))                                                       
+      214 +    }                                                         
+      215 +  })                                                          
+      216 +                                                              
+      217 +  it('hands-together segment is poly with parallel octaves', (
+          +) => {                                                        
+      218 +    for (const l of melodicMinorLessons()) {                  
+      219 +      const together = l.segments[2]                          
+      220 +      expect(together.detectionMode).toBe('poly')             
+      221 +      for (const step of together.steps) expect(step.midis[1] 
+          +- step.midis[0]).toBe(12)                                     
+      222 +    }                                                         
+      223 +  })                                                          
+      224 +})                                                            
+      225 +                                                              
+      226 +describe('arpeggio fingerings (all 24 keys)', () => {         
+      227 +  it('covers every major and minor root', () => {             
+      228 +    expect(ARPEGGIO_KEYS).toHaveLength(24)                    
+      229 +    const majors = ARPEGGIO_KEYS.filter((k) => k.quality === '
+          +major')                                                       
+      230 +    const minors = ARPEGGIO_KEYS.filter((k) => k.quality === '
+          +minor')                                                       
+      231 +    expect(new Set(majors.map((k) => Note.chroma(k.root))).siz
+          +e).toBe(12)                                                   
+      232 +    expect(new Set(minors.map((k) => Note.chroma(k.root))).siz
+          +e).toBe(12)                                                   
+      233 +  })                                                          
+      234 +                                                              
+      235 +  it('every key has structurally valid fingering (lengths, ran
+          +ge, no adjacent repeats)', () => {                            
+      236 +    for (const { root, quality } of ARPEGGIO_KEYS) {          
+      237 +      const f = ARPEGGIO_FINGERINGS[`${root} ${quality}`]     
+      238 +      expect(f, `${root} ${quality}`).toBeDefined()           
+      239 +      expect(f.rh1).toHaveLength(4)                           
+      240 +      expect(f.lh1).toHaveLength(4)                           
+      241 +      expect(f.rh2).toHaveLength(7)                           
+      242 +      expect(f.lh2).toHaveLength(7)                           
+      243 +      for (const hand of [f.rh1, f.lh1, f.rh2, f.lh2]) {      
+      244 +        for (const finger of hand) {                          
+      245 +          expect(finger).toBeGreaterThanOrEqual(1)            
+      246 +          expect(finger).toBeLessThanOrEqual(5)               
+      247 +        }                                                     
+      248 +        for (let i = 1; i < hand.length; i++) {               
+      249 +          expect(hand[i], `${root} ${quality}`).not.toBe(hand[
+          +i - 1])                                                       
+      250 +        }                                                     
+      251 +      }                                                       
+      252 +    }                                                         
+      253 +  })                                                          
+      254 +                                                              
+      255 +  it('the thumb only ever lands on white keys (except all-blac
+          +k triads)', () => {                                           
+      256 +    const allBlack = new Set(['F# major', 'Eb minor'])        
+      257 +    for (const lesson of arpeggioLessons()) {                 
+      258 +      const key = lesson.title.replace(' arpeggio', '')       
+      259 +      if (allBlack.has(key)) continue                         
+      260 +      for (const seg of lesson.segments) {                    
+      261 +        for (const step of seg.steps) {                       
+      262 +          if (step.fingers[0] === 1) {                        
+      263 +            expect(isBlackKey(step.midis[0]), `${key} ${seg.la
+          +bel}: thumb on midi ${step.midis[0]}`).toBe(false)            
+      264 +          }                                                   
+      265 +        }                                                     
+      266 +      }                                                       
+      267 +    }                                                         
+      268 +  })                                                          
+      269 +                                                              
+      270 +  it('canonical spot checks: Bb major and Bb minor', () => {  
+      271 +    expect(ARPEGGIO_FINGERINGS['Bb major'].rh2).toEqual([2, 1,
+          + 2, 4, 1, 2, 4])                                              
+      272 +    expect(ARPEGGIO_FINGERINGS['Bb major'].lh2).toEqual([2, 1,
+          + 4, 2, 1, 4, 2])                                              
+      273 +    expect(ARPEGGIO_FINGERINGS['Bb minor'].rh2).toEqual([2, 3,
+          + 1, 2, 3, 1, 4])                                              
+      274 +    expect(ARPEGGIO_FINGERINGS['C major'].rh2).toEqual([1, 2, 
+          +3, 1, 2, 3, 5])                                               
+      275 +  })                                                          
+      276 +})                                                            
+      277 +                                                              
+      278  describe('chord fingerings', () => {
+      279    it('every quality and inversion has a fingering of the right
+            size', () => {
+      280      for (const q of CHORD_QUALITIES) {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All 24 fingering tests pass, including the thumb-never-on-black invariant
+  across all 24 arpeggio keys. Now update the guide's stage 4/5 to link the new
+  technique content, and check the notation smoke test covers lessons:
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/notation.test.ts)
+  ⎿  Added 1 line
+      20  import { chordFingering } from '../lib/data/chordFingerings'
+      21  import { SONG_CATALOG } from '../lib/data/songs/catalog'
+      22  import { songSystems } from '../lib/notation/songScore'
+      23 +import { allLessons } from '../lib/data/lessons'               
+      24  
+      25  describe('vex keys', () => {
+      26    it('converts note names', () => {
+
+⏺ Update(src/tests/notation.test.ts)
+  ⎿  Added 12 lines
+      151      expect(container.querySelector('svg')).toBeTruthy()
+      152    })
+      153  
+      154 +  it('renders every lesson segment without throwing', () => { 
+      155 +    const container = document.createElement('div')           
+      156 +    for (const lesson of allLessons()) {                      
+      157 +      for (const seg of lesson.segments) {                    
+      158 +        const score = scoreFromSteps(seg.steps, lesson.keySign
+          +ature, seg.clef)                                              
+      159 +        if (isGrandScore(score)) renderGrandScore(container, s
+          +core)                                                         
+      160 +        else renderScore(container, score as ScoreModel)      
+      161 +        expect(container.querySelector('svg'), `${lesson.id} ·
+          + ${seg.label}`).toBeTruthy()                                  
+      162 +      }                                                       
+      163 +    }                                                         
+      164 +  })                                                          
+      165 +                                                              
+      166    it('renders every catalog song (all key/time signatures) wit
+           hout throwing', () => {
+      167      const container = document.createElement('div')
+      168      for (const song of SONG_CATALOG) {
+
+⏺ Now update the guide's stage 4 and 5 to link the new technique lessons:
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 9 lines, removed 4 lines
+      400        'where daily technique practice starts to pay off audibl
+           y in the pieces.',
+      401      goals: [
+      402        'Play major scales with black-key tonics (B♭, E♭, A majo
+           r) and more minors',
+      403 -      'Play two octaves hands together as your default scale f
+          -orm',                                                         
+      404 -      'Play minor arpeggios in the common keys',              
+      403 +      'Play the chromatic scale and your first contrary-motion
+          + scales',                                                     
+      404 +      'Play melodic minor — different notes up and down',     
+      405 +      'Play arpeggios from black-key roots (B♭, E♭ major)',   
+      406        'Keep a walking bass steady under right-hand chords',
+      407        'Identify seventh chords by ear',
+      408      ],
+     ...
+      411        lesson('scale-Eb-major', 'E♭ major scale'),
+      412        lesson('scale-A-major', 'A major scale'),
+      413        lesson('scale-B-harmonic-minor', 'B harmonic minor scale
+           '),
+      413 -      lesson('scale-G-harmonic-minor', 'G harmonic minor scale
+          -'),                                                           
+      414 +      lesson('scale-A-melodic-minor', 'A melodic minor scale')
+          +,                                                             
+      415 +      lesson('scale-D-melodic-minor', 'D melodic minor scale')
+          +,                                                             
+      416 +      lesson('chromatic-C', 'Chromatic scale from C'),        
+      417 +      lesson('contrary-C-major', 'C major in contrary motion')
+          +,                                                             
+      418 +      lesson('contrary-G-major', 'G major in contrary motion')
+          +,                                                             
+      419 +      lesson('arpeggio-Bb-major', 'B♭ major arpeggio (black-ke
+          +y root)'),                                                    
+      420        lesson('arpeggio-A-minor', 'A minor arpeggio'),
+      421        lesson('arpeggio-D-minor', 'D minor arpeggio'),
+      416 -      lesson('arpeggio-E-minor', 'E minor arpeggio'),         
+      422      ],
+      423      repertoire: [
+      424        song('bach-prelude-c', 'Prelude in C (Bach, WTC I) — ope
+           ning'),
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 5 lines
+      490        lesson('scale-F#-major', 'F♯ major scale'),
+      491        lesson('scale-Db-major', 'D♭ major scale'),
+      492        lesson('scale-C#-harmonic-minor', 'C♯ harmonic minor sca
+           le'),
+      493 +      lesson('scale-E-melodic-minor', 'E melodic minor scale')
+          +,                                                             
+      494 +      lesson('chromatic-A', 'Chromatic scale from A'),        
+      495 +      lesson('contrary-E-major', 'E major in contrary motion')
+          +,                                                             
+      496 +      lesson('arpeggio-Db-major', 'D♭ major arpeggio'),       
+      497 +      lesson('arpeggio-F#-minor', 'F♯ minor arpeggio'),       
+      498        lesson('jazz-251-C', 'ii–V–I in C with guide tones'),
+      499        lesson('jazz-251-F', 'ii–V–I in F'),
+      500        lesson('jazz-blues-scale-C', 'C blues scale'),
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Only a timeout — ~460 segments is a lot of SVG. Bump the test's timeout:
+
+⏺ Update(src/tests/notation.test.ts)
+  ⎿  Added 1 line, removed 1 line
+      151      expect(container.querySelector('svg')).toBeTruthy()
+      152    })
+      153  
+      154 -  it('renders every lesson segment without throwing', () => { 
+      154 +  it('renders every lesson segment without throwing', { timeou
+          +t: 60_000 }, () => {                                          
+      155      const container = document.createElement('div')
+      156      for (const lesson of allLessons()) {
+      157        for (const seg of lesson.segments) {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All green. Committing Phase 3:
+
+  Committed 64b884e (ctrl+o to expand)
+
+⏺ Phase 4 — the quiz expansion. Let me check the playback API first (needed for
+  cadence/scale playback and rhythm dictation), and rhythms.ts:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 2 lines, removed 1 line
+      1  import { getChord } from '../theory/chords'
+      2 -import type { ChordQualityId } from '../theory/types'           
+      2 +import { getScale } from '../theory/scales'                     
+      3 +import type { ChordQualityId, ScaleTypeId } from '../theory/type
+        +s'                                                              
+      4  
+      5  /**
+      6   * Ear-training question generators. Pure logic — an injectable 
+         RNG keeps
+
+⏺ Update(src/lib/ear/quiz.ts)  ⎿  Added 1 line, removed 1 line
+      30    positionLabel: string
+      31  }
+      32  
+      33 -const INTERVAL_LABELS: Record<number, string> = {              
+      33 +export const INTERVAL_LABELS: Record<number, string> = {       
+      34    0: 'Unison',
+      35    1: 'Minor 2nd',
+      36    2: 'Major 2nd',
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 103 lines
+      152  /** Five-finger scale degrees above the root (major pentascale
+           ). */
+      153  const POSITION_OFFSETS = [0, 2, 4, 5, 7]
+      154  
+      155 +// --- scale-type identification ---                          
+      156 +                                                              
+      157 +export interface ScaleTypeQuestion {                          
+      158 +  kind: 'scale-type'                                          
+      159 +  /** Scale played ascending. */                              
+      160 +  midis: number[]                                             
+      161 +  answer: string                                              
+      162 +  options: string[]                                           
+      163 +}                                                             
+      164 +                                                              
+      165 +const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {      
+      166 +  major: 'Major',                                             
+      167 +  'natural minor': 'Natural minor',                           
+      168 +  'harmonic minor': 'Harmonic minor',                         
+      169 +  blues: 'Blues',                                             
+      170 +  'major pentatonic': 'Major pentatonic',                     
+      171 +  dorian: 'Dorian',                                           
+      172 +  mixolydian: 'Mixolydian',                                   
+      173 +}                                                             
+      174 +                                                              
+      175 +/** Roots every scale type supports (kept to low-accidental ke
+          +ys the library covers). */                                    
+      176 +const SCALE_QUIZ_ROOTS = ['C', 'G', 'F']                      
+      177 +                                                              
+      178 +export const SCALE_TYPE_LEVELS: ScaleTypeId[][] = [           
+      179 +  ['major', 'natural minor'],                                 
+      180 +  ['major', 'natural minor', 'harmonic minor'],               
+      181 +  ['major', 'natural minor', 'harmonic minor', 'blues', 'major
+          + pentatonic'],                                                
+      182 +  ['major', 'natural minor', 'harmonic minor', 'blues', 'major
+          + pentatonic', 'dorian', 'mixolydian'],                        
+      183 +]                                                             
+      184 +                                                              
+      185 +export function makeScaleTypeQuestion(level: number, rng: Rng 
+          += Math.random): ScaleTypeQuestion {                           
+      186 +  const set = SCALE_TYPE_LEVELS[clampLevel(level, SCALE_TYPE_L
+          +EVELS.length) - 1]                                            
+      187 +  const type = pick(set, rng)                                 
+      188 +  const root = pick(SCALE_QUIZ_ROOTS, rng)                    
+      189 +  const answer = SCALE_TYPE_LABELS[type]                      
+      190 +  return {                                                    
+      191 +    kind: 'scale-type',                                       
+      192 +    midis: getScale(root, type).midi,                         
+      193 +    answer,                                                   
+      194 +    options: makeOptions(set.map((t) => SCALE_TYPE_LABELS[t]),
+          + answer, 4, rng),                                             
+      195 +  }                                                           
+      196 +}                                                             
+      197 +                                                              
+      198 +// --- cadence identification ---                             
+      199 +                                                              
+      200 +export interface CadenceQuestion {                            
+      201 +  kind: 'cadence'                                             
+      202 +  /** Block chords played in order; the last move is the caden
+          +ce. */                                                        
+      203 +  chords: number[][]                                          
+      204 +  answer: string                                              
+      205 +  options: string[]                                           
+      206 +}                                                             
+      207 +                                                              
+      208 +type CadenceId = 'authentic' | 'plagal' | 'half' | 'deceptive'
+      209 +                                                              
+      210 +const CADENCE_LABELS: Record<CadenceId, string> = {           
+      211 +  authentic: 'Perfect (V → I)',                               
+      212 +  plagal: 'Plagal (IV → I)',                                  
+      213 +  half: 'Half (ends on V)',                                   
+      214 +  deceptive: 'Deceptive (V → vi)',                            
+      215 +}                                                             
+      216 +                                                              
+      217 +export const CADENCE_LEVELS: CadenceId[][] = [                
+      218 +  ['authentic', 'plagal'],                                    
+      219 +  ['authentic', 'plagal', 'half'],                            
+      220 +  ['authentic', 'plagal', 'half', 'deceptive'],               
+      221 +]                                                             
+      222 +                                                              
+      223 +/**                                                           
+      224 + * Close voicings around the tonic (same shapes as the cadence
+          + drills):                                                     
+      225 + * I root position, IV in 2nd inversion, V in 1st inversion, v
+          +i in 1st                                                      
+      226 + * inversion — smooth voice leading so only the harmony change
+          +s.                                                            
+      227 + */                                                           
+      228 +function cadenceChords(tonicMidi: number, cadence: CadenceId):
+          + number[][] {                                                 
+      229 +  const I = [tonicMidi, tonicMidi + 4, tonicMidi + 7]         
+      230 +  const IV = [tonicMidi, tonicMidi + 5, tonicMidi + 9]        
+      231 +  const V = [tonicMidi - 1, tonicMidi + 2, tonicMidi + 7]     
+      232 +  const vi = [tonicMidi, tonicMidi + 4, tonicMidi + 9]        
+      233 +  switch (cadence) {                                          
+      234 +    case 'authentic':                                         
+      235 +      return [I, IV, V, I]                                    
+      236 +    case 'plagal':                                            
+      237 +      return [I, V, I, IV, I]                                 
+      238 +    case 'half':                                              
+      239 +      return [I, IV, V]                                       
+      240 +    case 'deceptive':                                         
+      241 +      return [I, IV, V, vi]                                   
+      242 +  }                                                           
+      243 +}                                                             
+      244 +                                                              
+      245 +export function makeCadenceQuestion(level: number, rng: Rng = 
+          +Math.random): CadenceQuestion {                               
+      246 +  const set = CADENCE_LEVELS[clampLevel(level, CADENCE_LEVELS.
+          +length) - 1]                                                  
+      247 +  const cadence = pick(set, rng)                              
+      248 +  const tonic = 57 + Math.floor(rng() * 8) // A3–E4: chords si
+          +t around middle C                                             
+      249 +  const answer = CADENCE_LABELS[cadence]                      
+      250 +  return {                                                    
+      251 +    kind: 'cadence',                                          
+      252 +    chords: cadenceChords(tonic, cadence),                    
+      253 +    answer,                                                   
+      254 +    options: makeOptions(set.map((c) => CADENCE_LABELS[c]), an
+          +swer, 4, rng),                                                
+      255 +  }                                                           
+      256 +}                                                             
+      257 +                                                              
+      258  export function makeEchoQuestion(level: number, rng: Rng = Mat
+           h.random): EchoQuestion {
+      259    const def = ECHO_LEVELS[clampLevel(level, ECHO_LEVELS.length
+           ) - 1]
+      260    const positionLabel = pick(def.positions, rng)
+
+⏺ Update(src/lib/ear/quiz.ts)
+  ⎿  Added 1 line, removed 1 line
+      234      case 'authentic':
+      235        return [I, IV, V, I]
+      236      case 'plagal':
+      237 -      return [I, V, I, IV, I]                                 
+      237 +      return [I, IV, I] // the "Amen" cadence                 
+      238      case 'half':
+      239        return [I, IV, V]
+      240      case 'deceptive':
+
+⏺ Now the theory quiz generators:
+
+⏺ Write(src/lib/theory/quiz.ts)
+  ⎿  Wrote 232 lines to src/lib/theory/quiz.ts
+       1 import { Note } from 'tonal'
+       2 import { getChord } from './chords'
+         ar/quiz'
+       4 import type { ChordQualityId } from './types'
+       5 
+       7  * Reading & theory question generators — the visual/text twins 
+         of the ear
+       8  * quizzes. Pure logic (injectable RNG, no DOM); the quiz screen
+       9  * staff-based stimuli with SheetMusic and plays nothing.
+      10  */
+     … +264 lines (ctrl+o to expand)
+
+⏺ That chordName helper came out garbled — fixing it:
+
+⏺ Update(src/lib/theory/quiz.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      206    const key = pick(keys, rng)
+      207    const degrees = lv === 1 ? DEGREES.filter(([n]) => ['I', 'IV
+           ', 'V'].includes(n)) : DEGREES
+      208    const [numeral, semis, quality] = pick(degrees, rng)
+      209 +  // Transpose by interval (not semitones) so spellings stay d
+          +iatonic (Bb major → Eb for IV, not D#).                       
+      210    const chordName = (s: number, q: 'major' | 'minor') =>
+      210 -    `${Note.pitchClass(Note.transpose(`${key}4`, Note.fromMidi
+          -(60 + s) ? intervalName(s) : '1P'))} ${q}`                    
+      211 -  // Build the answer via transposition so spellings stay diat
+          -onic (A major → C# minor for iii etc.).                       
+      211 +    `${Note.pitchClass(Note.transpose(key, intervalName(s)))} 
+          +${q}`                                                         
+      212    const answer = chordName(semis, quality)
+      213    const pool = degrees.map(([, s, q]) => chordName(s, q))
+      214    return {
+
+⏺ Now the rhythm dictation generator and extra patterns. Let me see the rest of
+  rhythms.ts:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/lib/data/rhythms.ts)
+  ⎿  Added 18 lines
+      53      events: [...bar(0, [[0, 4]]), ...bar(1, [[0, 2], [2, 2]])],
+      54      hint: 'One tap per bar, then two — count 1-2-3-4 out loud.'
+          ,
+      55    },
+      56 +  {                                                            
+      57 +    id: 'l1-quarters-rest',                                    
+      58 +    label: 'Quarters with a breath',                           
+      59 +    level: 1,                                                  
+      60 +    timeSignature: [4, 4],                                     
+      61 +    bars: 2,                                                   
+      62 +    events: [...bar(0, [[0, 1], [1, 1], [2, 2]]), ...bar(1, [[0
+         +, 1], [1, 1], [2, 1], [3, 1]])],                               
+      63 +    hint: 'Hold beat 3 through beat 4, then walk the second bar
+         +.',                                                            
+      64 +  },                                                           
+      65 +  {                                                            
+      66 +    id: 'l1-halves-quarters',                                  
+      67 +    label: 'Quarters then halves',                             
+      68 +    level: 1,                                                  
+      69 +    timeSignature: [4, 4],                                     
+      70 +    bars: 2,                                                   
+      71 +    events: [...bar(0, [[0, 1], [1, 1], [2, 1], [3, 1]]), ...ba
+         +r(1, [[0, 2], [2, 2]])],                                       
+      72 +    hint: 'Four taps, then two long ones — keep the pulse ident
+         +ical.',                                                        
+      73 +  },                                                           
+      74    // Level 2 — eighths and rests
+      75    {
+      76      id: 'l2-eighths',
+
+⏺ Update(src/lib/data/rhythms.ts)
+  ⎿  Added 18 lines
+      102      events: [...bar(0, [[0, 1], [1, 0.5], [1.5, 0.5], [2, 1], 
+           [3, 0.5], [3.5, 0.5]]), ...bar(1, [[0, 1], [1, 0.5], [1.5, 0.5
+           ], [2, 2]])],
+      103      hint: 'Say "1, 2-and, 3, 4-and" while you tap.',
+      104    },
+      105 +  {                                                           
+      106 +    id: 'l2-eighth-pairs',                                    
+      107 +    label: 'Pairs of eighths',                                
+      108 +    level: 2,                                                 
+      109 +    timeSignature: [4, 4],                                    
+      110 +    bars: 2,                                                  
+      111 +    events: [...bar(0, [[0, 0.5], [0.5, 0.5], [1, 1], [2, 0.5]
+          +, [2.5, 0.5], [3, 1]]), ...bar(1, [[0, 0.5], [0.5, 0.5], [1, 1
+          +], [2, 2]])],                                                 
+      112 +    hint: 'Two quick, one steady — "1-and, 2, 3-and, 4".',    
+      113 +  },                                                          
+      114 +  {                                                           
+      115 +    id: 'l2-rest-on-one',                                     
+      116 +    label: 'Rest on beat 1',                                  
+      117 +    level: 2,                                                 
+      118 +    timeSignature: [4, 4],                                    
+      119 +    bars: 2,                                                  
+      120 +    events: [...bar(0, [[1, 1], [2, 1], [3, 1]]), ...bar(1, [[
+          +1, 1], [2, 1], [3, 1]])],                                     
+      121 +    hint: 'Nothing on the downbeat — count "1" silently and co
+          +me in on 2.',                                                 
+      122 +  },                                                          
+      123    // Level 3 — dotted rhythms and syncopation
+      124    {
+      125      id: 'l3-dotted-quarter',
+
+⏺ Update(src/lib/data/rhythms.ts)
+  ⎿  Added 18 lines
+      148      events: [...bar(0, [[0, 1], [1.5, 1.5], [3, 1]]), ...bar(1
+           , [[0, 1], [1.5, 1.5], [3, 1]])],
+      149      hint: 'The middle tap comes on the "and" of 2 and hangs ac
+           ross beat 3.',
+      150    },
+      151 +  {                                                           
+      152 +    id: 'l3-dotted-eighth',                                   
+      153 +    label: 'Dotted eighth + sixteenth',                       
+      154 +    level: 3,                                                 
+      155 +    timeSignature: [4, 4],                                    
+      156 +    bars: 2,                                                  
+      157 +    events: [...bar(0, [[0, 0.75], [0.75, 0.25], [1, 0.75], [1
+          +.75, 0.25], [2, 1], [3, 1]]), ...bar(1, [[0, 0.75], [0.75, 0.2
+          +5], [1, 1], [2, 2]])],                                        
+      158 +    hint: 'A long-short limp — the short note snaps right befo
+          +re the next beat.',                                           
+      159 +  },                                                          
+      160 +  {                                                           
+      161 +    id: 'l3-anticipation',                                    
+      162 +    label: 'Anticipated downbeat',                            
+      163 +    level: 3,                                                 
+      164 +    timeSignature: [4, 4],                                    
+      165 +    bars: 2,                                                  
+      166 +    events: [...bar(0, [[0, 1], [1, 1], [2, 1], [3.5, 0.5]]), 
+          +...bar(1, [[0, 1], [1, 1], [2, 2]])],                         
+      167 +    hint: 'The last tap of bar 1 arrives half a beat early — l
+          +ean into it.',                                                
+      168 +  },                                                          
+      169    // Level 4 — swing and jazz comping
+      170    {
+      171      id: 'l4-swing-eighths',
+
+⏺ Update(src/lib/data/rhythms.ts)
+  ⎿  Added 20 lines
+      200      events: [...bar(0, [[1, 1], [3, 1]]), ...bar(1, [[1, 1], [
+           3, 0.5], [3.5, 0.5]])],
+      201      hint: 'Where the drummer’s hi-hat lives — nothing on 1 and
+            3.',
+      202    },
+      203 +  {                                                           
+      204 +    id: 'l4-charleston-variation',                            
+      205 +    label: 'Charleston, displaced',                           
+      206 +    level: 4,                                                 
+      207 +    timeSignature: [4, 4],                                    
+      208 +    bars: 2,                                                  
+      209 +    swing: true,                                              
+      210 +    events: [...bar(0, [[0, 1.5], [1.5, 1], [3, 1]]), ...bar(1
+          +, [[0.5, 1], [1.5, 1.5], [3, 1]])],                           
+      211 +    hint: 'Bar 1 is the Charleston plus beat 4; bar 2 starts o
+          +ff the beat.',                                                
+      212 +  },                                                          
+      213 +  {                                                           
+      214 +    id: 'l4-red-garland',                                     
+      215 +    label: 'Comp on the and of 2',                            
+      216 +    level: 4,                                                 
+      217 +    timeSignature: [4, 4],                                    
+      218 +    bars: 2,                                                  
+      219 +    swing: true,                                              
+      220 +    events: [...bar(0, [[1.5, 1], [3.5, 0.5]]), ...bar(1, [[1.
+          +5, 1], [3.5, 0.5]])],                                         
+      221 +    hint: 'The classic trio comp — always between the beats, n
+          +ever on them.',                                               
+      222 +  },                                                          
+      223  ]
+      224  
+      225  export interface NotationEvent {
+
+⏺ Write(src/lib/quiz/rhythmQuiz.ts)
+  ⎿  Wrote 38 lines to src/lib/quiz/rhythmQuiz.ts
+       1 import { RHYTHM_PATTERNS, type RhythmPattern } from '../data/rhy
+         thms'
+       3 
+       4 /**
+       5  * Rhythm dictation: hear a pattern tapped on one note, pick the
+       6  * that matches. The inverse of the tap-along trainer (notation 
+         → taps).
+       7  */
+       9 export interface RhythmDictationQuestion {
+      10   kind: 'rhythm-dictation'
+     … +33 lines (ctrl+o to expand)
+
+⏺ Write(src/lib/quiz/modes.ts)
+  ⎿  Added 23 lines, removed 2 lines
+       2   * Quiz mode registry shared by the quiz screen and the learnin
+          g guide's
+       3   * deep links. Pure data — no Svelte/DOM imports.
+       4   */
+       5 -export type QuizModeId = 'intervals' | 'chords' | 'echo'       
+       5 +export type QuizModeId =                                       
+       6 +  // by ear                                                    
+       7 +  | 'intervals'                                                
+       8 +  | 'chords'                                                   
+       9 +  | 'scale-type'                                               
+      10 +  | 'cadence'                                                  
+      11 +  | 'echo'                                                     
+      12 +  | 'rhythm-dictation'                                         
+      13 +  // reading & theory                                          
+      14 +  | 'note-naming'                                              
+      15 +  | 'key-signature'                                            
+      16 +  | 'interval-staff'                                           
+      17 +  | 'chord-spelling'                                           
+      18 +  | 'chord-function'                                           
+      19  
+       7 -/** Highest selectable level per mode (must match the LEVELS ar
+         -rays in ear/quiz.ts). */                                       
+      20 +/** Highest selectable level per mode (must match the LEVELS ar
+         +rays in the generators). */                                    
+      21  export const QUIZ_LEVEL_COUNTS: Record<QuizModeId, number> = {
+      22    intervals: 4,
+      23    chords: 4,
+      24 +  'scale-type': 4,                                             
+      25 +  cadence: 3,                                                  
+      26    echo: 3,
+      27 +  'rhythm-dictation': 4,                                       
+      28 +  'note-naming': 4,                                            
+      29 +  'key-signature': 4,                                          
+      30 +  'interval-staff': 4,                                         
+      31 +  'chord-spelling': 3,                                         
+      32 +  'chord-function': 3,                                         
+      33  }
+
+⏺ Now the UI. Let me check QuizCard and SheetMusic props:
+
+  Read 2 files, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now the components. First make QuizCard's replay optional:
+
+⏺ Update(src/components/QuizCard.svelte)
+  ⎿  Added 9 lines, removed 6 lines
+      1  <script lang="ts">
+      2    /**
+      3 -   * Presentational multiple-choice card for by-ear quizzes: a r
+        -eplay button,                                                   
+      4 -   * answer options, and reveal styling once the user has picked
+        -.                                                               
+      3 +   * Presentational multiple-choice card: answer options with re
+        +veal styling                                                    
+      4 +   * once the user has picked, plus a replay button for by-ear q
+        +uestions                                                        
+      5 +   * (omit onreplay for visual/text questions).                 
+      6     */
+      7    let {
+      8      options,
+     ...
+      17      selected: string | null
+      18      playing?: boolean
+      19      onselect: (option: string) => void
+      19 -    onreplay: () => void                                       
+      20 +    onreplay?: () => void                                      
+      21    } = $props()
+      22  
+      23    const revealed = $derived(selected !== null)
+      24  </script>
+      25  
+      26  <div class="quiz">
+      26 -  <button class="primary replay" onclick={onreplay} disabled={p
+         -laying}>                                                       
+      27 -    {playing ? 'Playing…' : '🔊 Hear it again'}                
+      28 -  </button>                                                    
+      27 +  {#if onreplay}                                               
+      28 +    <button class="primary replay" onclick={onreplay} disabled=
+         +{playing}>                                                     
+      29 +      {playing ? 'Playing…' : '🔊 Hear it again'}              
+      30 +    </button>                                                  
+      31 +  {/if}                                                        
+      32    <div class="options">
+      33      {#each options as opt (opt)}
+      34        <button
+
+⏺ Write(src/components/RhythmQuizCard.svelte)
+  ⎿  Wrote 109 lines to src/components/RhythmQuizCard.svelte
+       1 <script lang="ts">
+       3   import { patternToNotation, type RhythmPattern } from '../lib/
+         data/rhythms'
+       4   import { durationFromBeats, type ScoreModel } from '../lib/not
+       5 
+       6   /**
+         notation —
+       8    * QuizCard stays string-only; this is its notation sibling fo
+         r dictation.
+      10   let {
+     … +109 lines (ctrl+o to expand)
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now the Quizzes screen, replacing EarTraining:
+
+⏺ Write(src/screens/Quizzes.svelte)
+  ⎿  Wrote 463 lines to src/screens/Quizzes.svelte
+       1 <script lang="ts">
+       2   import EchoPlayer from '../components/EchoPlayer.svelte'
+       3   import QuizCard from '../components/QuizCard.svelte'
+         e'
+       5   import SheetMusic from '../components/SheetMusic.svelte'
+       6   import { playChord, playChordSequence, playSequence, playSong 
+         } from '../lib/audio/playback'
+       7   import {
+       9     makeChordQuestion,
+      10     makeEchoQuestion,
+     … +499 lines (ctrl+o to expand)
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 1 line, removed 1 line
+      338          {#if selected !== null}
+      339            <button class="primary next" onclick={next}>Next →</
+           button>
+      340          {/if}
+      341 -      {:else if modeDef.audio}                                
+      341 +      {:else if question.kind === 'interval' || question.kind 
+          +=== 'chord' || question.kind === 'scale-type' || question.kind
+          + === 'cadence'}                                               
+      342          {#if !heard}
+      343            <button class="primary" onclick={play} disabled={pla
+           ying}>🔊 Hear it</button>
+      344          {:else}
+
+⏺ Now update App.svelte, remove the old screen, and point the guide's quiz links
+  at /quizzes:
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line, removed 1 line
+       7    import ScalesLibrary from './screens/ScalesLibrary.svelte'
+       8    import ChordsLibrary from './screens/ChordsLibrary.svelte'
+       9    import Practice from './screens/Practice.svelte'
+      10 -  import EarTraining from './screens/EarTraining.svelte'       
+      10 +  import Quizzes from './screens/Quizzes.svelte'               
+      11    import RhythmTrainer from './screens/RhythmTrainer.svelte'
+      12    import Songs from './screens/Songs.svelte'
+      13    import FreePlay from './screens/FreePlay.svelte'
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 1 line, removed 1 line
+      19      { route: '/scales', label: 'Scales' },
+      20      { route: '/chords', label: 'Chords' },
+      21      { route: '/practice', label: 'Practice' },
+      22 -    { route: '/ear', label: 'Ear Training' },                  
+      22 +    { route: '/quizzes', label: 'Quizzes' },                   
+      23      { route: '/rhythm', label: 'Rhythm' },
+      24      { route: '/songs', label: 'Songs' },
+      25      { route: '/play', label: 'Free Play' },
+
+⏺ Update(src/App.svelte)
+  ⎿  Added 2 lines, removed 2 lines
+      48      <ChordsLibrary />
+      49    {:else if route === '/practice'}
+      50      <Practice />
+      51 -  {:else if route === '/ear'}                                  
+      52 -    <EarTraining />                                            
+      51 +  {:else if route === '/quizzes' || route === '/ear'}          
+      52 +    <Quizzes />                                                
+      53    {:else if route === '/rhythm'}
+      54      <RhythmTrainer />
+      55    {:else if route === '/songs'}
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line, removed 1 line
+      60      case 'song':
+      61        return '#' + buildHash('/songs', { song: link.songId })
+      62      case 'quiz':
+      63 -      return '#' + buildHash('/ear', { mode: link.mode, level: 
+         -String(link.level) })                                          
+      63 +      return '#' + buildHash('/quizzes', { mode: link.mode, lev
+         +el: String(link.level) })                                      
+      64      case 'rhythm':
+      65        return '#' + buildHash('/rhythm', { level: String(link.le
+          vel) })
+      66      case 'sight':
+
+⏺ Update(src/tests/guide.test.ts)
+  ⎿  Added 1 line
+      21    '/chords',
+      22    '/practice',
+      23    '/ear',
+      24 +  '/quizzes',                                                  
+      25    '/rhythm',
+      26    '/songs',
+      27    '/play',
+
+⏺ Update(src/lib/voice/parser.ts)
+  ⎿  Added 1 line, removed 1 line
+      192    ['chords', { kind: 'navigate', route: '/chords' }],
+      193    ['practice', { kind: 'navigate', route: '/practice' }],
+      194    ['ear training', { kind: 'navigate', route: '/ear' }],
+      195 -  ['quizzes', { kind: 'navigate', route: '/ear' }],           
+      195 +  ['quizzes', { kind: 'navigate', route: '/quizzes' }],       
+      196    ['rhythm', { kind: 'navigate', route: '/rhythm' }],
+      197    ['rhythm trainer', { kind: 'navigate', route: '/rhythm' }],
+      198    ['songs', { kind: 'navigate', route: '/songs' }],
+
+⏺ Update(src/lib/voice/intents.ts)
+  ⎿  Added 1 line, removed 1 line
+      10    | { kind: 'wake' } // wake word alone — "Yes?" + armed window
+      11    | {
+      12        kind: 'navigate'
+      13 -      route: '/' | '/guide' | '/scales' | '/chords' | '/practic
+         -e' | '/ear' | '/rhythm' | '/songs' | '/play' | '/tuner'        
+      13 +      route: '/' | '/guide' | '/scales' | '/chords' | '/practic
+         +e' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/t
+         +uner'                                                          
+      14      }
+      15    | { kind: 'show-stage'; stage: number } // "show stage two" —
+           guide (cross-screen capable)
+      16    | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number
+           }
+
+⏺ Update(src/lib/voice/dispatcher.ts)
+  ⎿  Added 1 line
+      22  
+      23  const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
+      24    '/guide': 'the Guide',
+      25 +  '/quizzes': 'Quizzes',                                       
+      26    '/scales': 'Scales',
+      27    '/chords': 'Chords',
+      28    '/practice': 'Practice',
+
+⏺ Update(src/screens/Home.svelte)
+  ⎿  Added 3 lines, removed 3 lines
+      27        desc: 'Guided beginner routines — five-finger positions, 
+          Hanon, scales, cadences and sight-reading — with live feedback 
+          from your piano.',
+      28      },
+      29      {
+      30 -      route: '/ear',                                           
+      31 -      title: 'Ear Training',                                   
+      32 -      desc: 'Name intervals and chord qualities by ear, and pla
+         -y back short phrases from memory.',                            
+      30 +      route: '/quizzes',                                       
+      31 +      title: 'Quizzes',                                        
+      32 +      desc: 'Train your ear and your reading: intervals, chords
+         +, cadences and scales by ear; notes, key signatures and harmony
+         + on the page.',                                                
+      33      },
+      34      {
+      35        route: '/rhythm',
+
+⏺ Now the generator tests:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/tests/earQuiz.test.ts)
+  ⎿  Added 4 lines
+       1  import { describe, expect, it } from 'vitest'
+       2  import {
+       3 +  CADENCE_LEVELS,                                              
+       4    ECHO_LEVELS,
+       5    ECHO_POSITIONS,
+       6    INTERVAL_LEVELS,
+       7 +  SCALE_TYPE_LEVELS,                                           
+       8 +  makeCadenceQuestion,                                         
+       9    makeChordQuestion,
+      10    makeEchoQuestion,
+      11    makeIntervalQuestion,
+      12 +  makeScaleTypeQuestion,                                       
+      13    type Rng,
+      14  } from '../lib/ear/quiz'
+      15  
+
+⏺ Update(src/tests/earQuiz.test.ts)
+  ⎿  Added 69 lines
+      118      }
+      119    })
+      120  })
+      121 +                                                              
+      122 +describe('makeScaleTypeQuestion', () => {                     
+      123 +  it('answer is in unique options drawn from the level set', (
+          +) => {                                                        
+      124 +    for (const level of [1, 2, 3, 4]) {                       
+      125 +      const labels = new Set(                                 
+      126 +        ['Major', 'Natural minor', 'Harmonic minor', 'Blues', 
+          +'Major pentatonic', 'Dorian', 'Mixolydian'].slice(            
+      127 +          0,                                                  
+      128 +          SCALE_TYPE_LEVELS[level - 1].length,                
+      129 +        ),                                                    
+      130 +      )                                                       
+      131 +      for (const seed of seeds) {                             
+      132 +        const q = makeScaleTypeQuestion(level, seededRng(seed)
+          +)                                                             
+      133 +        expect(q.options.filter((o) => o === q.answer)).toHave
+          +Length(1)                                                     
+      134 +        expect(new Set(q.options).size).toBe(q.options.length)
+      135 +        expect(labels.has(q.answer), q.answer).toBe(true)     
+      136 +      }                                                       
+      137 +    }                                                         
+      138 +  })                                                          
+      139 +                                                              
+      140 +  it('plays an ascending scale', () => {                      
+      141 +    for (const seed of seeds) {                               
+      142 +      const q = makeScaleTypeQuestion(4, seededRng(seed))     
+      143 +      expect(q.midis.length).toBeGreaterThanOrEqual(6)        
+      144 +      for (let i = 1; i < q.midis.length; i++) expect(q.midis[
+          +i]).toBeGreaterThan(q.midis[i - 1])                           
+      145 +      expect(q.midis[q.midis.length - 1] - q.midis[0]).toBe(12
+          +)                                                             
+      146 +    }                                                         
+      147 +  })                                                          
+      148 +})                                                            
+      149 +                                                              
+      150 +describe('makeCadenceQuestion', () => {                       
+      151 +  it('answer is in unique options from the level set', () => {
+      152 +    for (const level of [1, 2, 3]) {                          
+      153 +      for (const seed of seeds) {                             
+      154 +        const q = makeCadenceQuestion(level, seededRng(seed)) 
+      155 +        expect(q.options.filter((o) => o === q.answer)).toHave
+          +Length(1)                                                     
+      156 +        expect(new Set(q.options).size).toBe(q.options.length)
+      157 +        expect(q.options.length).toBe(CADENCE_LEVELS[level - 1
+          +].length)                                                     
+      158 +      }                                                       
+      159 +    }                                                         
+      160 +  })                                                          
+      161 +                                                              
+      162 +  it('every progression starts on the tonic and matches its la
+          +bel', () => {                                                 
+      163 +    for (const seed of seeds) {                               
+      164 +      const q = makeCadenceQuestion(3, seededRng(seed))       
+      165 +      const tonicChord = q.chords[0]                          
+      166 +      // Root-position major triad establishes the key.       
+      167 +      expect(tonicChord[1] - tonicChord[0]).toBe(4)           
+      168 +      expect(tonicChord[2] - tonicChord[0]).toBe(7)           
+      169 +      const last = q.chords[q.chords.length - 1]              
+      170 +      if (q.answer.startsWith('Perfect') || q.answer.startsWit
+          +h('Plagal')) {                                                
+      171 +        expect(last).toEqual(tonicChord) // ends home         
+      172 +      } else {                                                
+      173 +        expect(last).not.toEqual(tonicChord) // half/deceptive
+          + end away                                                     
+      174 +      }                                                       
+      175 +    }                                                         
+      176 +  })                                                          
+      177 +                                                              
+      178 +  it('chords stay in a comfortable register', () => {         
+      179 +    for (const seed of seeds) {                               
+      180 +      const q = makeCadenceQuestion(3, seededRng(seed))       
+      181 +      for (const chord of q.chords) {                         
+      182 +        for (const m of chord) {                              
+      183 +          expect(m).toBeGreaterThanOrEqual(48)                
+      184 +          expect(m).toBeLessThanOrEqual(84)                   
+      185 +        }                                                     
+      186 +      }                                                       
+      187 +    }                                                         
+      188 +  })                                                          
+      189 +})                                                            
+
+⏺ Write(src/tests/theoryQuiz.test.ts)
+  ⎿  Wrote 212 lines to src/tests/theoryQuiz.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { Note } from 'tonal'
+       3 import type { Rng } from '../lib/ear/quiz'
+       4 import { getChord } from '../lib/theory/chords'
+       5 import {
+       6   CHORD_SPELLING_LEVELS,
+       7   KEY_SIGNATURE_LEVELS,
+       8   NOTE_NAMING_LEVELS,
+       9   makeChordFunctionQuestion,
+      10   makeChordSpellingQuestion,
+     … +228 lines (ctrl+o to expand)
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ The deep-link block intentionally reads state once at init — silence the
+  warning the same way Practice.svelte does:
+
+⏺ Update(src/screens/Quizzes.svelte)
+  ⎿  Added 3 lines, removed 2 lines
+      88    // Deep link from the learning guide, read once at mount.
+      89    {
+      90      const params = currentParams()
+      91 -    if (ALL_MODES.some((m) => m.id === params.mode)) mode = par
+         -ams.mode as QuizModeId                                         
+      91 +    const linkedMode = ALL_MODES.some((m) => m.id === params.mo
+         +de) ? (params.mode as QuizModeId) : 'intervals'                
+      92 +    mode = linkedMode                                          
+      93      const linkedLevel = Number(params.level)
+      93 -    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && li
+         -nkedLevel <= QUIZ_LEVEL_COUNTS[mode]) {                        
+      94 +    if (Number.isInteger(linkedLevel) && linkedLevel >= 1 && li
+         +nkedLevel <= QUIZ_LEVEL_COUNTS[linkedMode]) {                  
+      95        level = linkedLevel
+      96      }
+      97    }
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All green. Now link the new quiz modes from the guide stages:
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      182            'few anchor notes (middle C, treble G, bass F) and c
+           ount neighbours from them rather than ' +
+      183            'memorizing every line at once.',
+      184          links: [
+      185 +          quiz('note-naming', 1, 'Quiz: name the note on the s
+          +taff'),                                                       
+      186            { kind: 'route', route: '/tuner', label: 'Note Detec
+           tor — play a key, see its name and notation' },
+      187            sight(1, 'Practice reading single notes in C positio
+           n'),
+      188          ],
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      260            'reading each accidental, think "I am in G, so every
+            F is sharp". Scales make key signatures ' +
+      261            'physical: your fingers learn where the black keys l
+           ive in each key.',
+      262          links: [
+      263 +          quiz('key-signature', 1, 'Quiz: read the key signatu
+          +re'),                                                         
+      264            { kind: 'scale', root: 'G', type: 'major', label: 'G
+            major in the scale library' },
+      265            { kind: 'scale', root: 'F', type: 'major', label: 'F
+            major in the scale library' },
+      266          ],
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      274            'trains your eye to see the same distances on the st
+           aff.',
+      275          links: [
+      276            quiz('intervals', 2, 'Interval ear quiz'),
+      277 +          quiz('interval-staff', 1, 'Quiz: intervals on the st
+          +aff'),                                                        
+      278            sight(2, 'Read by interval in sight-reading'),
+      279          ],
+      280        },
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 2 lines
+      366            'I, IV and V in a fixed order.',
+      367          links: [
+      368            lesson('cadence-G', 'Cadences in G'),
+      369 +          quiz('chord-function', 1, 'Quiz: which chord is V?')
+          +,                                                             
+      370 +          quiz('chord-spelling', 1, 'Quiz: spell the chord'), 
+      371            song('twelve-bar-blues-c', 'Hear I–IV–V in the 12-ba
+           r blues'),
+      372          ],
+      373        },
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 4 lines, removed 1 line
+      342        quiz('intervals', 3, 'Intervals — level 3'),
+      343        quiz('echo', 2, 'Play it back — level 2'),
+      344      ],
+      345 -    rhythm: [rhythm(3, 'Rhythm — level 3 (dotted rhythms & syn
+          -copation)')],                                                 
+      345 +    rhythm: [                                                 
+      346 +      rhythm(3, 'Rhythm — level 3 (dotted rhythms & syncopatio
+          +n)'),                                                         
+      347 +      quiz('rhythm-dictation', 2, 'Rhythm dictation — hear it,
+          + pick the notation'),                                         
+      348 +    ],                                                        
+      349      sight: [sight(3, 'Sight-reading — level 3 (bass clef, acci
+           dentals)')],
+      350      theory: [
+      351        {
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 1 line
+      435      ear: [
+      436        quiz('chords', 3, 'Chord qualities — level 3 (adds 7th c
+           hords)'),
+      437        quiz('intervals', 4, 'Intervals — level 4 (all twelve)')
+           ,
+      438 +      quiz('cadence', 1, 'Cadences — perfect or plagal?'),    
+      439        quiz('echo', 3, 'Play it back — level 3'),
+      440      ],
+      441      rhythm: [rhythm(4, 'Rhythm — level 4 (swing, Charleston, c
+           omping)')],
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 3 lines, removed 1 line
+      517      ],
+      518      ear: [
+      519        quiz('chords', 4, 'Chord qualities — level 4 (everything
+           )'),
+      520 -      quiz('intervals', 4, 'Intervals — level 4'),            
+      520 +      quiz('scale-type', 4, 'Scale types — modes and blues by 
+          +ear'),                                                        
+      521 +      quiz('cadence', 3, 'Cadences — including the deceptive V
+          + → vi'),                                                      
+      522 +      quiz('rhythm-dictation', 4, 'Rhythm dictation — swing pa
+          +tterns'),                                                     
+      523      ],
+      524      rhythm: [rhythm(4, 'Rhythm — level 4 (keep swing honest)')
+           ],
+      525      sight: [sight(5, 'Sight-reading — level 5 (hands together)
+           ')],
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 2 lines
+      451          links: [
+      452            { kind: 'chord', root: 'G', quality: 'dominant 7th',
+            label: 'G7 in the chord library' },
+      453            quiz('chords', 3, 'Hear 7th chords in the ear quiz')
+           ,
+      454 +          quiz('chord-spelling', 3, 'Quiz: spell the 7th chord
+          +s'),                                                          
+      455 +          quiz('key-signature', 3, 'Quiz: key signatures aroun
+          +d the circle'),                                               
+      456          ],
+      457        },
+      458      ],
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ git add -A picked up the user's untracked chat transcripts — unstaging those
+  before committing:
+
+  Committed c2b268b (ctrl+o to expand)
+
+⏺ Phase 5 — repertoire. Let me study the catalog encoding:
+
+  Read 1 file, ran 5 shell commands (ctrl+o to expand)
+⏺ GitHub API worked via curl, so network is fine — KernScores just didn't
+  respond. Let me retry properly; real PD source data would make these pieces
+  accurate:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Mutopia has Satie Gymnopédie 1, Clementi Op. 36, and Schumann Op. 68. Checking
+  for MIDI files in the repo:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ The Mutopia site serves MIDI directly. Now let me look at the existing MIDI
+  import to build the transcode script around it:
+
+  Read 1 file, ran 8 shell commands (ctrl+o to expand)
+
+⏺ All 9 MIDI files are in. Now improve the MIDI importer to assign hands by
+  track (Mutopia files have separate RH/LH tracks; the current midi < 60 split
+  butchers piano music):
+
+⏺ Update(src/lib/songs/midiImport.ts)
+  ⎿  Added 4 lines, removed 2 lines
+       2  
+       3  /**
+       4   * Standard MIDI File (format 0/1) → Song. Onsets and durations
+           quantize to
+       5 - * a 16th-note grid; notes below middle C go to the left hand. 
+         -Assumes 4/4                                                    
+       6 - * unless the file carries a time-signature meta event.        
+       5 + * a 16th-note grid. Hands: when exactly two tracks carry notes
+         + (the common                                                   
+       6 + * piano-staff export), the higher-pitched track is the right h
+         +and; otherwise                                                 
+       7 + * notes below middle C go left. Assumes 4/4 unless the file ca
+         +rries a                                                        
+       8 + * time-signature meta event.                                  
+       9   */
+      10  export class MidiImportError extends Error {}
+      11  
+
+⏺ Update(src/lib/songs/midiImport.ts)
+  ⎿  Added 1 line
+      55    midi: number
+      56    startTick: number
+      57    durationTicks: number
+      58 +  track: number                                                
+      59  }
+      60  
+      61  export function parseMidiFile(buffer: ArrayBuffer, id: string):
+           Song {
+
+⏺ Update(src/lib/songs/midiImport.ts)
+  ⎿  Added 2 lines, removed 1 line
+      116            const start = open.get(midi)
+      117            if (start !== undefined) {
+      118              open.delete(midi)
+      119 -            if (midi >= 21 && midi <= 108) notes.push({ midi, 
+          -startTick: start, durationTicks: tick - start })              
+      119 +            if (midi >= 21 && midi <= 108)                    
+      120 +              notes.push({ midi, startTick: start, durationTic
+          +ks: tick - start, track: t })                                 
+      121            }
+      122          }
+      123        } else if (type === 0xc0 || type === 0xd0) {
+
+⏺ Update(src/lib/songs/midiImport.ts)
+  ⎿  Added 18 lines, removed 1 line
+      131  
+      132    if (notes.length === 0) fail('No notes found in this MIDI fi
+           le.')
+      133  
+      134 +  // Two note-bearing tracks = a piano staff: the higher-pitch
+          +ed track is                                                   
+      135 +  // the right hand. Anything else falls back to the middle-C 
+          +split.                                                        
+      136 +  const byTrack = new Map<number, { sum: number; count: number
+          + }>()                                                         
+      137 +  for (const n of notes) {                                    
+      138 +    const acc = byTrack.get(n.track) ?? { sum: 0, count: 0 }  
+      139 +    acc.sum += n.midi                                         
+      140 +    acc.count++                                               
+      141 +    byTrack.set(n.track, acc)                                 
+      142 +  }                                                           
+      143 +  let rightTrack: number | null = null                        
+      144 +  if (byTrack.size === 2) {                                   
+      145 +    const [a, b] = [...byTrack.entries()]                     
+      146 +    rightTrack = a[1].sum / a[1].count >= b[1].sum / b[1].coun
+          +t ? a[0] : b[0]                                               
+      147 +  }                                                           
+      148 +  const handOf = (n: RawNote): Hand =>                        
+      149 +    rightTrack !== null ? (n.track === rightTrack ? 'R' : 'L')
+          + : n.midi < 60 ? 'L' : 'R'                                    
+      150 +                                                              
+      151    // Quantize to the 16th grid and bucket into measures.
+      152    const q = (ticks: number) => Math.round((ticks / division) *
+            4) / 4
+      153    const beatsPerMeasure = (timeSignature[0] * 4) / timeSignatu
+           re[1]
+     ...
+      161        midi: n.midi,
+      162        startBeat: start - measureIndex * beatsPerMeasure,
+      163        durationBeats: duration,
+      147 -      hand: n.midi < 60 ? 'L' : 'R',                          
+      164 +      hand: handOf(n),                                        
+      165      }
+      166      measures[measureIndex].notes.push(songNote)
+      167    }
+
+⏺ Update(src/lib/songs/midiImport.ts)
+  ⎿  Added 1 line
+      1 +import type { Hand } from '../theory/types'                     
+      2  import type { Song, SongMeasure, SongNote } from '../data/songs/
+         types'
+      3  
+      4  /**
+
+⏺ Now the transcode script:
+
+⏺ Write(scripts/midiToCatalog.ts)
+  ⎿  Wrote 37 lines to scripts/midiToCatalog.ts
+       1 /**
+       2  * One-off dev tool: MIDI file(s) → catalog.ts tuple code.
+       4  *   npx vite-node scripts/midiToCatalog.ts <file.mid> [more.mid
+          ...]
+       5  *
+          a
+       7  * `measures: [...]` block in the compact catalog encoding
+       8  * ([midi, startBeat, durationBeats]), right hand first, left ha
+       9  * Grade/style/sections/fingerings are hand-edited afterwards.
+      10  */
+     … +35 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The pipeline works — that's the real Schumann Melodie. Generating all pieces:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Clementi and Maple Leaf failed silently — investigating:
+
+  Ran 2 shell commands (ctrl+o to expand)
+⏺ Clementi was the leftover 404 HTML — the zip's sonatina-1.mid is the real one,
+  and Maple failed only because the script died on Clementi first. Re-running:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Write(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c-
+       826a-b779f6e2300d/scratchpad/assemble.mjs)
+  ⎿  Wrote 153 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The regex split was naive — parse the whole bar as JSON instead:
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c
+        -826a-b779f6e2300d/scratchpad/assemble.mjs)
+  ⎿  Added 3 lines, removed 5 lines (ctrl+o to expand)
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c
+        -826a-b779f6e2300d/scratchpad/assemble.mjs)
+  ⎿  Added 1 line, removed 1 line (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ That's the real La Candeur. Wiring into the catalog and adding the invariant
+  test:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 2 lines, removed 1 line
+      722    saintsStride,
+      723    mozartK545,
+      724    entertainerStride,
+      725 -]                                                             
+      725 +  ...IMPORTED_SONGS,                                          
+      726 +].sort((a, b) => a.grade - b.grade)                           
+
+⏺ Update(src/lib/data/songs/catalog.ts)
+  ⎿  Added 1 line
+      1  import type { Finger, Hand } from '../../theory/types'
+      2 +import { IMPORTED_SONGS } from './catalogImported'              
+      3  import type { Song, SongMeasure, SongNote } from './types'
+      4  
+      5  /**
+
+⏺ Now the catalog invariant test:
+
+⏺ Write(src/tests/catalog.test.ts)
+  ⎿  Wrote 79 lines to src/tests/catalog.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { SONG_CATALOG } from '../lib/data/songs/catalog'
+       4 /** Structural invariants for the bundled repertoire (hand-writt
+         en and imported). */
+       5 
+         ts[1]
+       7 
+       8 describe('song catalog invariants', () => {
+         {
+      10     const ids = SONG_CATALOG.map((s) => s.id)
+     … +80 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All render. Now surface the new pieces in the guide stages:
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 3 lines
+      332        lesson('cadence-F', 'I–IV–V–I cadence in F'),
+      333      ],
+      334      repertoire: [
+      335 +      song('schumann-melodie', 'Melody, Op. 68 No. 1 (Schumann
+          +)'),                                                          
+      336 +      song('burgmuller-la-candeur', 'La Candeur, Op. 100 No. 1
+          + (Burgmüller)'),                                              
+      337 +      song('old-french-song', 'Old French Song (Tchaikovsky)')
+          +,                                                             
+      338        song('st-james-infirmary', 'St. James Infirmary'),
+      339        song('twelve-bar-blues-c', '12-Bar Blues in C'),
+      340        song('fur-elise', 'Für Elise — theme (Beethoven)'),
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 3 lines
+      432        lesson('arpeggio-D-minor', 'D minor arpeggio'),
+      433      ],
+      434      repertoire: [
+      435 +      song('burgmuller-arabesque', 'Arabesque, Op. 100 No. 2 (
+          +Burgmüller)'),                                                
+      436 +      song('schumann-wild-rider', 'The Wild Horseman, Op. 68 N
+          +o. 8 (Schumann)'),                                            
+      437 +      song('clementi-sonatina-1', 'Sonatina Op. 36 No. 1, 1st 
+          +movement (Clementi)'),                                        
+      438        song('bach-prelude-c', 'Prelude in C (Bach, WTC I) — ope
+           ning'),
+      439        song('jazz-blues-walking-g', 'Jazz Blues in G with walki
+           ng bass'),
+      440      ],
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 3 lines
+      518        lesson('jazz-blues-comp-C', '12-bar blues comping in C')
+           ,
+      519      ],
+      520      repertoire: [
+      521 +      song('gymnopedie-1', 'Gymnopédie No. 1 (Satie)'),       
+      522 +      song('burgmuller-ballade', 'Ballade, Op. 100 No. 15 (Bur
+          +gmüller)'),                                                   
+      523        song('canon-in-d', 'Canon in D (Pachelbel)'),
+      524        song('ii-v-i-etude', 'ii–V–I Étude (swing)'),
+      525 +      song('maple-leaf-rag', 'Maple Leaf Rag — A strain (Jopli
+          +n)'),                                                         
+      526        song('chopin-prelude-e-minor', 'Prelude in E minor, Op. 
+           28 No. 4 (Chopin)'),
+      527        song('when-the-saints-stride', 'When the Saints — stride
+            version'),
+      528      ],
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+⏺ Update(src/tests/songSteps.test.ts)
+  ⎿  Added 2 lines, removed 1 line
+      39          const rh = measure.notes.filter((n) => n.hand === 'R').
+          map((n) => n.midi)
+      40          const lh = measure.notes.filter((n) => n.hand === 'L').
+          map((n) => n.midi)
+      41          if (rh.length && lh.length) {
+      42 -          expect(Math.min(...rh), song.id).toBeGreaterThan(Math
+         -.max(...lh))                                                   
+      42 +          // >= not >: real repertoire occasionally shares a un
+         +ison between hands.                                            
+      43 +          expect(Math.min(...rh), song.id).toBeGreaterThanOrEqu
+         +al(Math.max(...lh))                                            
+      44          }
+      45        }
+      46      }
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Update(src/tests/songSteps.test.ts)
+  ⎿  Added 7 lines, removed 8 lines
+      33      }
+      34    })
+      35  
+      36 -  it('right-hand melodies sit above left-hand parts', () => {  
+      36 +  it('right-hand parts sit above left-hand parts on average (ha
+         +nds not flipped)', () => {                                     
+      37 +    // Real repertoire crosses voices within a bar, so compare 
+         +per-song means                                                 
+      38 +    // rather than per-measure extremes — this still catches sw
+         +apped hands.                                                   
+      39      for (const song of SONG_CATALOG) {
+      38 -      for (const measure of song.measures) {                   
+      39 -        const rh = measure.notes.filter((n) => n.hand === 'R').
+         -map((n) => n.midi)                                             
+      40 -        const lh = measure.notes.filter((n) => n.hand === 'L').
+         -map((n) => n.midi)                                             
+      41 -        if (rh.length && lh.length) {                          
+      42 -          // >= not >: real repertoire occasionally shares a un
+         -ison between hands.                                            
+      43 -          expect(Math.min(...rh), song.id).toBeGreaterThanOrEqu
+         -al(Math.max(...lh))                                            
+      44 -        }                                                      
+      40 +      const mean = (hand: string) => {                         
+      41 +        const midis = song.measures.flatMap((m) => m.notes.filt
+         +er((n) => n.hand === hand).map((n) => n.midi))                 
+      42 +        return midis.reduce((a, b) => a + b, 0) / midis.length 
+      43        }
+      44 +      expect(mean('R'), song.id).toBeGreaterThan(mean('L'))    
+      45      }
+      46    })
+      47  })
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All 492 tests pass. Updating CLAUDE.md to document the new module and script,
+  then committing:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(CLAUDE.md)
+  ⎿  Added 13 lines, removed 2 lines
+       82      `stopMonoDetection()`'s `mic.stop()` can't tear down the s
+           tream while voice listens.
+       83  - `src/lib/practice/` — `matcher.ts` is a pure cursor matcher 
+           ("wait, don't fail": wrong notes
+       84    flash but never advance); `history.svelte.ts` persists compl
+           etions to localStorage.
+       85 -- `src/lib/data/lessons/` — practice content (five-finger, Han
+          -on No. 1, scale routine, I–IV–V–I                             
+       86 -  cadences (poly), generated sight-reading melodies).         
+       85 +- `src/lib/data/lessons/` — practice content (five-finger, Han
+          +on No. 1, scale routine incl.                                 
+       86 +  melodic minors, chromatic, contrary motion, arpeggios in all
+          + 24 keys, I–IV–V–I cadences                                   
+       87 +  (poly), jazz, generated sight-reading melodies).            
+       88 +- `src/lib/data/songs/` — graded repertoire: `catalog.ts` (han
+          +d-written arrangements, named                                 
+       89 +  midi constants) + `catalogImported.ts` (generated from publi
+          +c-domain Mutopia MIDI via                                     
+       90 +  `scripts/midiToCatalog.ts`, then curated: grades/sections/te
+          +mpi are editorial). To add                                    
+       91 +  imported pieces: download the Mutopia .mid, run             
+       92 +  `npx vite-node scripts/midiToCatalog.ts file.mid`, paste + c
+          +lamp/curate.                                                  
+       93 +- `src/lib/data/guide.ts` — the learning guide: five curriculu
+          +m stages whose deep links are                                 
+       94 +  integrity-tested against the lesson/song/quiz registries (`s
+          +rc/tests/guide.test.ts`).                                     
+       95 +  Deliberately static — the guide never tracks progress.      
+       96 +- `src/lib/quiz/` + `src/lib/theory/quiz.ts` + `src/lib/ear/qu
+          +iz.ts` — pure quiz generators                                 
+       97 +  (11 modes) behind `/quizzes` (`/ear` is an alias route).    
+       98  - `src/lib/transcribe/` — `cluster.ts` (Tier A: onsets → chord
+           s, no rhythm) and `quantize.ts`
+       99    (Tier B: metronome-locked 8th-note grid with rests/barlines)
+           . Both pure and unit-tested.
+      100  
+
+  Committed e4cf5d9 (ctrl+o to expand)
+
+⏺ Phase 6 — the guide's theory prose is mostly in place from Phase 1; filling
+  the gaps (rhythm primer in stage 1, melodic-minor explainer in stage 4, modes
+  in stage 5):
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 13 lines
+      187            sight(1, 'Practice reading single notes in C positio
+           n'),
+      188          ],
+      189        },
+      190 +      {                                                       
+      191 +        title: 'Counting time',                               
+      192 +        body:                                                 
+      193 +          'Rhythm is arithmetic you can feel: a whole note las
+          +ts four beats, a half note two, a ' +                         
+      194 +          'quarter one. The time signature tells you how many 
+          +beats fill a bar. Count out loud — ' +                        
+      195 +          '"1, 2, 3, 4" — while you play; the notes that feel 
+          +long are the ones you are counting ' +                        
+      196 +          'through. The metronome is not a critic, it is a dan
+          +ce partner: put it on 60 and land ' +                         
+      197 +          'your quarters exactly with the clicks.',           
+      198 +        links: [                                              
+      199 +          rhythm(1, 'Tap level-1 rhythms against the metronome
+          +'),                                                           
+      200 +          quiz('rhythm-dictation', 1, 'Quiz: hear a rhythm, pi
+          +ck its notation'),                                            
+      201 +        ],                                                    
+      202 +      },                                                      
+      203      ],
+      204      weeklyPlan: {
+      205        totalMinutes: 20,
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 13 lines
+      474            quiz('key-signature', 3, 'Quiz: key signatures aroun
+           d the circle'),
+      475          ],
+      476        },
+      477 +      {                                                       
+      478 +        title: 'Three flavours of minor',                     
+      479 +        body:                                                 
+      480 +          'Minor is not one scale but a family. Natural minor 
+          +is what the key signature gives ' +                           
+      481 +          'you; harmonic minor raises the 7th so the dominant 
+          +chord can pull home; melodic minor ' +                        
+      482 +          'also raises the 6th on the way up so the line climb
+          +s smoothly, then relaxes back to ' +                          
+      483 +          'natural on the way down. Composers mix all three fr
+          +eely inside a single minor-key ' +                            
+      484 +          'piece — that is why minor pieces are speckled with 
+          +accidentals.',                                                
+      485 +        links: [                                              
+      486 +          lesson('scale-A-melodic-minor', 'A melodic minor — h
+          +ear both directions'),                                        
+      487 +          { kind: 'scale', root: 'A', type: 'harmonic minor', 
+          +label: 'Compare in the scale library' },                      
+      488 +        ],                                                    
+      489 +      },                                                      
+      490      ],
+      491      weeklyPlan: {
+      492        totalMinutes: 45,
+
+⏺ Update(src/lib/data/guide.ts)
+  ⎿  Added 14 lines
+      574          ],
+      575        },
+      576        {
+      577 +        title: 'Modes: old scales, new colours',              
+      578 +        body:                                                 
+      579 +          'Play the white keys from D to D and you get Dorian 
+          +— a minor scale with a bright 6th, ' +                        
+      580 +          'the sound of Scarborough Fair and half of jazz. Fro
+          +m G to G is Mixolydian: a major ' +                           
+      581 +          'scale with a lowered 7th, the sound of the blues an
+          +d rock. Modes are not new notes to ' +                        
+      582 +          'learn, just familiar keys heard from a different ho
+          +me base — which is why training ' +                           
+      583 +          'your ear to spot them matters more than memorizing 
+          +them.',                                                       
+      584 +        links: [                                              
+      585 +          { kind: 'scale', root: 'D', type: 'dorian', label: '
+          +D Dorian in the scale library' },                             
+      586 +          { kind: 'scale', root: 'G', type: 'mixolydian', labe
+          +l: 'G Mixolydian in the scale library' },                     
+      587 +          quiz('scale-type', 4, 'Quiz: name the scale type by 
+          +ear'),                                                        
+      588 +        ],                                                    
+      589 +      },                                                      
+      590 +      {                                                       
+      591          title: 'Where to go from here',
+      592          body:
+      593            'Beyond this stage the priorities shift to tone, ped
+           alling, dynamics and interpretation — ' +
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Phase 7 — the GUIDE.md export. First the pure renderer:
+
+⏺ Write(src/lib/data/guideMarkdown.ts)
+  ⎿  Wrote 69 lines to src/lib/data/guideMarkdown.ts
+       1 import { GUIDE_STAGES, guideHref, type GuideLink, type GuideStag
+       2 
+       3 /**
+         e readable/
+         ngle source
+       6  * of truth; src/tests/guideMarkdown.test.ts fails if the commit
+       7  * drifts from this renderer's output (regenerate with `npm run 
+         guide:md`).
+       9 
+          \`${guideHref(link)}\``
+     … +76 lines (ctrl+o to expand)
+
+⏺ Write(scripts/generateGuideMd.ts)
+  ⎿  Wrote 15 lines to scripts/generateGuideMd.ts
+       1 /**
+       2  * Regenerates docs/GUIDE.md from src/lib/data/guide.ts:
+       3  *
+       5  *
+       6  * The staleness test (src/tests/guideMarkdown.test.ts) fails un
+         til the
+       7  * committed file matches the renderer, so run this after any gu
+         ide change.
+       9 import { writeFileSync } from 'node:fs'
+      10 import { fileURLToPath } from 'node:url'
+     … +8 lines (ctrl+o to expand)
+
+⏺ Write(src/tests/guideMarkdown.test.ts)
+  ⎿  Wrote 22 lines to src/tests/guideMarkdown.test.ts
+       1 import { readFileSync } from 'node:fs'
+       2 import { fileURLToPath } from 'node:url'
+       3 import { describe, expect, it } from 'vitest'
+       5 import { renderGuideMarkdown } from '../lib/data/guideMarkdown'
+       6 
+       7 const GUIDE_MD = fileURLToPath(new URL('../../docs/GUIDE.md', im
+         port.meta.url))
+       8 
+      10   it('matches the renderer output (regenerate with `npm run guid
+         e:md`)', () => {
+     … +15 lines (ctrl+o to expand)
+
+  Listed 1 directory, ran 3 shell commands (ctrl+o to expand)
+⏺ Update(src/tests/guideMarkdown.test.ts)
+  ⎿  Added 1 line
+      1 +// @vitest-environment node                                     
+      2  import { readFileSync } from 'node:fs'
+      3  import { fileURLToPath } from 'node:url'
+      4  import { describe, expect, it } from 'vitest'
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All 494 tests pass. Adding the README pointer and committing Phase 7:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(README.md)
+  ⎿  File must be read first
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(README.md)
+  ⎿  Added 5 lines
+      10  
+      11  ![Scales screen: C major with sheet music, fingering, and keybo
+          ard](docs/screenshots/scales.png)
+      12  
+      13 +**New to the piano, or unsure what to practice next?** Start wi
+         +th the                                                         
+      14 +[Learning Guide](docs/GUIDE.md) — a staged path from first note
+         +s to early intermediate                                        
+      15 +(~ABRSM Grade 4) that organizes everything below into a curricu
+         +lum, with weekly practice                                      
+      16 +plans and curated external resources. The same guide lives in t
+         +he app under **Guide**.                                        
+      17 +                                                               
+      18  ## Features
+      19  
+      20  ### 📚 Reference library
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c-
+       826a-b779f6e2300d/scratchpad/verify.mjs)
+  ⎿  Wrote 74 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c
+        -826a-b779f6e2300d/scratchpad/verify.mjs)
+  ⎿  Added 1 line, removed 1 line (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c
+        -826a-b779f6e2300d/scratchpad/verify.mjs)
+  ⎿  Added 5 lines, removed 1 line (ctrl+o to expand)
+
+⏺ Update(/private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-223c-421c
+        -826a-b779f6e2300d/scratchpad/verify.mjs)
+  ⎿  Added 5 lines, removed 4 lines (ctrl+o to expand)
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+⏺ Stop Task
+  ⎿  npm run dev · stopped
+
+⏺ The new Learning Guide screen — five stages from first notes to ~ABRSM Grade
+  4, every chip deep-links into the app.
+
+  ›      /private/tmp/claude-501/-Users-steli-src-piano-tutor/d1cb6e93-2 (266.8K
+  [image]3c-421c-826a-b779f6e2300d/scratchpad/guide.png                 B)
+
+⏺ All seven phases are done, committed (6 commits on main), and verified
+  end-to-end in the running app — 494 unit tests pass, svelte-check is clean,
+  the production build succeeds, and a Playwright pass through the real UI
+  confirmed all 20 checks (guide, deep links, quizzes, new lessons, new songs).
+
+  What the app now does for a beginner → intermediate learner:
+
+  - Learning Guide (/guide, plus a highlighted "start here" tile on Home): five
+  stages from first notes to ~ABRSM Grade 4. Each stage has goals,
+  technique/pieces/ear/rhythm/sight-reading chips that deep-link straight to the
+  right lesson, song, or quiz level, theory primers, a weekly practice
+  template, self-assessment "move on when…" bullets, and curated external
+  resources (Faber/Alfred method books, ABRSM & RCM syllabi, Bill
+  Hilton/PianoTV/Josh Wright/Open Studio on YouTube, IMSLP/MuseScore,
+  r/pianolearning, and when-to-get-a-teacher advice from stage 3 on). Per your
+  call, it's a static map: no checkboxes, no progress state; existing
+  history/streak code was left untouched and nothing new tracks.
+  - The same guide as a document: docs/GUIDE.md, generated from the same data by
+  npm run guide:md, with a test that fails if the two ever drift. README points
+  to it.
+  - Technique gaps filled: chromatic scales (C/D/A), contrary-motion majors
+  (C/G/E/F), melodic minors (A/D/E/G/C), and arpeggios in all 24 keys including
+  the black-key roots the code previously deferred. One honest caveat: the
+  black-key arpeggio and chromatic fingering tables are transcribed convention
+  (tests enforce structure plus a thumb-never-on-black invariant, and I
+  documented the rule), but a human eyeball against your ABRSM manual is worth a
+  minute — editions vary.
+  - Quizzes (the part you enjoyed) grew from 3 modes to 11: by ear — intervals,
+  chord qualities, scale types, cadences, play-it-back, rhythm dictation (hear
+  it, pick the notation); reading & theory — note naming on the staff, key
+  signatures, intervals on the staff, chord spelling, and chord functions. All
+  generators are pure and answer-verified against tonal in tests.
+  - Nine real pieces added (grades 2–5) — and accurately: rather than typing
+  scores from memory, I transcoded public-domain Mutopia Project engravings
+  through a new scripts/midiToCatalog.ts pipeline (improving the MIDI importer's
+  hand assignment along the way). You now have Burgmüller's La Candeur,
+  Arabesque and Ballade, Tchaikovsky's Old French Song, Schumann's Melody and
+  Wild Horseman, the complete first movement of Clementi's Op. 36 No. 1,
+  Gymnopédie No. 1, and the Maple Leaf Rag A strain. The plan's folk tunes
+  (Scarborough Fair, Greensleeves) and Handy/Grieg were dropped — no reliable
+  source data, and I didn't want approximations in the catalog; the transcode
+  script makes them cheap to add later.
+  - Voice control learned "piano, open the guide" and "piano, show stage two"
+  (plus the previously missing ear/rhythm/songs navigation), validated against
+  the real MiniLM embedding model.
+
+  One small judgment call to flag: I renamed the Ear Training nav entry to
+  Quizzes at /quizzes (old /ear links still work). Shout if you'd rather keep
+  the old name.
+
+✻ Churned for 1h 18m 54s
+
+※ recap: Goal: take the piano app from beginner to intermediate. All seven phases are done, committed, and verified: learning guide, deep links, new technique lessons, 11 quiz modes, nine real pieces, GUIDE.md export. Next action: none, unless you want changes.

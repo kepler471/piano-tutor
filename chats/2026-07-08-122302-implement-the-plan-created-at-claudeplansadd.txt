@@ -1,0 +1,1417 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.204
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+
+❯ Implement the plan created at                                                 
+  ~/.claude/plans/add-some-detailed-theory-playful-crystal.md                   
+
+⏺ I'll read the existing plan file first.
+
+  Searched for 3 patterns, read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: 
+     ~/.claude/plans/implement-the-plan-created-adaptive-minsky.md · /plan to 
+     edit
+     Implement: Circle of Fifths (theory content, interactive screen, quiz mode)
+
+     Context
+
+     Execute the already-approved plan at
+     ~/.claude/plans/add-some-detailed-theory-playful-crystal.md. The app's
+     learning guide only mentions the circle of fifths in passing; the user
+     wants detailed theory content, an interactive screen, and a quiz mode. The
+     gemb0y/piano-scales poster is CC-BY-NC-ND, so it is linked as an external
+     resource only — all in-app content is original.
+
+     I re-verified the plan's key anchors against the worktree; everything
+     holds, with one correction:
+
+     - Step 6 correction: SCREEN_NAME_FOR_ROUTE and the navigate-route union
+     both live in src/lib/voice/intents.ts (line 13 route union, line 49 map),
+     not dispatcher.ts. Both edits happen in intents.ts; dispatcher.ts needs no
+     change.
+
+     Verified anchors:
+     - src/lib/theory/quiz.ts:103-128 — SHARP_ORDER/FLAT_ORDER (unicode ♯/♭
+     spellings), SHARP_COUNTS/FLAT_COUNTS, RELATIVE_MINOR (private),
+     sigAccidentals() (exported), KEY_SIGNATURE_LEVELS.
+     - src/lib/theory/scales.ts:5-6 — MAJOR_ROOTS already in fifths order (C G D
+     A E B F# Db Ab Eb Bb F); MINOR_ROOTS for chroma-matching relative-minor
+     spellings.
+     - src/lib/quiz/modes.ts — QuizModeId union + QUIZ_LEVEL_COUNTS.
+     - src/lib/voice/parser.ts:187 NAV_TARGETS, :401 staticWords in
+     buildGrammar.
+     - src/tests/guide.test.ts:17 KNOWN_ROUTES.
+     - Components: PianoKeyboard.svelte (SVG pattern), SheetMusic.svelte,
+     GlossText.svelte, BackToGuide.svelte all exist.
+
+     Steps (per the source plan, implementation order: model → quiz → 
+     wheel/screen → voice → glossary → guide + regen, tests alongside)
+
+     1. Pure model — new src/lib/theory/circle.ts
+
+     Move SHARP_ORDER, FLAT_ORDER, SHARP_COUNTS, FLAT_COUNTS, RELATIVE_MINOR,
+     sigAccidentals() from quiz.ts into it; quiz.ts re-exports sigAccidentals
+     (export { sigAccidentals } from './circle') so theoryQuiz.test.ts imports
+     keep working. KEY_SIGNATURE_LEVELS stays in quiz.ts.
+
+     New exports:
+     export interface CircleKey {
+       index: number            // 0–11 clockwise from C
+       major: string            // MAJOR_ROOTS spelling ('F#', 'Db', …)
+       minor: string            // display relative minor ('D#' for F#)
+       minorScaleRoot: string   // spelling resolvable in the scales library 
+     ('Eb' for F# major)
+       accidentals: { kind: 'sharps'|'flats'|'none'; names: string[] }
+       enharmonic?: string      // 'Gb' on the F# slot
+     }
+     export const CIRCLE_KEYS: CircleKey[]
+     export function fifthUp(major: string): string
+     export function fifthDown(major: string): string
+     export function neighborsOf(major: string): [string, string]  // [fifth 
+     down, fifth up]
+     minorScaleRoot via chroma-matching RELATIVE_MINOR[major] against
+     MINOR_ROOTS (tonal Note.chroma). Pure — no DOM (CLAUDE.md convention).
+     Handles the D♯/E♭ seam.
+
+     2. Quiz mode
+
+     - src/lib/quiz/modes.ts: add 'circle-of-fifths' to QuizModeId;
+     QUIZ_LEVEL_COUNTS['circle-of-fifths'] = 4.
+     - src/lib/theory/quiz.ts: CircleQuestion { kind:'circle-of-fifths'; prompt;
+     keySignature?; answer; options; explanation } + makeCircleQuestion(level, 
+     rng = Math.random) using existing helpers (clampLevel, pick, makeOptions,
+     injectable Rng, ♯/♭ unicode). Levels:
+       a. Neighbours (keys ≤3 accidentals) — "Which key is a fifth up from D?"
+       b. Accidental counts, both directions (all keys) — explanation lists
+     exact accidentals via sigAccidentals + last-sharp / second-to-last-flat
+     tricks.
+       c. Relative minors, both directions, keySignature set so the staff
+     renders — three-semitones-below explanation.
+       d. Circle geometry — neighbour pairs, F♯=G♭ seam, which sharp is added
+     between adjacent keys (set difference of sigAccidentals).
+
+     3. Quizzes screen wiring — src/screens/Quizzes.svelte
+
+     Add CircleQuestion to the Question union; MODE_GROUPS "Reading & theory"
+     entry { id:'circle-of-fifths', label:'Circle of fifths', desc:'Fifths, key 
+     signatures and relative minors — navigate the clock of keys.', audio:false 
+     }; makeQuestion() case; visualScore case returning the rest-only staff ({ 
+     clef:'treble', keySignature, events:[{keys:[], duration:'w', rest:true}] })
+     when question.keySignature is set — same as 'key-signature'.
+
+     4. Wheel component — new src/components/CircleOfFifthsWheel.svelte
+
+     Original SVG modeled on PianoKeyboard.svelte (runes, viewBox, $derived.by).
+     Props { selected: string; onselect?: (major: string) => void; size?: 
+     number }. 12 annular-sector wedges at i*30 − 90° (C at 12 o'clock); outer
+     ring major labels (seam slot F♯/G♭), inner ring lowercase relative minors
+     (seam shows both), accidental-count badge (3♯, 2♭, –). Selected wedge
+     highlighted (app blue palette); wedges clickable + keyboard accessible
+     (role="button", tabindex, Enter, aria-label). Purely presentational — no
+     router/voice imports.
+
+     5. Screen — new src/screens/CircleOfFifths.svelte, route /circle
+
+     - selectedMajor = $state('C'); honor ?key= deep-link at mount (chroma-match
+     like ScalesLibrary).
+     - <BackToGuide />; wheel with onselect.
+     - Detail card ($derived from CIRCLE_KEYS): key-signature staff via
+     SheetMusic rest-only pattern; GlossText prose line; chip links (GuideScreen
+     .chip style) to #/scales?root=…&type=major, relative minor's natural-minor
+     scale (using minorScaleRoot), key-signature quiz, new circle quiz;
+     neighbour chips select on the wheel.
+     - Theory prose sections (local SECTIONS: {title, body}[] via GlossText):
+     why fifths / order of sharps & flats mirror / relative minors / nearest-key
+     modulation / the F♯-G♭ seam.
+     - Screen-scoped voice: registerVoiceCommands in $effect — bare-root
+     show-scale intents (non-explicit) select on the wheel with TTS confirmation
+     ("E flat major — three flats"; never contains "piano"); explicit "…scale"
+     utterances fall through to the dispatcher.
+     - src/App.svelte: nav link { route:'/circle', label:'Circle of 5ths' } +
+     {:else if route === '/circle'} branch.
+     - src/screens/Home.svelte: add a tile.
+
+     6. Voice navigation (cross-screen) — corrected file locations
+
+     - src/lib/voice/intents.ts: add '/circle' to the navigate route union (line
+     ~13) AND '/circle': 'the Circle of Fifths' to SCREEN_NAME_FOR_ROUTE (line
+     ~49).
+     - src/lib/voice/parser.ts: NAV_TARGETS entries 'circle of fifths',
+     'circle', 'fifths' → {kind:'navigate', route:'/circle'}; add circle, fifths
+     to buildGrammar staticWords.
+     - Optional: intentBank.ts template ("how are the keys related") → navigate
+     /circle.
+
+     7. Glossary — src/lib/data/glossary.ts
+
+     Two new entries (21–240 chars, lowercase ids): enharmonic (aliases:
+     enharmonics, enharmonic equivalent, enharmonically) and modulation
+     (aliases: modulate, modulates, modulating).
+
+     8. Guide prose — src/lib/data/guide.ts + regeneration
+
+     - Stage-2 "Key signatures" section (~line 305): expand body (order of
+     sharps, last-sharp trick, flats mirror); add link { kind:'route', 
+     route:'/circle', label:'See it on the circle of fifths' }.
+     - Stage-4: split "Seventh chords and the circle of fifths" into "Seventh
+     chords" + new dedicated "The circle of fifths" section; links to /circle,
+     quiz('circle-of-fifths', 1, …), quiz('key-signature', 3, …).
+     - Stage-5 ii–V–I section: tie "around the circle" to falling-fifth
+     (anticlockwise) motion; links to /circle and quiz('circle-of-fifths', 4, 
+     …).
+     - New stage-4 resource: gemb0y/piano-scales GitHub link, noting CC BY-NC-ND
+     (view/print only). Link only, no embedding.
+     - Regenerate docs/GUIDE.md: npm run guide:md.
+
+     9. Tests
+
+     - src/tests/guide.test.ts: add '/circle' to KNOWN_ROUTES (line 17).
+     - New src/tests/circle.test.ts: 12 entries matching MAJOR_ROOTS order;
+     accidental invariant (index ≤6 → index sharps, else 12−index flats);
+     relative-minor chroma −3 for all 12; getScale(major,'major') and
+     getScale(minorScaleRoot,'natural minor') never throw;
+     fifthUp/fifthDown/neighborsOf chroma distances + round-trips;
+     sigAccidentals re-export from quiz.ts works.
+     - src/tests/theoryQuiz.test.ts: describe('makeCircleQuestion') with
+     existing seededRng/expectValidOptions helpers — per-level shape assertions;
+     level count matches QUIZ_LEVEL_COUNTS.
+     - src/tests/voiceParser.test.ts: nav cases for "circle of fifths" / "show
+     me the circle of fifths".
+
+     Verification
+
+     1. npm test — all suites, including new circle.test.ts and the voice-phrase
+     mimicry invariant (voicePhrases.test.ts) if example phrases are added.
+     2. npm run guide:md then npm test again (GUIDE.md integrity test).
+     3. npm run check — svelte-check + tsc (exhaustiveness of QuizModeId and
+     route unions).
+     4. Manual npm run dev walkthrough: Home tile → /circle; click around the
+     wheel (seam shows F♯/G♭, d♯/e♭); staff updates; scale chips resolve (D♯→E♭
+     seam); Quizzes → Circle of fifths levels 1–4 (staff on level 3); voice
+     "piano, circle of fifths" navigates, "piano, e flat" selects; guide stage
+     2/4/5 chips deep-link.
+
+⏺ Plan approved. Starting with the pure model — reading the source files first.
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ I'll track this multi-step implementation with tasks.
+
+⏺ Now writing the pure model:
+⏺ Write(.claude/worktrees/circle-of-fifths/src/lib/theory/circle.ts)
+  ⎿  Wrote 81 lines to
+     .claude/worktrees/circle-of-fifths/src/lib/theory/circle.ts
+       1 import { Note } from 'tonal'
+       2 import { MAJOR_ROOTS, MINOR_ROOTS } from './scales'
+       4 /**
+       5  * Circle-of-fifths model — the canonical home of key-signature 
+         facts.
+         rcle screen
+       7  * both consume this.
+       8  */
+      10 export const SHARP_ORDER = ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯', 
+         'B♯']
+     … +90 lines (ctrl+o to expand)
+
+⏺ Now update quiz.ts to import from circle.ts and re-export sigAccidentals:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/theory/quiz.ts)
+  ⎿  Added 1 line, removed 18 lines
+      100    explanation: string
+      101  }
+      102  
+      103 -const SHARP_ORDER = ['F♯', 'C♯', 'G♯', 'D♯', 'A♯', 'E♯', 'B♯']
+      104 -const FLAT_ORDER = ['B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭', 'F♭'] 
+      105 -const SHARP_COUNTS: Record<string, number> = { C: 0, G: 1, D: 
+          -2, A: 3, E: 4, B: 5, 'F#': 6 }                                
+      106 -const FLAT_COUNTS: Record<string, number> = { F: 1, Bb: 2, Eb:
+          - 3, Ab: 4, Db: 5 }                                            
+      103 +export { sigAccidentals } from './circle'                     
+      104  
+      108 -/** The accidentals a major key's signature carries, in signat
+          -ure order. */                                                 
+      109 -export function sigAccidentals(major: string): { kind: 'sharps
+          -' | 'flats' | 'none'; names: string[] } {                     
+      110 -  const sharps = SHARP_COUNTS[major]                          
+      111 -  if (sharps !== undefined) {                                 
+      112 -    return sharps === 0 ? { kind: 'none', names: [] } : { kind
+          -: 'sharps', names: SHARP_ORDER.slice(0, sharps) }             
+      113 -  }                                                           
+      114 -  return { kind: 'flats', names: FLAT_ORDER.slice(0, FLAT_COUN
+          -TS[major]) }                                                  
+      115 -}                                                             
+      116 -                                                              
+      105  /** Majors ordered by accidental count; minors mirror them at 
+           level 4. */
+      106  export const KEY_SIGNATURE_LEVELS: string[][] = [
+      107    ['C', 'G', 'D', 'F', 'Bb'],
+     ...
+      110    ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 
+           'Db'], // asked as minors
+      111  ]
+      112  
+      125 -const RELATIVE_MINOR: Record<string, string> = {              
+      126 -  C: 'A', G: 'E', D: 'B', A: 'F#', E: 'C#', B: 'G#', 'F#': 'D#
+          -',                                                            
+      127 -  F: 'D', Bb: 'G', Eb: 'C', Ab: 'F', Db: 'Bb',                
+      128 -}                                                             
+      129 -                                                              
+      113  export function makeKeySignatureQuestion(level: number, rng: R
+           ng = Math.random): KeySignatureQuestion {
+      114    const lv = clampLevel(level, KEY_SIGNATURE_LEVELS.length)
+      115    const set = KEY_SIGNATURE_LEVELS[lv - 1]
+
+⏺ quiz.ts still uses sigAccidentals and RELATIVE_MINOR internally — the
+  re-export doesn't bind them locally, so I need imports too:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/theory/quiz.ts)
+  ⎿  Added 1 line
+      1  import { Note } from 'tonal'
+      2  import { getChord } from './chords'
+      3 +import { CIRCLE_KEYS, RELATIVE_MINOR, fifthUp, neighborsOf, sigA
+        +ccidentals } from './circle'                                    
+      4  import {
+      5    CHORD_QUALITY_EXPLANATIONS,
+      6    INTERVAL_EXPLANATIONS,
+
+⏺ Now let me look at the existing test file to match its helpers and style:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now writing the circle model tests:
+
+⏺ Write(.claude/worktrees/circle-of-fifths/src/tests/circle.test.ts)
+  ⎿  Wrote 97 lines to
+     .claude/worktrees/circle-of-fifths/src/tests/circle.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { Note } from 'tonal'
+       3 import { CIRCLE_KEYS, fifthDown, fifthUp, neighborsOf } from '..
+       4 import { sigAccidentals } from '../lib/theory/quiz'
+       5 import { MAJOR_ROOTS, getScale } from '../lib/theory/scales'
+       6 
+       7 describe('CIRCLE_KEYS', () => {
+       8   it('has 12 entries matching MAJOR_ROOTS in fifths order', () =
+       9     expect(CIRCLE_KEYS).toHaveLength(12)
+      10     expect(CIRCLE_KEYS.map((k) => k.major)).toEqual(MAJOR_ROOTS)
+     … +102 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Model tests pass. Marking task 1 done and moving to the quiz mode.
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/quiz/modes.ts)
+  ⎿  Added 1 line
+      13    // reading & theory
+      14    | 'note-naming'
+      15    | 'key-signature'
+      16 +  | 'circle-of-fifths'                                         
+      17    | 'interval-staff'
+      18    | 'chord-spelling'
+      19    | 'chord-function'
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/quiz/modes.ts)
+  ⎿  Added 1 line
+      28    'rhythm-dictation': 4,
+      29    'note-naming': 4,
+      30    'key-signature': 4,
+      31 +  'circle-of-fifths': 4,                                       
+      32    'interval-staff': 4,
+      33    'chord-spelling': 3,
+      34    'chord-function': 3,
+
+⏺ Now the generator in quiz.ts — appending after makeKeySignatureQuestion:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/theory/quiz.ts)
+  ⎿  Added 1 line, removed 1 line
+      1  import { Note } from 'tonal'
+      2  import { getChord } from './chords'
+      3 -import { CIRCLE_KEYS, RELATIVE_MINOR, fifthUp, neighborsOf, sigA
+        -ccidentals } from './circle'                                    
+      3 +import { CIRCLE_KEYS, RELATIVE_MINOR, SHARP_ORDER, fifthDown, fi
+        +fthUp, neighborsOf, sigAccidentals } from './circle'            
+      4  import {
+      5    CHORD_QUALITY_EXPLANATIONS,
+      6    INTERVAL_EXPLANATIONS,
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/theory/quiz.ts)
+  ⎿  Added 147 lines
+      148    }
+      149  }
+      150  
+      151 +// --- the circle of fifths ---                               
+      152 +                                                              
+      153 +export interface CircleQuestion {                             
+      154 +  kind: 'circle-of-fifths'                                    
+      155 +  prompt: string                                              
+      156 +  /** Set when the staff should render the signature under dis
+          +cussion (relative-minor level). */                            
+      157 +  keySignature?: string                                       
+      158 +  answer: string                                              
+      159 +  options: string[]                                           
+      160 +  explanation: string                                         
+      161 +}                                                             
+      162 +                                                              
+      163 +const uni = (name: string) => name.replace('#', '♯').replace('
+          +b', '♭')                                                      
+      164 +const majorLabel = (root: string) => `${uni(root)} major`     
+      165 +                                                              
+      166 +/** Prompt keys for the neighbours level — nothing past three 
+          +accidentals. */                                               
+      167 +const EASY_CIRCLE_KEYS = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb']
+      168 +                                                              
+      169 +export const CIRCLE_LEVEL_COUNT = 4                           
+      170 +                                                              
+      171 +export function makeCircleQuestion(level: number, rng: Rng = M
+          +ath.random): CircleQuestion {                                 
+      172 +  const lv = clampLevel(level, CIRCLE_LEVEL_COUNT)            
+      173 +  const allMajors = CIRCLE_KEYS.map((k) => majorLabel(k.major)
+          +)                                                             
+      174 +                                                              
+      175 +  if (lv === 1) {                                             
+      176 +    // Neighbours: one step clockwise or anticlockwise.       
+      177 +    const key = pick(EASY_CIRCLE_KEYS, rng)                   
+      178 +    const up = rng() < 0.5                                    
+      179 +    const target = up ? fifthUp(key) : fifthDown(key)         
+      180 +    const answer = majorLabel(target)                         
+      181 +    return {                                                  
+      182 +      kind: 'circle-of-fifths',                               
+      183 +      prompt: `On the circle of fifths, which key is a fifth $
+          +{up ? 'up' : 'down'} from ${majorLabel(key)}?`,               
+      184 +      answer,                                                 
+      185 +      options: makeOptions(allMajors, answer, 4, rng),        
+      186 +      explanation:                                            
+      187 +        `A fifth ${up ? 'up' : 'down'} from ${uni(key)} is ${u
+          +ni(target)} — one step ${up ? 'clockwise, adding one sharp (or
+          + dropping one flat)' : 'anticlockwise, adding one flat (or dro
+          +pping one sharp)'}. ` +                                       
+      188 +        'Neighbouring keys share six of their seven notes.',  
+      189 +    }                                                         
+      190 +  }                                                           
+      191 +                                                              
+      192 +  if (lv === 2) {                                             
+      193 +    // Accidental counts, asked in both directions.           
+      194 +    const k = pick(CIRCLE_KEYS.filter((c) => c.accidentals.kin
+          +d !== 'none'), rng)                                           
+      195 +    const acc = k.accidentals                                 
+      196 +    const word = acc.kind === 'sharps' ? 'sharp' : 'flat'     
+      197 +    const n = acc.names.length                                
+      198 +    const explanation =                                       
+      199 +      `${majorLabel(k.major)} has ${n} ${word}${n === 1 ? '' :
+          + 's'}: ${acc.names.join(', ')}. ` +                           
+      200 +      (acc.kind === 'sharps'                                  
+      201 +        ? 'Sharps always arrive in the fixed order F–C–G–D–A–E
+          +–B, and the last sharp sits one semitone below the key name.' 
+      202 +        : 'Flats arrive in the mirror order B–E–A–D–G–C–F, and
+          + the second-to-last flat names the key.')                     
+      203 +    if (rng() < 0.5) {                                        
+      204 +      const answer = String(n)                                
+      205 +      return {                                                
+      206 +        kind: 'circle-of-fifths',                             
+      207 +        prompt: `How many ${word}s does ${majorLabel(k.major)}
+          + have?`,                                                      
+      208 +        answer,                                               
+      209 +        options: makeOptions(['1', '2', '3', '4', '5', '6'], a
+          +nswer, 4, rng),                                               
+      210 +        explanation,                                          
+      211 +      }                                                       
+      212 +    }                                                         
+      213 +    const answer = majorLabel(k.major)                        
+      214 +    return {                                                  
+      215 +      kind: 'circle-of-fifths',                               
+      216 +      prompt: `Which major key has ${n} ${word}${n === 1 ? '' 
+          +: 's'}?`,                                                     
+      217 +      answer,                                                 
+      218 +      options: makeOptions(allMajors, answer, 4, rng),        
+      219 +      explanation,                                            
+      220 +    }                                                         
+      221 +  }                                                           
+      222 +                                                              
+      223 +  if (lv === 3) {                                             
+      224 +    // Relative minors (the inner ring), with the signature on
+          + the staff.                                                   
+      225 +    const k = pick(CIRCLE_KEYS, rng)                          
+      226 +    const toMinor = rng() < 0.5                               
+      227 +    const minorName = `${uni(k.minor)} minor`                 
+      228 +    const explanation =                                       
+      229 +      `${minorName} is the relative minor of ${majorLabel(k.ma
+          +jor)} — the same key signature, with its tonic three semitones
+          + below. ` +                                                   
+      230 +      'On the circle it sits directly inside its major, on the
+          + inner ring.'                                                 
+      231 +    if (toMinor) {                                            
+      232 +      return {                                                
+      233 +        kind: 'circle-of-fifths',                             
+      234 +        prompt: `Which minor key shares this key signature wit
+          +h ${majorLabel(k.major)}?`,                                   
+      235 +        keySignature: k.major,                                
+      236 +        answer: minorName,                                    
+      237 +        options: makeOptions(CIRCLE_KEYS.map((c) => `${uni(c.m
+          +inor)} minor`), minorName, 4, rng),                           
+      238 +        explanation,                                          
+      239 +      }                                                       
+      240 +    }                                                         
+      241 +    const answer = majorLabel(k.major)                        
+      242 +    return {                                                  
+      243 +      kind: 'circle-of-fifths',                               
+      244 +      prompt: `${minorName} is the relative minor of which maj
+          +or key?`,                                                     
+      245 +      keySignature: k.major,                                  
+      246 +      answer,                                                 
+      247 +      options: makeOptions(allMajors, answer, 4, rng),        
+      248 +      explanation,                                            
+      249 +    }                                                         
+      250 +  }                                                           
+      251 +                                                              
+      252 +  // Level 4 — circle geometry: neighbour pairs, the enharmoni
+          +c seam, the added sharp.                                      
+      253 +  const variant = pick(['neighbours', 'seam', 'added-sharp'] a
+          +s const, rng)                                                 
+      254 +  if (variant === 'neighbours') {                             
+      255 +    const k = pick(CIRCLE_KEYS, rng)                          
+      256 +    const [down, up] = neighborsOf(k.major)                   
+      257 +    const pairLabel = (a: string, b: string) => `${uni(a)} and
+          + ${uni(b)}`                                                   
+      258 +    const answer = pairLabel(down, up)                        
+      259 +    const pool = CIRCLE_KEYS.map((c) => pairLabel(...neighbors
+          +Of(c.major)))                                                 
+      260 +    return {                                                  
+      261 +      kind: 'circle-of-fifths',                               
+      262 +      prompt: `Which two keys sit either side of ${majorLabel(
+          +k.major)} on the circle?`,                                    
+      263 +      answer,                                                 
+      264 +      options: makeOptions(pool, answer, 4, rng),             
+      265 +      explanation:                                            
+      266 +        `${uni(down)} and ${uni(up)} are ${uni(k.major)}'s nei
+          +ghbours — each shares six of its seven notes. ` +             
+      267 +        'That overlap is why music most often modulates one st
+          +ep around the circle.',                                       
+      268 +    }                                                         
+      269 +  }                                                           
+      270 +  if (variant === 'seam') {                                   
+      271 +    const answer = 'G♭ major'                                 
+      272 +    return {                                                  
+      273 +      kind: 'circle-of-fifths',                               
+      274 +      prompt: 'At six o\'clock the sharp and flat sides of the
+          + circle meet. F♯ major is the same key as…?',                 
+      275 +      answer,                                                 
+      276 +      options: makeOptions(['G♭ major', 'E♯ major', 'G major',
+          + 'F major', 'D♭ major'], answer, 4, rng),                     
+      277 +      explanation:                                            
+      278 +        'F♯ major (six sharps) and G♭ major (six flats) are en
+          +harmonic — the same piano keys spelled two ways. ' +          
+      279 +        'Composers pick whichever spelling is easier to read.'
+          +,                                                             
+      280 +    }                                                         
+      281 +  }                                                           
+      282 +  // added-sharp: set difference between adjacent signatures o
+          +n the sharp side.                                             
+      283 +  const k = pick(CIRCLE_KEYS.filter((c) => c.index < 6), rng) 
+      284 +  const next = fifthUp(k.major)                               
+      285 +  const here = new Set(sigAccidentals(k.major).names)         
+      286 +  const answer = sigAccidentals(next).names.find((n) => !here.
+          +has(n))!                                                      
+      287 +  return {                                                    
+      288 +    kind: 'circle-of-fifths',                                 
+      289 +    prompt: `Going clockwise from ${majorLabel(k.major)} to ${
+          +majorLabel(next)}, which sharp is added?`,                    
+      290 +    answer,                                                   
+      291 +    options: makeOptions(SHARP_ORDER, answer, 4, rng),        
+      292 +    explanation:                                              
+      293 +      `Each clockwise step keeps every accidental and adds the
+          + next sharp in the fixed order F–C–G–D–A–E–B. ` +             
+      294 +      `${majorLabel(next)} takes everything from ${majorLabel(
+          +k.major)} and adds ${answer}.`,                               
+      295 +  }                                                           
+      296 +}                                                             
+      297 +                                                              
+      298  // --- intervals on the staff (visual twin of the ear quiz) --
+           -
+      299  
+      300  export interface IntervalStaffQuestion {
+
+⏺ Now the tests for makeCircleQuestion in theoryQuiz.test.ts:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/theoryQuiz.test.ts)
+  ⎿  Added 2 lines
+       4  import { getChord } from '../lib/theory/chords'
+       5  import {
+       6    CHORD_SPELLING_LEVELS,
+       7 +  CIRCLE_LEVEL_COUNT,                                          
+       8    KEY_SIGNATURE_LEVELS,
+       9    NOTE_NAMING_LEVELS,
+      10    makeChordFunctionQuestion,
+      11    makeChordSpellingQuestion,
+      12 +  makeCircleQuestion,                                          
+      13    makeIntervalStaffQuestion,
+      14    makeKeySignatureQuestion,
+      15    makeNoteNamingQuestion,
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/theoryQuiz.test.ts)
+  ⎿  Added 81 lines
+      101    })
+      102  })
+      103  
+      104 +describe('makeCircleQuestion', () => {                        
+      105 +  const chromaOf = (label: string) => Note.chroma(label.replac
+          +e(' major', '').replace(' minor', '').replace('♯', '#').replac
+          +e('♭', 'b'))!                                                 
+      106 +                                                              
+      107 +  it('level 1 answers sit a fifth away from the asked key', ()
+          + => {                                                         
+      108 +    for (const seed of seeds) {                               
+      109 +      const q = makeCircleQuestion(1, seededRng(seed))        
+      110 +      expectValidOptions(q.options, q.answer)                 
+      111 +      const m = /fifth (up|down) from (\S+) major\?/.exec(q.pr
+          +ompt)!                                                        
+      112 +      const [, dir, key] = m                                  
+      113 +      const expected = dir === 'up' ? 7 : 5                   
+      114 +      expect((chromaOf(q.answer) - chromaOf(key) + 12) % 12).t
+          +oBe(expected)                                                 
+      115 +    }                                                         
+      116 +  })                                                          
+      117 +                                                              
+      118 +  it('level 2 counts match sigAccidentals in both question dir
+          +ections', () => {                                             
+      119 +    for (const seed of seeds) {                               
+      120 +      const q = makeCircleQuestion(2, seededRng(seed))        
+      121 +      expectValidOptions(q.options, q.answer)                 
+      122 +      const asCount = /How many (sharp|flat)s does (\S+) major
+          + have\?/.exec(q.prompt)                                       
+      123 +      if (asCount) {                                          
+      124 +        const [, kind, key] = asCount                         
+      125 +        const acc = sigAccidentals(key.replace('♯', '#').repla
+          +ce('♭', 'b'))                                                 
+      126 +        expect(acc.kind).toBe(`${kind}s`)                     
+      127 +        expect(q.answer).toBe(String(acc.names.length))       
+      128 +      } else {                                                
+      129 +        const m = /Which major key has (\d) (sharp|flat)s?\?/.
+          +exec(q.prompt)!                                               
+      130 +        const [, n, kind] = m                                 
+      131 +        const acc = sigAccidentals(q.answer.replace(' major', 
+          +'').replace('♯', '#').replace('♭', 'b'))                      
+      132 +        expect(acc.kind).toBe(`${kind}s`)                     
+      133 +        expect(acc.names.length).toBe(Number(n))              
+      134 +      }                                                       
+      135 +    }                                                         
+      136 +  })                                                          
+      137 +                                                              
+      138 +  it('level 3 sets the staff signature and keeps the minor thr
+          +ee semitones below', () => {                                  
+      139 +    for (const seed of seeds) {                               
+      140 +      const q = makeCircleQuestion(3, seededRng(seed))        
+      141 +      expectValidOptions(q.options, q.answer)                 
+      142 +      expect(q.keySignature).toBeTruthy()                     
+      143 +      const majorChroma = Note.chroma(q.keySignature!)!       
+      144 +      const minorLabel = q.answer.endsWith('minor')           
+      145 +        ? q.answer                                            
+      146 +        : /^(\S+) minor/.exec(q.prompt)![0]                   
+      147 +      expect((majorChroma - chromaOf(minorLabel) + 12) % 12).t
+          +oBe(3)                                                        
+      148 +      if (!q.answer.endsWith('minor')) {                      
+      149 +        expect(q.answer).toBe(`${q.keySignature} major`.replac
+          +e('#', '♯').replace('b', '♭'))                                
+      150 +      }                                                       
+      151 +    }                                                         
+      152 +  })                                                          
+      153 +                                                              
+      154 +  it('level 4 geometry answers are consistent with the circle 
+          +model', () => {                                               
+      155 +    for (const seed of seeds) {                               
+      156 +      const q = makeCircleQuestion(4, seededRng(seed))        
+      157 +      expectValidOptions(q.options, q.answer)                 
+      158 +      const neighbours = /either side of (\S+) major/.exec(q.p
+          +rompt)                                                        
+      159 +      const added = /clockwise from (\S+) major to (\S+) major
+          +/.exec(q.prompt)                                              
+      160 +      if (neighbours) {                                       
+      161 +        const key = neighbours[1]                             
+      162 +        const [a, b] = q.answer.split(' and ')                
+      163 +        expect((chromaOf(key) - chromaOf(a) + 12) % 12).toBe(7
+          +)                                                             
+      164 +        expect((chromaOf(b) - chromaOf(key) + 12) % 12).toBe(7
+          +)                                                             
+      165 +      } else if (added) {                                     
+      166 +        // The added accidental is the new key's last sharp.  
+      167 +        const acc = sigAccidentals(added[2].replace('♯', '#').
+          +replace('♭', 'b'))                                            
+      168 +        expect(acc.names[acc.names.length - 1]).toBe(q.answer)
+      169 +      } else {                                                
+      170 +        expect(q.prompt).toContain('F♯ major')                
+      171 +        expect(q.answer).toBe('G♭ major')                     
+      172 +      }                                                       
+      173 +    }                                                         
+      174 +  })                                                          
+      175 +                                                              
+      176 +  it('every level carries a teaching explanation', () => {    
+      177 +    for (const level of [1, 2, 3, 4]) {                       
+      178 +      for (const seed of seeds) {                             
+      179 +        expect(makeCircleQuestion(level, seededRng(seed)).expl
+          +anation.length).toBeGreaterThan(20)                           
+      180 +      }                                                       
+      181 +    }                                                         
+      182 +  })                                                          
+      183 +})                                                            
+      184 +                                                              
+      185  describe('makeIntervalStaffQuestion', () => {
+      186    it('answer names the rendered interval, always ascending', (
+           ) => {
+      187      for (const level of [1, 2, 3, 4]) {
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/theoryQuiz.test.ts)  ⎿  Added 1 line
+      354    it('level counts match the generator level tables', () => {
+      355      expect(QUIZ_LEVEL_COUNTS['note-naming']).toBe(NOTE_NAMING_
+           LEVELS.length)
+      356      expect(QUIZ_LEVEL_COUNTS['key-signature']).toBe(KEY_SIGNAT
+           URE_LEVELS.length)
+      357 +    expect(QUIZ_LEVEL_COUNTS['circle-of-fifths']).toBe(CIRCLE_
+          +LEVEL_COUNT)                                                  
+      358      expect(QUIZ_LEVEL_COUNTS['chord-spelling']).toBe(CHORD_SPE
+           LLING_LEVELS.length)
+      359    })
+      360  })
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Quizzes.svelte)
+  ⎿  Added 2 lines
+      21    import {
+      22      makeChordFunctionQuestion,
+      23      makeChordSpellingQuestion,
+      24 +    makeCircleQuestion,                                        
+      25      makeIntervalStaffQuestion,
+      26      makeKeySignatureQuestion,
+      27      makeNoteNamingQuestion,
+      28      type ChordFunctionQuestion,
+      29      type ChordSpellingQuestion,
+      30 +    type CircleQuestion,                                       
+      31      type IntervalStaffQuestion,
+      32      type KeySignatureQuestion,
+      33      type NoteNamingQuestion,
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      48      | CadenceQuestion
+      49      | NoteNamingQuestion
+      50      | KeySignatureQuestion
+      51 +    | CircleQuestion                                           
+      52      | IntervalStaffQuestion
+      53      | ChordSpellingQuestion
+      54      | ChordFunctionQuestion
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      79        modes: [
+      80          { id: 'note-naming', label: 'Name the note', desc: 'A n
+          ote on the staff — what is it called?', audio: false },
+      81          { id: 'key-signature', label: 'Key signatures', desc: '
+          Read the sharps and flats — which key are you in?', audio: fals
+          e },
+      82 +        { id: 'circle-of-fifths', label: 'Circle of fifths', de
+         +sc: 'Fifths, key signatures and relative minors — navigate the 
+         +clock of keys.', audio: false },                               
+      83          { id: 'interval-staff', label: 'Intervals on the staff'
+          , desc: 'Two written notes — name the interval by sight.', audi
+          o: false },
+      84          { id: 'chord-spelling', label: 'Spell the chord', desc:
+           'A chord symbol — pick the notes that build it.', audio: false
+           },
+      85          { id: 'chord-function', label: 'Chord functions', desc:
+           'Which chord is V in G major? Harmony as the Romans wrote it.'
+          , audio: false },
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Quizzes.svelte)
+  ⎿  Added 1 line
+      153        case 'rhythm-dictation': return makeRhythmDictationQuest
+           ion(level)
+      154        case 'note-naming': return makeNoteNamingQuestion(level)
+      155        case 'key-signature': return makeKeySignatureQuestion(le
+           vel)
+      156 +      case 'circle-of-fifths': return makeCircleQuestion(level
+          +)                                                             
+      157        case 'interval-staff': return makeIntervalStaffQuestion(
+           level)
+      158        case 'chord-spelling': return makeChordSpellingQuestion(
+           level)
+      159        case 'chord-function': return makeChordFunctionQuestion(
+           level)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Quizzes.svelte)
+  ⎿  Added 8 lines
+      228            keySignature: question.keySignature,
+      229            events: [{ keys: [], duration: 'w', rest: true }],
+      230          }
+      231 +      case 'circle-of-fifths':                                
+      232 +        // Only the relative-minor level carries a signature t
+          +o show.                                                       
+      233 +        if (!question.keySignature) return null               
+      234 +        return {                                              
+      235 +          clef: 'treble',                                     
+      236 +          keySignature: question.keySignature,                
+      237 +          events: [{ keys: [], duration: 'w', rest: true }],  
+      238 +        }                                                     
+      239        case 'interval-staff':
+      240          return {
+      241            clef: 'treble',
+
+⏺ Now the wheel and screen. Reading the reference components:
+
+  Searched for 1 pattern, read 5 files (ctrl+o to expand)
+
+⏺ Now let me read the voice layer files, since both the screen scope and
+  navigation need them:
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ Now checking the router's param encoding (the F# root in URLs needs care) and
+  guideHref:
+
+  Searched for 1 pattern, read 4 files (ctrl+o to expand)
+
+⏺ I have all the patterns I need. Writing the wheel component:
+
+⏺ Write(.claude/worktrees/circle-of-fifths/src/components/CircleOfFifthsWheel.sv
+       elte)
+  ⎿  Wrote 171 lines to .claude/worktrees/circle-of-fifths/src/components/C
+     ircleOfFifthsWheel.svelte
+       1 <script lang="ts">
+       2   import { CIRCLE_KEYS, type CircleKey } from '../lib/theory/cir
+         cle'
+       4   let {
+       5     selected,
+       6     onselect,
+       7     size = 420,
+       8   }: {
+         Db', …). */
+      10     selected: string
+     … +178 lines (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/phrases.ts)
+  ⎿  Added 1 line
+      26    'Lesson': ['demo', 'restart', 'next part', 'metronome on at e
+          ighty', 'slower / faster', 'start listening'],
+      27    'Free Play': ['melody mode / chord mode', 'start listening', 
+          'record at one hundred', 'stop recording', 'clear', 'copy the n
+          otes'],
+      28    'Guide': ['show stage two', 'open stage four'],
+      29 +  'Circle': ['show me e flat', 'b major', 'go back'],          
+      30    'Quizzes': ['hear it again', 'next'],
+      31    'Note Detector': ['start listening', 'stop listening'],
+      32  }
+
+⏺ Write(.claude/worktrees/circle-of-fifths/src/screens/CircleOfFifths.svelte)
+  ⎿  Wrote 265 lines to
+     .claude/worktrees/circle-of-fifths/src/screens/CircleOfFifths.svelte
+       1 <script lang="ts">
+       2   import { Note } from 'tonal'
+       3   import BackToGuide from '../components/BackToGuide.svelte'
+         heel.svelte'
+       5   import GlossText from '../components/GlossText.svelte'
+       6   import SheetMusic from '../components/SheetMusic.svelte'
+       7   import { buildHash } from '../lib/routing'
+       8   import { CIRCLE_KEYS, neighborsOf, type CircleKey } from '../l
+       9   import type { ScoreModel } from '../lib/notation/vexScore'
+      10   import { SCOPE_PHRASES } from '../lib/voice/phrases'
+     … +313 lines (ctrl+o to expand)
+
+⏺ Now wiring App.svelte route + nav and the Home tile:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/App.svelte)  ⎿  Added 1 line
+       5    import Home from './screens/Home.svelte'
+       6    import GuideScreen from './screens/GuideScreen.svelte'
+       7    import ScalesLibrary from './screens/ScalesLibrary.svelte'
+       8 +  import CircleOfFifths from './screens/CircleOfFifths.svelte' 
+       9    import ChordsLibrary from './screens/ChordsLibrary.svelte'
+      10    import Practice from './screens/Practice.svelte'
+      11    import Quizzes from './screens/Quizzes.svelte'
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/App.svelte)
+  ⎿  Added 1 line
+      19      { route: '/guide', label: 'Guide' },
+      20      { route: '/scales', label: 'Scales' },
+      21      { route: '/chords', label: 'Chords' },
+      22 +    { route: '/circle', label: 'Circle of 5ths' },             
+      23      { route: '/practice', label: 'Practice' },
+      24      { route: '/quizzes', label: 'Quizzes' },
+      25      { route: '/rhythm', label: 'Rhythm' },
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/App.svelte)
+  ⎿  Added 2 lines
+      48      <ScalesLibrary />
+      49    {:else if route === '/chords'}
+      50      <ChordsLibrary />
+      51 +  {:else if route === '/circle'}                               
+      52 +    <CircleOfFifths />                                         
+      53    {:else if route === '/practice'}
+      54      <Practice />
+      55    {:else if route === '/quizzes' || route === '/ear'}
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/screens/Home.svelte)
+  ⎿  Added 5 lines
+      32        desc: 'Triads and 7th chords in every key and inversion, 
+          with notation and fingering.',
+      33      },
+      34      {
+      35 +      route: '/circle',                                        
+      36 +      title: 'Circle of Fifths',                               
+      37 +      desc: 'The map of the twelve keys — key signatures, relat
+         +ive minors and why music modulates where it does, on an interac
+         +tive wheel.',                                                  
+      38 +    },                                                         
+      39 +    {                                                          
+      40        route: '/practice',
+      41        title: 'Practice',
+      42        desc: 'Guided beginner routines — five-finger positions, 
+          Hanon, scales, cadences and sight-reading — with live feedback 
+          from your piano.',
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/intents.ts)
+  ⎿  Added 1 line, removed 1 line
+      10    | { kind: 'wake' } // wake word alone — "Yes?" + armed window
+      11    | {
+      12        kind: 'navigate'
+      13 -      route: '/' | '/guide' | '/scales' | '/chords' | '/practic
+         -e' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/t
+         -uner'                                                          
+      13 +      route: '/' | '/guide' | '/scales' | '/chords' | '/circle'
+         + | '/practice' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '
+         +/play' | '/tuner'                                              
+      14      }
+      15    | { kind: 'show-stage'; stage: number } // "show stage two" —
+           guide (cross-screen capable)
+      16    | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number
+           }
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/intents.ts)
+  ⎿  Added 1 line
+      55    '/songs': 'Songs',
+      56    '/scales': 'Scales',
+      57    '/chords': 'Chords',
+      58 +  '/circle': 'the Circle of Fifths',                           
+      59    '/practice': 'Practice',
+      60    '/play': 'Free Play',
+      61    '/tuner': 'Note Detector',
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/parser.ts)
+  ⎿  Added 3 lines
+      190    ['learning guide', { kind: 'navigate', route: '/guide' }],
+      191    ['scales', { kind: 'navigate', route: '/scales' }],
+      192    ['chords', { kind: 'navigate', route: '/chords' }],
+      193 +  ['circle of fifths', { kind: 'navigate', route: '/circle' }]
+          +,                                                             
+      194 +  ['circle', { kind: 'navigate', route: '/circle' }],         
+      195 +  ['fifths', { kind: 'navigate', route: '/circle' }],         
+      196    ['practice', { kind: 'navigate', route: '/practice' }],
+      197    ['ear training', { kind: 'navigate', route: '/ear' }],
+      198    ['quizzes', { kind: 'navigate', route: '/quizzes' }],
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/parser.ts)
+  ⎿  Added 1 line, removed 1 line
+      404    const staticWords = `
+      405      hey okay ok
+      406      go to open show me the a an of screen page
+      407 -    home scales chords practice free play tuner note detector 
+      407 +    home scales chords circle fifths practice free play tuner 
+          +note detector                                                 
+      408      guide learning stage stages ear training rhythm songs quiz
+           zes
+      409      start stop turn off on cancel quiet be help what can i say
+            you do commands
+      410      metronome tempo speed at set slower faster slow down up
+
+⏺ Now the voiceParser test cases. Let me check the existing nav tests:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/voiceParser.test.ts)
+  ⎿  Added 4 lines
+       94      ['piano open songs', '/songs'],
+       95      ['piano rhythm trainer', '/rhythm'],
+       96      ['piano go to rhythm', '/rhythm'],
+       97 +    ['piano circle of fifths', '/circle'],                    
+       98 +    ['piano show me the circle of fifths', '/circle'],        
+       99 +    ['piano open the circle', '/circle'],                     
+      100 +    ['piano fifths', '/circle'],                              
+      101    ]
+      102    for (const [phrase, route] of cases) {
+      103      it(phrase, () => {
+
+⏺ Now the optional intentBank template — checking its structure:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Adding the nav-circle template to the intent bank:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/voice/intentBank.ts)
+  ⎿  Added 5 lines
+      53      'i want to see the chords',
+      54      'where are all the chords',
+      55    ], { kind: 'navigate', route: '/chords' }),
+      56 +  fixed('nav-circle', [                                        
+      57 +    'how are the keys related',                                
+      58 +    'which keys go well together',                             
+      59 +    'show me the key relationships',                           
+      60 +  ], { kind: 'navigate', route: '/circle' }),                  
+      61    fixed('nav-practice', [
+      62      'i want to practice something now',
+      63      'what should i practice today',
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/voiceIntentBank.test.ts)
+  ⎿  Added 1 line
+      10    'nav-guide': 'navigate',
+      11    'nav-scales': 'navigate',
+      12    'nav-chords': 'navigate',
+      13 +  'nav-circle': 'navigate',                                    
+      14    'nav-practice': 'navigate',
+      15    'nav-play': 'navigate',
+      16    'nav-tuner': 'navigate',
+
+  Ran 1 shell command (ctrl+o to expand)
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/glossary.ts)
+  ⎿  Added 14 lines
+      288        'The clock of keys: each step clockwise adds a sharp (C→
+           G→D…), each step anticlockwise adds a flat. Neighbours share m
+           ost notes.',
+      289    },
+      290    {
+      291 +    id: 'enharmonic',                                         
+      292 +    term: 'Enharmonic',                                       
+      293 +    short:                                                    
+      294 +      'Two names for the same piano key: F♯ and G♭ sound ident
+          +ical. The circle of fifths meets itself at an enharmonic seam 
+          +at six o\'clock.',                                            
+      295 +    aliases: ['enharmonics', 'enharmonic equivalent', 'enharmo
+          +nically'],                                                    
+      296 +  },                                                          
+      297 +  {                                                           
+      298 +    id: 'modulation',                                         
+      299 +    term: 'Modulation',                                       
+      300 +    short:                                                    
+      301 +      'Changing key in the middle of a piece. Most modulations
+          + move to a neighbour on the circle of fifths, because those ke
+          +ys share all but one note.',                                  
+      302 +    aliases: ['modulate', 'modulates', 'modulating'],         
+      303 +  },                                                          
+      304 +  {                                                           
+      305      id: 'contrary motion',
+      306      term: 'Contrary motion',
+      307      short:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/guide.ts)
+  ⎿  Added 6 lines, removed 1 line
+      307            'A key signature at the start of each line tells you
+            which notes are always sharp or flat. ' +
+      308            'G major has one sharp (F♯); F major one flat (B♭); 
+           D major two sharps (F♯, C♯). Rather than ' +
+      309            'reading each accidental, think "I am in G, so every
+            F is sharp". Scales make key signatures ' +
+      310 -          'physical: your fingers learn where the black keys l
+          -ive in each key.',                                            
+      310 +          'physical: your fingers learn where the black keys l
+          +ive in each key. The sharps always arrive ' +                 
+      311 +          'in the same fixed order (F, C, G, D, A, E, B), so a
+          + signature is really just a count — and the ' +               
+      312 +          'last sharp always sits one semitone below the key n
+          +ame. Flats mirror this (B, E, A, D, G, C, F), ' +             
+      313 +          'and the second-to-last flat names the key. Keys arr
+          +anged by that count form the circle of ' +                    
+      314 +          'fifths — worth a first look now, and studied proper
+          +ly in stage 4.',                                              
+      315          links: [
+      316            quiz('key-signature', 1, 'Quiz: read the key signatu
+           re'),
+      317            { kind: 'scale', root: 'G', type: 'major', label: 'G
+            major in the scale library' },
+      318            { kind: 'scale', root: 'F', type: 'major', label: 'F
+            major in the scale library' },
+      319 +          { kind: 'route', route: '/circle', label: 'See it on
+          + the circle of fifths' },                                     
+      320          ],
+      321        },
+      322        {
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/guide.ts)
+  ⎿  Added 19 lines, removed 4 lines
+      502      sight: [sight(4, 'Sight-reading — level 4 (eighths & dotte
+           d rhythms)')],
+      503      theory: [
+      504        {
+      505 -        title: 'Seventh chords and the circle of fifths',     
+      505 +        title: 'Seventh chords',                              
+      506          body:
+      507            'Add one more third on top of a triad and you get a 
+           seventh chord — the sound of jazz and of ' +
+      508 -          'every dominant that pulls home to its tonic. The ci
+          -rcle of fifths orders all twelve keys by ' +                  
+      509 -          'how many sharps or flats they carry; moving one ste
+          -p around it adds one accidental. Practice ' +                 
+      510 -          'scales in circle order (C, G, D, A… / C, F, B♭, E♭…
+          -) and the pattern becomes second nature.',                    
+      508 +          'every dominant that pulls home to its tonic. The do
+          +minant 7th is the workhorse: its tritone ' +                  
+      509 +          '(the 3rd against the 7th) is what makes V7 lean so 
+          +strongly onto I.',                                            
+      510          links: [
+      511            { kind: 'chord', root: 'G', quality: 'dominant 7th',
+            label: 'G7 in the chord library' },
+      512            quiz('chords', 3, 'Hear 7th chords in the ear quiz')
+           ,
+      513            quiz('chord-spelling', 3, 'Quiz: spell the 7th chord
+           s'),
+      514 +        ],                                                    
+      515 +      },                                                      
+      516 +      {                                                       
+      517 +        title: 'The circle of fifths',                        
+      518 +        body:                                                 
+      519 +          'The circle of fifths orders all twelve keys by how 
+          +many sharps or flats they carry: each ' +                     
+      520 +          'clockwise step goes up a fifth and adds exactly one
+          + sharp (in the fixed order F, C, G, D, A, ' +                 
+      521 +          'E, B), each anticlockwise step adds one flat (the m
+          +irror order). The inner ring holds each ' +                   
+      522 +          'key\'s relative minor — same signature, tonic three
+          + semitones down. Neighbouring keys share ' +                  
+      523 +          'six of their seven notes, which is why music modula
+          +tes to them so smoothly. At six o\'clock ' +                  
+      524 +          'the two sides meet: F♯ major and G♭ major are enhar
+          +monic spellings of the same keys. ' +                         
+      525 +          'Practice scales in circle order (C, G, D, A… / C, F
+          +, B♭, E♭…) and the geography becomes ' +                      
+      526 +          'second nature.',                                   
+      527 +        links: [                                              
+      528 +          { kind: 'route', route: '/circle', label: 'Explore t
+          +he interactive circle' },                                     
+      529 +          quiz('circle-of-fifths', 1, 'Quiz: navigate the circ
+          +le'),                                                         
+      530            quiz('key-signature', 3, 'Quiz: key signatures aroun
+           d the circle'),
+      531          ],
+      532        },
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/guide.ts)
+  ⎿  Added 5 lines
+      561        ABRSM_SYLLABUS,
+      562        RCM_SYLLABUS,
+      563        IMSLP,
+      564 +      {                                                       
+      565 +        title: 'Piano scales poster (gemb0y/piano-scales)',   
+      566 +        url: 'https://github.com/gemb0y/piano-scales',        
+      567 +        note: 'A beautifully drawn circle-of-fifths poster wit
+          +h every major and minor scale — free to view and print for you
+          +rself (CC BY-NC-ND: no modified redistribution).',            
+      568 +      },                                                      
+      569      ],
+      570      moveOnWhen: [
+      571        'Two-octave hands-together scales feel like the normal w
+           ay to play a scale',
+
+⏺ Now the stage-5 ii–V–I section:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/guide.ts)
+  ⎿  Added 6 lines, removed 2 lines
+      627          body:
+      628            'Jazz harmony strings dominant motion together: the 
+           ii chord leads to V, V resolves to I. The ' +
+      629            'guide tones — each chord’s 3rd and 7th — are the tw
+           o notes that carry the progression; ' +
+      630 -          'voice-lead them smoothly and the harmony plays itse
+          -lf. Learn the drill in C and F first, then ' +                
+      631 -          'take it around the circle of fifths.',             
+      630 +          'voice-lead them smoothly and the harmony plays itse
+          +lf. Notice the roots: D to G to C is two ' +                  
+      631 +          'falling fifths — one anticlockwise step each on the
+          + circle of fifths. That is dominant motion, ' +               
+      632 +          'and it is the engine under almost every jazz standa
+          +rd. Learn the drill in C and F first, then ' +                
+      633 +          'take it around the circle.',                       
+      634          links: [
+      635            lesson('jazz-251-C', 'ii–V–I drill in C'),
+      636            song('ii-v-i-etude', 'Hear it as music in the étude'
+           ),
+      637 +          { kind: 'route', route: '/circle', label: 'Trace it 
+          +on the circle' },                                             
+      638 +          quiz('circle-of-fifths', 4, 'Quiz: circle geometry')
+          +,                                                             
+      639          ],
+      640        },
+      641        {
+
+⏺ Now add /circle to the guide test's KNOWN_ROUTES, then regenerate GUIDE.md:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/tests/guide.test.ts)
+  ⎿  Added 1 line
+      19    '/guide',
+      20    '/scales',
+      21    '/chords',
+      22 +  '/circle',                                                   
+      23    '/practice',
+      24    '/ear',
+      25    '/quizzes',
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Guide regenerated. Now the full verification pass:
+
+  Listed 1 directory, ran 2 shell commands (ctrl+o to expand)
+⏺ The embedding test runs the real model and passes with the new template. Now
+  type checks:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Type checks are clean. Now verifying the change end-to-end in the running app:
+
+⏺ Skill(verify)
+  ⎿  Successfully loaded skill
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ No project verify skill — cold start. This is a Vite browser app; I'll launch
+  the dev server and drive it with Playwright:
+
+  Made 1 scratchpad edit +109, ran 6 shell commands (ctrl+o to expand)
+
+⏺ Deep links work in both real scenarios. Let me look at the screenshots to
+  eyeball the rendering:
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ The wheel renders well. One cosmetic issue: after a click, Chromium draws a
+  default focus rectangle around the wedge (visible in the seam screenshot).
+  Adding an outline suppression for mouse focus:
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/components/CircleOfFifthsWheel.s
+        velte)
+  ⎿  Added 3 lines, removed 1 line
+      121    .wedge:hover {
+      122      fill: #eff6ff;
+      123    }
+      124 -  .wedge:focus-visible {                                      
+      124 +  .wedge:focus {                                              
+      125      outline: none;
+      126 +  }                                                           
+      127 +  .wedge:focus-visible {                                      
+      128      stroke: #3b82f6;
+      129      stroke-width: 2;
+      130    }
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Quiz staff renders correctly. Final checks — guide chips and the focus-ring
+  fix:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ All guide integrations verified. Checking the focus-fix screenshot, then
+  cleaning up:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(.claude/worktrees/circle-of-fifths/.claude/skills/verify/SKILL.md)
+  ⎿  Wrote 40 lines to
+     .claude/worktrees/circle-of-fifths/.claude/skills/verify/SKILL.md
+      1 ---
+      2 name: verify
+      3 description: How to launch and drive this app to verify a change 
+        end-to-end (dev server + Playwright).
+      4 ---
+      6 # Verifying Piano Tutor changes
+      7 
+      8 Browser app (Vite + Svelte 5, hash router). Verify UI changes by 
+        driving the
+      9 real app, not by re-running vitest.
+     … +41 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The plan is fully implemented. All 702 tests pass, npm run check is clean, and
+  I drove the feature end-to-end in the real app.
+
+  What was built
+
+  Circle of fifths across the app (per the approved plan, in a clean working
+  tree — nothing committed):
+
+  - src/lib/theory/circle.ts — new pure model, now the canonical home of
+  key-signature facts (moved from quiz.ts, which re-exports sigAccidentals so
+  existing imports keep working). Exposes CIRCLE_KEYS (with both the display
+  spelling D♯ and the library spelling Eb at the enharmonic seam),
+  fifthUp/fifthDown/neighborsOf.
+  - Quiz mode — circle-of-fifths with 4 levels (neighbours → accidental counts →
+  relative minors with a rendered staff → circle geometry incl. the F♯/G♭ seam
+  and which-sharp-is-added), wired into the Quizzes screen under Reading &
+  theory.
+  - /circle screen — original interactive SVG wheel (clickable +
+  keyboard-accessible wedges, seam slot shows both spellings), a detail card
+  with the key signature on a staff, glossary-annotated prose, neighbour
+  selectors, and chips into the scale library and both quizzes; five theory
+  sections below. Nav link, Home tile, and ?key= deep links included.
+  - Voice — "piano, circle of fifths / circle / fifths" navigates (parser +
+  grammar + intents union); on-screen, bare keys like "piano, e flat" select on
+  the wheel while explicit "…scale" requests still fall through to Scales; a
+  nav-circle embedding-fallback template ("how are the keys related") passes the
+  real-model integration test.
+  - Glossary — new enharmonic and modulation entries.
+  - Guide — stage 2 key-signature section expanded (order of sharps,
+  last-sharp/second-to-last-flat tricks) with a circle link; stage 4 split into
+  "Seventh chords" + a dedicated "The circle of fifths" section; stage 5 ties
+  ii–V–I to falling-fifth motion; the gemb0y/piano-scales poster added as a
+  stage-4 external resource (linked only — its CC BY-NC-ND license forbids
+  embedding). docs/GUIDE.md regenerated.
+
+  Verification: circle-of-fifths feature end-to-end
+
+  Verdict: PASS
+
+  Claim: New /circle screen, quiz mode, voice nav, glossary and guide content,
+  per the plan file.
+
+  Method: Cold start (no project verify skill existed — I created
+  .claude/skills/verify/SKILL.md with the recipe). Vite dev server + Playwright
+  headless Chromium.
+
+  Steps
+
+  1. ✅ Home tile → /circle; wheel renders, C major selected, detail card +
+  staff correct (screenshot above)
+  2. ✅ Clicked the seam wedge → header "F♯ / G♭ major · d♯ minor", six sharps
+  on the staff, prose mentions the G♭ spelling
+  3. ✅ "D♯ minor scale" chip from the seam → Scales opens Eb natural minor (the
+  enharmonic-spelling trap the plan called out) — and browser back returns to
+  /circle
+  4. ✅ Deep links: fresh-load ?key=Gb → F♯ slot; cross-screen ?key=eb → E♭;
+  guide chip arrives with the "← Back to the learning guide" breadcrumb
+  5. ✅ Keyboard: focused a wedge, pressed Enter → selects
+  6. ✅ Quiz levels 1–4 all render; level 3 shows the key-signature staff;
+  answering a question reveals the Next button
+  7. ✅ Guide: stage-2 chip, stage-4 "The circle of fifths" section with 3
+  chips, stage-5 geometry-quiz chip, poster resource with the license note — all
+  present and navigable
+  8. 🔍 Bogus deep link ?key=H%23 → screen falls back cleanly to C major, no
+  errors
+  9. 🔍 Zero page/console errors across every run
+
+  Findings
+
+  - ⚠️ Fixed during verification: clicking a wedge left Chromium's default focus
+  rectangle around it (tabindex focus). Added .wedge:focus { outline: none }
+  while keeping a :focus-visible ring for keyboard users.
+  - Hash-only URL changes don't remount a screen, so ?key= is read once at mount
+  — same behavior as the existing ScalesLibrary deep links, and both real entry
+  paths (guide chip, fresh load) work.
+  - Not exercised live: the actual microphone→Vosk voice path (headless browsers
+  have no getUserMedia). The new voice behavior is covered at the project's
+  stated test surface — parser/grammar/dispatcher/embedding-bank vitest suites,
+  including the real-MiniLM integration test (347 voice tests pass).
+✻ Cogitated for 19m 31s
+
+※ recap: Circle of fifths feature is fully implemented and verified: interactive wheel screen, quiz mode, voice commands, glossary, and guide updates. All tests and checks pass. Changes are uncommitted in the worktree; next step is committing them when you're ready. (disable recaps in /config)
+
+❯ merge this into main                                                          
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The worktree is on branch worktree-circle-of-fifths with everything
+  uncommitted. I'll commit, then merge into main.
+
+  Committed 7256eeb, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Overlapping files (glossary.ts, guide.ts, scales.ts) mean likely conflicts.
+  Safest path: merge main into the worktree branch first, resolve and re-test
+  here, then fast-merge into main.
+
+  Searched for 1 pattern, read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(.claude/worktrees/circle-of-fifths/src/lib/data/guide.ts)
+  ⎿  Added 4 lines, removed 9 lines
+      312            'A key signature at the start of each line tells you
+            which notes are always sharp or flat. ' +
+      313            'G major has one sharp (F♯); F major one flat (B♭); 
+           D major two sharps (F♯, C♯). Rather than ' +
+      314            'reading each accidental, think "I am in G, so every
+            F is sharp". Scales make key signatures ' +
+      315 -<<<<<<< HEAD                                                  
+      316 -          'physical: your fingers learn where the black keys l
+          -ive in each key. The sharps always arrive ' +                 
+      317 -          'in the same fixed order (F, C, G, D, A, E, B), so a
+          - signature is really just a count — and the ' +               
+      318 -          'last sharp always sits one semitone below the key n
+          -ame. Flats mirror this (B, E, A, D, G, C, F), ' +             
+      319 -          'and the second-to-last flat names the key. Keys arr
+          -anged by that count form the circle of ' +                    
+      320 -          'fifths — worth a first look now, and studied proper
+          -ly in stage 4.',                                              
+      321 -=======                                                       
+      315            'physical: your fingers learn where the black keys l
+           ive in each key. Learn them in this ' +
+      316            'order: C first (all white keys), then one sharp at 
+           a time around the circle of fifths — ' +
+      317            'G, D, A and E even share C major\'s finger numbers,
+            so they come as a family. Flat keys ' +
+      325 -          'and black-key scales can wait until a piece needs t
+          -hem.',                                                        
+      326 ->>>>>>> main                                                  
+      318 +          'and black-key scales can wait until a piece needs t
+          +hem. The sharps themselves always ' +                         
+      319 +          'arrive in a fixed order (F, C, G, D, A, E, B), so a
+          + signature is really just a count: the ' +                    
+      320 +          'last sharp sits one semitone below the key name, an
+          +d for flats (the mirror order B, E, A, ' +                    
+      321 +          'D, G, C, F) the second-to-last flat names the key.'
+          +,                                                             
+      322          links: [
+      323            quiz('key-signature', 1, 'Quiz: read the key signatu
+           re'),
+      324            { kind: 'scale', root: 'G', type: 'major', label: 'G
+            major in the scale library' },
+
+⏺ Now resolve docs/GUIDE.md by regenerating it from the merged source, then
+  finish the merge:
+
+  Committed 69b2920, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Merged tree is green (704 tests, clean check). Now merging into main:
+
+  Merged worktree-circle-of-fifths (ctrl+o to expand)
+
+⏺ Merged into main. Summary:
+
+  - 7256eeb — the circle-of-fifths feature, committed on
+  worktree-circle-of-fifths.
+  - Main had moved ahead in the meantime (the pianofs scale-pedagogy merge), so
+  I merged main into the branch first. One real conflict, in the stage-2
+  key-signature guide prose: both branches had expanded the same paragraph, so I
+  combined them — pianofs's "learn C first, then one sharp at a time" ordering
+  followed by my order-of-sharps/flats tricks — and regenerated docs/GUIDE.md
+  from the merged source (69b2920).
+  - Verified the merged tree: all 704 tests pass and npm run check is clean.
+  - 4cf526e — merged into main with a --no-ff merge commit, matching the style
+  of the previous worktree merge.
+
+  Main's tip is now 4cf526e with the interactive /circle screen, the quiz mode,
+  voice navigation, glossary entries, and the expanded guide content. The branch
+  worktree-circle-of-fifths still exists alongside this worktree — say the word
+  if you want them cleaned up. Nothing was pushed (no remote configured on this
+  repo).
+
+✻ Brewed for 2m 59s
+
+※ recap: Built the circle-of-fifths feature (interactive screen, quiz mode, voice control, guide theory), verified it end-to-end, and merged it into main with all 704 tests passing. Nothing left to do, unless you want the worktree and branch deleted. (disable recaps in /config)
