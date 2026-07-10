@@ -14,10 +14,10 @@
 
   const SWING_RATIO = 2 / 3
   const COUNT_IN = 4
-  const MAX_LEVEL = 4
+  const MAX_LEVEL = 5
   const ACTIVITY = 'rhythm'
 
-  type Level = 1 | 2 | 3 | 4
+  type Level = 1 | 2 | 3 | 4 | 5
 
   let level = $state<Level>(1)
   let patternId = $state(RHYTHM_PATTERNS[0].id)
@@ -28,7 +28,7 @@
   {
     const linked = Number(currentParams().level)
     const stored = Math.min(getProgress(ACTIVITY).level, MAX_LEVEL) as Level
-    level = linked === 1 || linked === 2 || linked === 3 || linked === 4 ? linked : stored
+    level = Number.isInteger(linked) && linked >= 1 && linked <= MAX_LEVEL ? (linked as Level) : stored
     patternId = RHYTHM_PATTERNS.find((p) => p.level === level)!.id
   }
 
@@ -184,7 +184,7 @@
   </p>
 
   <div class="controls-row">
-    {#each [1, 2, 3, 4] as const as l (l)}
+    {#each [1, 2, 3, 4, 5] as const as l (l)}
       <button class="seg" class:active={level === l} onclick={() => setLevel(l)}>
         Level {l}
       </button>

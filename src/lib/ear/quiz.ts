@@ -1,4 +1,4 @@
-import { getChord } from '../theory/chords'
+import { getChord, inversionsFor, INVERSION_LABELS } from '../theory/chords'
 import { getScale } from '../theory/scales'
 import type { ChordQualityId, ScaleTypeId } from '../theory/types'
 
@@ -12,6 +12,8 @@ export interface IntervalQuestion {
   kind: 'interval'
   /** Played in order (second note above or below the first). */
   midis: [number, number]
+  /** True when both notes sound together (levels 5+) instead of in sequence. */
+  harmonic: boolean
   answer: string
   options: string[]
   /** Why: shown after the reveal so a wrong answer still teaches. */
@@ -77,9 +79,39 @@ export const INTERVAL_LEVELS: number[][] = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
 ]
 
+/**
+ * Full interval ladder: levels 1–4 are the melodic sets above (unchanged so
+ * saved progress keeps its meaning); level 5 plays both notes together
+ * (harmonic — no unison, which would just be one note); level 6 mixes
+ * melodic and harmonic questions over the full chromatic set.
+ */
+export const INTERVAL_LEVEL_DEFS: { set: number[]; playback: 'melodic' | 'harmonic' | 'mixed' }[] = [
+  { set: INTERVAL_LEVELS[0], playback: 'melodic' },
+  { set: INTERVAL_LEVELS[1], playback: 'melodic' },
+  { set: INTERVAL_LEVELS[2], playback: 'melodic' },
+  { set: INTERVAL_LEVELS[3], playback: 'melodic' },
+  { set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], playback: 'harmonic' },
+  { set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], playback: 'mixed' },
+]
+
 export const CHORD_LEVELS: ChordQualityId[][] = [
   ['major', 'minor'],
   ['major', 'minor', 'diminished', 'augmented'],
+  ['major', 'minor', 'diminished', 'augmented', 'dominant 7th', 'major 7th', 'minor 7th'],
+  [
+    'major',
+    'minor',
+    'diminished',
+    'augmented',
+    'dominant 7th',
+    'major 7th',
+    'minor 7th',
+    'half-diminished',
+    'diminished 7th',
+    'major 6th',
+  ],
+  // Level 5 — the level-3 qualities again, but voiced in a random inversion:
+  // same colour, different bottom note. Level 6 — every quality, any inversion.
   ['major', 'minor', 'diminished', 'augmented', 'dominant 7th', 'major 7th', 'minor 7th'],
   [
     'major',
@@ -131,12 +163,39 @@ export const ECHO_POSITIONS: Record<string, number> = {
   'G position': 55,
   'F position': 65,
   'D position': 62,
+  'A position': 57,
+  'A minor position': 57,
+  'D minor position': 62,
+  'C minor position': 60,
 }
 
-export const ECHO_LEVELS: { positions: string[]; minLen: number; maxLen: number }[] = [
-  { positions: ['C position'], minLen: 3, maxLen: 4 },
-  { positions: ['C position', 'G position', 'F position'], minLen: 4, maxLen: 5 },
-  { positions: ['C position', 'G position', 'F position', 'D position'], minLen: 5, maxLen: 6 },
+/** Five-finger scale degrees above the root. */
+const MAJOR_PENTASCALE = [0, 2, 4, 5, 7]
+const MINOR_PENTASCALE = [0, 2, 3, 5, 7]
+
+export const ECHO_LEVELS: { positions: string[]; minLen: number; maxLen: number; offsets: number[] }[] = [
+  { positions: ['C position'], minLen: 3, maxLen: 4, offsets: MAJOR_PENTASCALE },
+  { positions: ['C position', 'G position', 'F position'], minLen: 4, maxLen: 5, offsets: MAJOR_PENTASCALE },
+  {
+    positions: ['C position', 'G position', 'F position', 'D position'],
+    minLen: 5,
+    maxLen: 6,
+    offsets: MAJOR_PENTASCALE,
+  },
+  // Level 4 — a fifth major position and longer phrases.
+  {
+    positions: ['C position', 'G position', 'F position', 'D position', 'A position'],
+    minLen: 6,
+    maxLen: 7,
+    offsets: MAJOR_PENTASCALE,
+  },
+  // Level 5 — minor five-finger positions: same hand shape, darker colour.
+  {
+    positions: ['A minor position', 'D minor position', 'C minor position'],
+    minLen: 6,
+    maxLen: 8,
+    offsets: MINOR_PENTASCALE,
+  },
 ]
 
 const clampLevel = (level: number, max: number) => Math.max(1, Math.min(max, Math.floor(level)))
@@ -164,9 +223,11 @@ function makeOptions(all: string[], answer: string, max: number, rng: Rng): stri
 }
 
 export function makeIntervalQuestion(level: number, rng: Rng = Math.random): IntervalQuestion {
-  const set = INTERVAL_LEVELS[clampLevel(level, INTERVAL_LEVELS.length) - 1]
-  const semitones = pick(set, rng)
-  const up = semitones === 0 || rng() < 0.5
+  const def = INTERVAL_LEVEL_DEFS[clampLevel(level, INTERVAL_LEVEL_DEFS.length) - 1]
+  const semitones = pick(def.set, rng)
+  const harmonic = def.playback === 'harmonic' || (def.playback === 'mixed' && rng() < 0.5)
+  // Harmonic pairs always stack upward; melodic ones go either way.
+  const up = harmonic || semitones === 0 || rng() < 0.5
   // Root somewhere around middle C so both directions stay in comfortable range.
   const root = 55 + Math.floor(rng() * 13)
   const midis: [number, number] = [root, up ? root + semitones : root - semitones]
@@ -174,8 +235,9 @@ export function makeIntervalQuestion(level: number, rng: Rng = Math.random): Int
   return {
     kind: 'interval',
     midis,
+    harmonic,
     answer,
-    options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
+    options: makeOptions(def.set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
     explanation: INTERVAL_EXPLANATIONS[semitones],
   }
 }
@@ -183,21 +245,26 @@ export function makeIntervalQuestion(level: number, rng: Rng = Math.random): Int
 const QUIZ_ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
 
 export function makeChordQuestion(level: number, rng: Rng = Math.random): ChordQuestion {
-  const set = CHORD_LEVELS[clampLevel(level, CHORD_LEVELS.length) - 1]
+  const lvl = clampLevel(level, CHORD_LEVELS.length)
+  const set = CHORD_LEVELS[lvl - 1]
   const quality = pick(set, rng)
   const root = pick(QUIZ_ROOTS, rng)
+  // From level 5 the chord may be voiced in any inversion — recognizing the
+  // quality without the root on the bottom is the next listening skill.
+  const inversion = lvl >= 5 ? pick(inversionsFor(quality), rng) : 0
   const answer = CHORD_LABELS[quality]
+  const explanation =
+    inversion > 0
+      ? `${CHORD_QUALITY_EXPLANATIONS[quality]} This one was voiced in ${INVERSION_LABELS[inversion]}, so the root was not the lowest note.`
+      : CHORD_QUALITY_EXPLANATIONS[quality]
   return {
     kind: 'chord',
-    midis: getChord(root, quality, 0).midi,
+    midis: getChord(root, quality, inversion).midi,
     answer,
     options: makeOptions(set.map((q) => CHORD_LABELS[q]), answer, 4, rng),
-    explanation: CHORD_QUALITY_EXPLANATIONS[quality],
+    explanation,
   }
 }
-
-/** Five-finger scale degrees above the root (major pentascale). */
-const POSITION_OFFSETS = [0, 2, 4, 5, 7]
 
 // --- scale-type identification ---
 
@@ -210,7 +277,7 @@ export interface ScaleTypeQuestion {
   explanation: string
 }
 
-const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
+export const SCALE_TYPE_LABELS: Record<ScaleTypeId, string> = {
   major: 'Major',
   'natural minor': 'Natural minor',
   'harmonic minor': 'Harmonic minor',
@@ -242,20 +309,60 @@ export const SCALE_TYPE_EXPLANATIONS: Record<ScaleTypeId, string> = {
   locrian: 'Locrian lowers both the 2nd and the 5th — unstable and unresolved, it never quite lands.',
 }
 
-/** Roots every scale type supports (kept to low-accidental keys the library covers). */
+/** Familiar low-accidental roots while the scale colours are still new. */
 const SCALE_QUIZ_ROOTS = ['C', 'G', 'F']
+/** Wider transposition for the top levels — it's ear-only, so more keys is a mild bump. */
+const SCALE_QUIZ_ROOTS_WIDE = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb', 'E']
 
 export const SCALE_TYPE_LEVELS: ScaleTypeId[][] = [
   ['major', 'natural minor'],
   ['major', 'natural minor', 'harmonic minor'],
   ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic'],
   ['major', 'natural minor', 'harmonic minor', 'blues', 'major pentatonic', 'minor pentatonic', 'dorian', 'mixolydian'],
+  // Levels 5–6: the remaining church modes join, brightest to darkest,
+  // and (below) the roots widen from C/G/F to eight keys.
+  [
+    'major',
+    'natural minor',
+    'harmonic minor',
+    'blues',
+    'major pentatonic',
+    'minor pentatonic',
+    'dorian',
+    'mixolydian',
+    'lydian',
+    'phrygian',
+  ],
+  [
+    'major',
+    'natural minor',
+    'harmonic minor',
+    'blues',
+    'major pentatonic',
+    'minor pentatonic',
+    'dorian',
+    'mixolydian',
+    'lydian',
+    'phrygian',
+    'locrian',
+  ],
+]
+
+/** Roots per level, parallel to SCALE_TYPE_LEVELS. */
+export const SCALE_TYPE_ROOTS_BY_LEVEL: string[][] = [
+  SCALE_QUIZ_ROOTS,
+  SCALE_QUIZ_ROOTS,
+  SCALE_QUIZ_ROOTS,
+  SCALE_QUIZ_ROOTS,
+  SCALE_QUIZ_ROOTS_WIDE,
+  SCALE_QUIZ_ROOTS_WIDE,
 ]
 
 export function makeScaleTypeQuestion(level: number, rng: Rng = Math.random): ScaleTypeQuestion {
-  const set = SCALE_TYPE_LEVELS[clampLevel(level, SCALE_TYPE_LEVELS.length) - 1]
+  const lvl = clampLevel(level, SCALE_TYPE_LEVELS.length)
+  const set = SCALE_TYPE_LEVELS[lvl - 1]
   const type = pick(set, rng)
-  const root = pick(SCALE_QUIZ_ROOTS, rng)
+  const root = pick(SCALE_TYPE_ROOTS_BY_LEVEL[lvl - 1], rng)
   const answer = SCALE_TYPE_LABELS[type]
   return {
     kind: 'scale-type',
@@ -296,45 +403,72 @@ export const CADENCE_EXPLANATIONS: Record<CadenceId, string> = {
     'Deceptive (V → vi): sets up a full stop, then sidesteps to the minor vi chord — the "surprise" that keeps the music going.',
 }
 
-export const CADENCE_LEVELS: CadenceId[][] = [
-  ['authentic', 'plagal'],
-  ['authentic', 'plagal', 'half'],
-  ['authentic', 'plagal', 'half', 'deceptive'],
+export type CadenceMode = 'major' | 'minor'
+
+/**
+ * Cadence ladder: levels 1–3 grow the cadence set in major (unchanged);
+ * level 4 hears the same four cadences in minor keys; level 5 mixes modes.
+ */
+export const CADENCE_LEVEL_DEFS: { cadences: CadenceId[]; modes: CadenceMode[] }[] = [
+  { cadences: ['authentic', 'plagal'], modes: ['major'] },
+  { cadences: ['authentic', 'plagal', 'half'], modes: ['major'] },
+  { cadences: ['authentic', 'plagal', 'half', 'deceptive'], modes: ['major'] },
+  { cadences: ['authentic', 'plagal', 'half', 'deceptive'], modes: ['minor'] },
+  { cadences: ['authentic', 'plagal', 'half', 'deceptive'], modes: ['major', 'minor'] },
 ]
+
+export const CADENCE_LEVELS: CadenceId[][] = CADENCE_LEVEL_DEFS.map((d) => d.cadences)
+
+/** What changes when the same cadence is heard in a minor key. */
+const MINOR_CADENCE_NOTES: Record<CadenceId, string> = {
+  authentic:
+    'Heard here in minor: home is a minor chord, but the V stays major (raised leading tone) so the pull home is just as strong.',
+  plagal: 'Heard here in minor: both chords are minor, so the "Amen" turns melancholy.',
+  half: 'Heard here in minor: the phrase parks on the major V — the raised leading tone leaves it hanging even harder.',
+  deceptive:
+    'Heard here in minor: the sidestep lands on the MAJOR VI chord — a sudden brightening instead of a darkening.',
+}
 
 /**
  * Close voicings around the tonic (same shapes as the cadence drills):
- * I root position, IV in 2nd inversion, V in 1st inversion, vi in 1st
- * inversion — smooth voice leading so only the harmony changes.
+ * tonic root position, subdominant in 2nd inversion, V in 1st inversion,
+ * the deceptive target in 1st inversion — smooth voice leading so only the
+ * harmony changes. In minor, V keeps its major third (harmonic minor's
+ * raised leading tone) and the deceptive cadence lands on the major VI.
  */
-function cadenceChords(tonicMidi: number, cadence: CadenceId): number[][] {
-  const I = [tonicMidi, tonicMidi + 4, tonicMidi + 7]
-  const IV = [tonicMidi, tonicMidi + 5, tonicMidi + 9]
-  const V = [tonicMidi - 1, tonicMidi + 2, tonicMidi + 7]
-  const vi = [tonicMidi, tonicMidi + 4, tonicMidi + 9]
+function cadenceChords(tonicMidi: number, cadence: CadenceId, mode: CadenceMode): number[][] {
+  const t = tonicMidi
+  const minor = mode === 'minor'
+  const tonic = minor ? [t, t + 3, t + 7] : [t, t + 4, t + 7]
+  const sub = minor ? [t, t + 5, t + 8] : [t, t + 5, t + 9]
+  const V = [t - 1, t + 2, t + 7]
+  const six = minor ? [t, t + 3, t + 8] : [t, t + 4, t + 9]
   switch (cadence) {
     case 'authentic':
-      return [I, IV, V, I]
+      return [tonic, sub, V, tonic]
     case 'plagal':
-      return [I, IV, I] // the "Amen" cadence
+      return [tonic, sub, tonic] // the "Amen" cadence
     case 'half':
-      return [I, IV, V]
+      return [tonic, sub, V]
     case 'deceptive':
-      return [I, IV, V, vi]
+      return [tonic, sub, V, six]
   }
 }
 
 export function makeCadenceQuestion(level: number, rng: Rng = Math.random): CadenceQuestion {
-  const set = CADENCE_LEVELS[clampLevel(level, CADENCE_LEVELS.length) - 1]
-  const cadence = pick(set, rng)
+  const def = CADENCE_LEVEL_DEFS[clampLevel(level, CADENCE_LEVEL_DEFS.length) - 1]
+  const cadence = pick(def.cadences, rng)
+  const mode = def.modes.length === 1 ? def.modes[0] : pick(def.modes, rng)
   const tonic = 57 + Math.floor(rng() * 8) // A3–E4: chords sit around middle C
   const answer = CADENCE_LABELS[cadence]
+  const explanation =
+    mode === 'minor' ? `${CADENCE_EXPLANATIONS[cadence]} ${MINOR_CADENCE_NOTES[cadence]}` : CADENCE_EXPLANATIONS[cadence]
   return {
     kind: 'cadence',
-    chords: cadenceChords(tonic, cadence),
+    chords: cadenceChords(tonic, cadence, mode),
     answer,
-    options: makeOptions(set.map((c) => CADENCE_LABELS[c]), answer, 4, rng),
-    explanation: CADENCE_EXPLANATIONS[cadence],
+    options: makeOptions(def.cadences.map((c) => CADENCE_LABELS[c]), answer, 4, rng),
+    explanation,
   }
 }
 
@@ -343,16 +477,17 @@ export function makeEchoQuestion(level: number, rng: Rng = Math.random): EchoQue
   const positionLabel = pick(def.positions, rng)
   const rootMidi = ECHO_POSITIONS[positionLabel]
   const len = def.minLen + Math.floor(rng() * (def.maxLen - def.minLen + 1))
+  const offsets = def.offsets
   const midis = [rootMidi] // start on the root so the ear has an anchor
   let idx = 0
   for (let i = 1; i < len; i++) {
     // Mostly stepwise, occasional skip, stay inside the five-finger position.
     const moves = [-2, -1, -1, 1, 1, 2]
     let next = idx + moves[Math.floor(rng() * moves.length)]
-    next = Math.max(0, Math.min(POSITION_OFFSETS.length - 1, next))
-    if (next === idx) next = idx + (idx === POSITION_OFFSETS.length - 1 ? -1 : 1)
+    next = Math.max(0, Math.min(offsets.length - 1, next))
+    if (next === idx) next = idx + (idx === offsets.length - 1 ? -1 : 1)
     idx = next
-    midis.push(rootMidi + POSITION_OFFSETS[idx])
+    midis.push(rootMidi + offsets[idx])
   }
   return { kind: 'echo', midis, positionLabel }
 }

@@ -25,4 +25,16 @@ describe('makeSightReadQuestion', () => {
       expect(['treble', 'bass']).toContain(q.clef)
     }
   })
+
+  it('is deterministic under a fixed seed', () => {
+    for (const level of [1, 2, 3, 4]) {
+      for (const seed of [7, 42, 1234]) {
+        const a = makeSightReadQuestion(level, seed)
+        const b = makeSightReadQuestion(level, seed)
+        expect(a.steps).toEqual(b.steps)
+        expect(a.keySignature).toBe(b.keySignature)
+        expect(a.clef).toBe(b.clef)
+      }
+    }
+  })
 })

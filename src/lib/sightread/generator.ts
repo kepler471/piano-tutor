@@ -44,12 +44,15 @@ const RHYTHM_TEMPLATES: Record<SightLevel, number[][]> = {
     [1, 1, 2],
     [2, 2],
     [1, 2, 1],
+    [4],
   ],
   3: [
     [1, 1, 1, 1],
     [2, 1, 1],
     [1, 1, 2],
     [2, 2],
+    [1, 2, 1],
+    [4],
   ],
   4: [
     [1, 0.5, 0.5, 1, 1],
@@ -58,6 +61,9 @@ const RHYTHM_TEMPLATES: Record<SightLevel, number[][]> = {
     [1, 1, 1.5, 0.5],
     [0.5, 0.5, 0.5, 0.5, 2],
     [2, 1.5, 0.5],
+    [1, 0.5, 0.5, 0.5, 0.5, 1],
+    [1.5, 0.5, 1.5, 0.5],
+    [0.5, 0.5, 2, 1],
   ],
   // Every template keeps onsets on beats 0 and 2 so the LH can move with them.
   5: [
@@ -120,14 +126,19 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
 
   // Like printed sight-reading tests: only the first note carries a finger
   // number (a hand-position cue). Everything after must be read off the staff.
+  // Vary where the melody starts (tonic, 2nd or 3rd) so phrases don't all
+  // open the same way. The first-note finger cue adjusts with it.
+  const startIndex = Math.floor(rng() * 3)
+
   if (level === 3) {
     clef = 'bass'
     hand = 'L'
     const lhOctave = octave.map((m) => m - 24) // octave 2–3, solid bass-clef range
-    const walk = melodyWalk(slots.length, lhOctave.length - 1, rng)
+    const walk = melodyWalk(slots.length, lhOctave.length - 1, rng, startIndex)
     steps = slots.map((slot, i) => ({
       midis: [lhOctave[walk[i]]],
-      fingers: [i === 0 ? 5 : null], // LH starts with 5 on the tonic
+      // LH position cue: 5 on the tonic, walking up from there (5-4-3…).
+      fingers: [i === 0 && walk[i] < 5 ? ((5 - walk[i]) as Finger) : null],
       ...slot,
     }))
   } else if (level === 5) {
@@ -147,7 +158,7 @@ export function makeSightReading(level: SightLevel, seed?: number): Lesson {
     clef = 'treble'
     hand = 'R'
     const material = level === 4 ? wide : fiveFinger
-    const walk = melodyWalk(slots.length, material.length - 1, rng)
+    const walk = melodyWalk(slots.length, material.length - 1, rng, startIndex)
     steps = slots.map((slot, i) => ({
       midis: [material[walk[i]]],
       fingers: [i === 0 && walk[i] < 5 ? ((walk[i] + 1) as Finger) : null],
