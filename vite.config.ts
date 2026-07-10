@@ -1,6 +1,34 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { VitePWA } from 'vite-plugin-pwa'
+import { createHash } from 'node:crypto'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// The SW-cached model/WASM dirs in public/ aren't content-hashed by the
+// build, so the runtime cache name embeds a hash of their contents instead:
+// re-copying them (package upgrades) renames the cache automatically and
+// deployed devices re-fetch on next use — no manual cache-name bump. Outdated
+// generations are deleted at app startup (src/lib/swCacheCleanup.ts), since
+// workbox generateSW has no hook for cleaning up renamed runtime caches.
+function staticAssetsRevision(): string {
+  const publicDir = fileURLToPath(new URL('public', import.meta.url))
+  const h = createHash('sha256')
+  for (const dir of ['model', 'tfjs-wasm', 'ort-wasm', 'worklets']) {
+    const root = join(publicDir, dir)
+    for (const rel of (readdirSync(root, { recursive: true }) as string[]).sort()) {
+      const p = join(root, rel)
+      if (statSync(p).isFile()) {
+        h.update(rel)
+        h.update(readFileSync(p))
+      }
+    }
+  }
+  return h.digest('hex').slice(0, 8)
+}
+
+const SW_STATIC_CACHE = `piano-tutor.sw-static-${staticAssetsRevision()}`
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,6 +37,10 @@ export default defineConfig({
   // root-absolute asset path 404s immediately instead of only in prod.
   // Source code prefixes public/ URLs via src/lib/assetUrl.ts.
   base: '/piano-tutor/',
+  define: {
+    // Lets swCacheCleanup.ts know the current cache generation.
+    __SW_STATIC_CACHE__: JSON.stringify(SW_STATIC_CACHE),
+  },
   plugins: [
     svelte(),
     // Installable + offline-capable. The app shell is precached; the big model
@@ -53,8 +85,6 @@ export default defineConfig({
           // visit; the assets runtime route below picks it up on first use.
           'assets/vosk-*.js',
         ],
-        // Model/WASM dirs are only re-copied on package upgrades; bump this
-        // cache name when re-copying them (see CLAUDE.md "Static assets").
         // ⚠️ workbox inlines these urlPattern functions into the generated SW
         // via .toString() — they must stay closure-free (no captured
         // variables, e.g. the base path), hence the base-agnostic matching.
@@ -77,7 +107,7 @@ export default defineConfig({
               sameOrigin && /\/(model|tfjs-wasm|ort-wasm|worklets)\//.test(url.pathname),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'piano-tutor.sw-static',
+              cacheName: SW_STATIC_CACHE,
               expiration: { maxEntries: 60 },
               cacheableResponse: { statuses: [0, 200] },
             },

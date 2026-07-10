@@ -171,9 +171,10 @@ Re-copy these after upgrading the corresponding packages.
 Installable, offline-capable (prod only; the dev SW is disabled because dev serves ort-wasm
 from node_modules). Precache = app shell only; `globIgnores` keeps every model/WASM dir (and
 the ~6 MB lazy vosk JS chunk) out of it. Runtime CacheFirst routes: hashed `/assets/`,
-same-origin `/model|tfjs-wasm|ort-wasm|worklets/` (cache `piano-tutor.sw-static` — **bump the
-cache name when re-copying those dirs**, they aren't content-hashed), and the Salamander
-sample host so demos play offline. Deliberately NO route for `model-vosk/` (modelLoader.ts
+same-origin `/model|tfjs-wasm|ort-wasm|worklets/` (cache `piano-tutor.sw-static-<hash>` —
+the name embeds a build-time content hash of those dirs, so re-copying them re-versions the
+cache automatically; outdated generations are deleted at startup by
+`src/lib/swCacheCleanup.ts`), and the Salamander sample host so demos play offline. Deliberately NO route for `model-vosk/` (modelLoader.ts
 already Cache-API-caches it with a progress bar; an SW route would double-store 41 MB) or
 `model-minilm/` (transformers.js self-caches).
 
