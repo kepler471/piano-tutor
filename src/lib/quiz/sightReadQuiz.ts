@@ -18,9 +18,11 @@ export interface SightReadQuestion {
   steps: LessonStep[]
 }
 
-export function makeSightReadQuestion(level: number): SightReadQuestion {
-  const lv = Math.max(1, Math.min(4, Math.floor(level))) as SightLevel
-  const lesson = makeSightReading(lv)
+export const SIGHT_READ_QUIZ_MAX_LEVEL = 4
+
+export function makeSightReadQuestion(level: number, seed?: number): SightReadQuestion {
+  const lv = Math.max(1, Math.min(SIGHT_READ_QUIZ_MAX_LEVEL, Math.floor(level))) as SightLevel
+  const lesson = makeSightReading(lv, seed)
   const segment = lesson.segments[0]
   // Levels 1–4 are always single-staff (treble or bass); never grand.
   const clef = segment.clef === 'grand' ? 'treble' : segment.clef

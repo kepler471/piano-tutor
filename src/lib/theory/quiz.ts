@@ -1,5 +1,6 @@
 import { Note } from 'tonal'
 import { getChord } from './chords'
+import { getScale } from './scales'
 import { CIRCLE_KEYS, RELATIVE_MINOR, SHARP_ORDER, fifthDown, fifthUp, neighborsOf, sigAccidentals } from './circle'
 import {
   CHORD_QUALITY_EXPLANATIONS,
@@ -55,11 +56,19 @@ const CLEF_MNEMONICS: Record<'treble' | 'bass', string> = {
 }
 
 /** [clef, low midi, high midi, accidentals allowed] per level. */
-export const NOTE_NAMING_LEVELS: { clefs: ('treble' | 'bass')[]; range: [number, number]; accidentals: boolean }[] = [
+export const NOTE_NAMING_LEVELS: {
+  clefs: ('treble' | 'bass')[]
+  range: [number, number]
+  accidentals: boolean
+  /** Octave-precise answers ('C4' style) — trains register reading. */
+  octaves?: boolean
+}[] = [
   { clefs: ['treble'], range: [60, 79], accidentals: false }, // C4–G5, in-staff treble
   { clefs: ['treble', 'bass'], range: [41, 79], accidentals: false }, // adds bass F2–B3
   { clefs: ['treble', 'bass'], range: [33, 88], accidentals: false }, // ledger lines both sides
   { clefs: ['treble', 'bass'], range: [41, 79], accidentals: true }, // sharps and flats
+  { clefs: ['treble', 'bass'], range: [33, 88], accidentals: true }, // ledger lines AND accidentals
+  { clefs: ['treble', 'bass'], range: [36, 84], accidentals: false, octaves: true }, // which C is it?
 ]
 
 const NATURAL_PCS = new Set([0, 2, 4, 5, 7, 9, 11])
@@ -74,7 +83,31 @@ export function makeNoteNamingQuestion(level: number, rng: Rng = Math.random): N
   if (!def.accidentals) {
     while (!NATURAL_PCS.has(midi % 12)) midi = lo + Math.floor(rng() * (hi - lo + 1))
   }
-  const name = Note.pitchClass(Note.fromMidi(midi)) // sharp spelling by default
+  const name = Note.pitchClass(Note.fromMidi(midi))
+  if (def.octaves) {
+    // Octave-precise naming (naturals only): the letter is easy, the register
+    // is the question. Distractors are the same letter an octave off and the
+    // neighbouring letters, so guessing by letter alone doesn't work.
+    const octave = Math.floor(midi / 12) - 1
+    const answer = `${name}${octave}`
+    const li = LETTERS.indexOf(name)
+    const below = LETTERS[(li + 6) % 7]
+    const above = LETTERS[(li + 1) % 7]
+    const pool = [
+      `${name}${octave - 1}`,
+      `${name}${octave + 1}`,
+      `${below}${name === 'C' ? octave - 1 : octave}`,
+      `${above}${name === 'B' ? octave + 1 : octave}`,
+    ]
+    return {
+      kind: 'note-naming',
+      midi,
+      clef,
+      answer,
+      options: makeOptions([answer, ...pool], answer, 4, rng),
+      explanation: `This is ${answer}. Middle C is C4, and the octave number steps up at every new C. ${CLEF_MNEMONICS[clef]}`,
+    }
+  }
   const answer = name.replace('#', '♯').replace('b', '♭')
   const pool = def.accidentals
     ? [answer, ...LETTERS.flatMap((l) => [l, `${l}♯`, `${l}♭`])]
@@ -94,7 +127,7 @@ export function makeNoteNamingQuestion(level: number, rng: Rng = Math.random): N
 export interface ReadMelodyQuestion {
   kind: 'read-melody'
   clef: 'treble' | 'bass'
-  keySignature: 'C'
+  keySignature: string
   /** Pitches of the phrase, left to right. */
   midis: number[]
   /** Display note name (Unicode accidentals) per midi. */
@@ -111,17 +144,41 @@ export const READ_MELODY_LEVELS: {
   range: [number, number]
   accidentals: boolean
   count: number
+  /** When set, the phrase is diatonic to one of these major keys and its signature is rendered. */
+  keys?: string[]
 }[] = [
   { clefs: ['treble'], range: [60, 72], accidentals: false, count: 3 }, // C4–C5, in-staff treble
   { clefs: ['treble', 'bass'], range: [41, 79], accidentals: false, count: 4 }, // adds bass clef
   { clefs: ['treble', 'bass'], range: [36, 84], accidentals: false, count: 5 }, // wider, longer phrase
   { clefs: ['treble', 'bass'], range: [55, 77], accidentals: true, count: 4 }, // sharps and flats
+  { clefs: ['treble', 'bass'], range: [50, 81], accidentals: true, count: 6 }, // longer chromatic phrase
+  { clefs: ['treble', 'bass'], range: [55, 79], accidentals: false, count: 5, keys: ['G', 'F', 'D', 'Bb'] }, // reading in a key
 ]
 
 const midiName = (midi: number) => Note.pitchClass(Note.fromMidi(midi)).replace('#', '♯').replace('b', '♭')
 
 // Full chromatic in the same spelling makeReadMelodyQuestion produces (flats).
 const CHROMATIC_NAMES = Array.from({ length: 12 }, (_, pc) => midiName(60 + pc))
+
+const uniPc = (name: string) => name.replace('#', '♯').replace('b', '♭')
+
+/** Stepwise random walk, biased small, staying inside the allowed set. */
+function stepwiseWalk(count: number, lo: number, hi: number, allowed: (m: number) => boolean, rng: Rng): number[] {
+  const pickAllowed = () => {
+    let m = lo + Math.floor(rng() * (hi - lo + 1))
+    while (!allowed(m)) m = lo + Math.floor(rng() * (hi - lo + 1))
+    return m
+  }
+  const midis = [pickAllowed()]
+  for (let i = 1; i < count; i++) {
+    const prev = midis[i - 1]
+    const next = shuffle([1, 2, -1, -2, 3, -3, 4, -4], rng)
+      .map((d) => prev + d)
+      .find(allowed)
+    midis.push(next ?? pickAllowed())
+  }
+  return midis
+}
 
 export function makeReadMelodyQuestion(level: number, rng: Rng = Math.random): ReadMelodyQuestion {
   const def = READ_MELODY_LEVELS[clampLevel(level, READ_MELODY_LEVELS.length) - 1]
@@ -130,23 +187,33 @@ export function makeReadMelodyQuestion(level: number, rng: Rng = Math.random): R
   const [lo, hi] =
     clef === 'treble' ? [Math.max(def.range[0], 57), def.range[1]] : [def.range[0], Math.min(def.range[1], 64)]
 
+  if (def.keys) {
+    // Reading in a key: the phrase is diatonic, the signature is rendered,
+    // and the notes it alters must be named with their sharps/flats even
+    // though no accidental is printed — the real key-signature skill.
+    const key = pick(def.keys, rng)
+    const spellings = new Map(getScale(key, 'major').notes.map((n) => [Note.chroma(n)!, n]))
+    const allowed = (m: number) => m >= lo && m <= hi && spellings.has(m % 12)
+    const midis = stepwiseWalk(def.count, lo, hi, allowed, rng)
+    const names = midis.map((m) => uniPc(spellings.get(m % 12)!))
+    // 12 buttons: the key's own spellings where the scale provides one,
+    // default (flat) spellings for the rest.
+    const optionPool = Array.from({ length: 12 }, (_, pc) =>
+      spellings.has(pc) ? uniPc(spellings.get(pc)!) : midiName(60 + pc),
+    )
+    return {
+      kind: 'read-melody',
+      clef,
+      keySignature: key,
+      midis,
+      names,
+      optionPool,
+      explanation: `In ${uniPc(key)} major the key signature applies to every matching letter: ${names.join(' ')}.`,
+    }
+  }
+
   const allowed = (m: number) => m >= lo && m <= hi && (def.accidentals || NATURAL_PCS.has(m % 12))
-  const pickAllowed = () => {
-    let m = lo + Math.floor(rng() * (hi - lo + 1))
-    while (!allowed(m)) m = lo + Math.floor(rng() * (hi - lo + 1))
-    return m
-  }
-
-  // Stepwise random walk, biased small, staying inside the readable range.
-  const midis = [pickAllowed()]
-  for (let i = 1; i < def.count; i++) {
-    const prev = midis[i - 1]
-    const next = shuffle([1, 2, -1, -2, 3, -3, 4, -4], rng)
-      .map((d) => prev + d)
-      .find(allowed)
-    midis.push(next ?? pickAllowed())
-  }
-
+  const midis = stepwiseWalk(def.count, lo, hi, allowed, rng)
   const names = midis.map(midiName)
   return {
     kind: 'read-melody',
@@ -173,23 +240,38 @@ export interface KeySignatureQuestion {
 
 export { sigAccidentals } from './circle'
 
-/** Majors ordered by accidental count; minors mirror them at level 4. */
-export const KEY_SIGNATURE_LEVELS: string[][] = [
-  ['C', 'G', 'D', 'F', 'Bb'],
-  ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb', 'Ab'],
-  ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 'Db'],
-  ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 'Db'], // asked as minors
+const ALL_MAJOR_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'F', 'Bb', 'Eb', 'Ab', 'Db']
+
+export type KeySignatureAsk = 'major' | 'minor' | 'either' | 'pair'
+
+/**
+ * Majors ordered by accidental count. Levels 1–3 grow the key set asked as
+ * majors; level 4 asks the same signatures as relative minors; level 5 flips
+ * a coin per question (major or minor); level 6 asks for the full pair.
+ */
+export const KEY_SIGNATURE_LEVEL_DEFS: { keys: string[]; ask: KeySignatureAsk }[] = [
+  { keys: ['C', 'G', 'D', 'F', 'Bb'], ask: 'major' },
+  { keys: ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb', 'Ab'], ask: 'major' },
+  { keys: ALL_MAJOR_KEYS, ask: 'major' },
+  { keys: ALL_MAJOR_KEYS, ask: 'minor' },
+  { keys: ALL_MAJOR_KEYS, ask: 'either' },
+  { keys: ALL_MAJOR_KEYS, ask: 'pair' },
 ]
 
+/** Key sets per level (kept as a derived view for tests and callers). */
+export const KEY_SIGNATURE_LEVELS: string[][] = KEY_SIGNATURE_LEVEL_DEFS.map((d) => d.keys)
+
 export function makeKeySignatureQuestion(level: number, rng: Rng = Math.random): KeySignatureQuestion {
-  const lv = clampLevel(level, KEY_SIGNATURE_LEVELS.length)
-  const set = KEY_SIGNATURE_LEVELS[lv - 1]
-  const major = pick(set, rng)
-  const asMinor = lv === 4
-  const label = (m: string) =>
-    (asMinor ? `${RELATIVE_MINOR[m]} minor` : `${m} major`).replace('#', '♯').replace('b', '♭')
+  const lv = clampLevel(level, KEY_SIGNATURE_LEVEL_DEFS.length)
+  const def = KEY_SIGNATURE_LEVEL_DEFS[lv - 1]
+  const major = pick(def.keys, rng)
+  const ask = def.ask === 'either' ? (rng() < 0.5 ? 'major' : 'minor') : def.ask
+  const label = (m: string) => {
+    if (ask === 'pair') return `${uniPc(m)} major / ${uniPc(RELATIVE_MINOR[m])} minor`
+    return ask === 'minor' ? `${uniPc(RELATIVE_MINOR[m])} minor` : `${uniPc(m)} major`
+  }
   const answer = label(major)
-  const majorLabel = `${major} major`.replace('#', '♯').replace('b', '♭')
+  const majorLabel = `${uniPc(major)} major`
   const acc = sigAccidentals(major)
   let explanation: string
   if (acc.kind === 'none') {
@@ -205,15 +287,23 @@ export function makeKeySignatureQuestion(level: number, rng: Rng = Math.random):
         ? 'F major\'s single flat is the one to memorize.'
         : 'Tip: the second-to-last flat names the key.')
   }
-  if (asMinor) {
+  if (ask === 'minor') {
     explanation += ` ${answer} shares this signature — the relative minor, three semitones below ${majorLabel}.`
+  } else if (ask === 'pair') {
+    explanation += ` ${uniPc(RELATIVE_MINOR[major])} minor shares the same signature — the relative minor, three semitones below ${majorLabel}.`
   }
+  const prompt =
+    ask === 'pair'
+      ? 'Which major/minor pair shares this key signature?'
+      : ask === 'minor'
+        ? 'Which minor key has this key signature?'
+        : 'Which major key has this key signature?'
   return {
     kind: 'key-signature',
     keySignature: major,
-    prompt: asMinor ? 'Which minor key has this key signature?' : 'Which major key has this key signature?',
+    prompt,
     answer,
-    options: makeOptions(set.map(label), answer, 4, rng),
+    options: makeOptions(def.keys.map(label), answer, 4, rng),
     explanation,
   }
 }
@@ -236,7 +326,23 @@ const majorLabel = (root: string) => `${uni(root)} major`
 /** Prompt keys for the neighbours level — nothing past three accidentals. */
 const EASY_CIRCLE_KEYS = ['C', 'G', 'D', 'A', 'F', 'Bb', 'Eb']
 
-export const CIRCLE_LEVEL_COUNT = 4
+/**
+ * Enharmonic spellings at and around the six-o'clock seam, asked in both
+ * directions. Each entry: [asked key, its accidentals, answer key, its
+ * accidentals].
+ */
+export const SEAM_PAIRS: [string, string, string, string][] = [
+  ['F♯', 'six sharps', 'G♭', 'six flats'],
+  ['G♭', 'six flats', 'F♯', 'six sharps'],
+  ['C♯', 'seven sharps', 'D♭', 'five flats'],
+  ['D♭', 'five flats', 'C♯', 'seven sharps'],
+  ['C♭', 'seven flats', 'B', 'five sharps'],
+  ['B', 'five sharps', 'C♭', 'seven flats'],
+]
+
+const SEAM_KEY_LABELS = ['F♯ major', 'G♭ major', 'C♯ major', 'D♭ major', 'C♭ major', 'B major']
+
+export const CIRCLE_LEVEL_COUNT = 6
 
 export function makeCircleQuestion(level: number, rng: Rng = Math.random): CircleQuestion {
   const lv = clampLevel(level, CIRCLE_LEVEL_COUNT)
@@ -319,49 +425,128 @@ export function makeCircleQuestion(level: number, rng: Rng = Math.random): Circl
     }
   }
 
-  // Level 4 — circle geometry: neighbour pairs, the enharmonic seam, the added sharp.
-  const variant = pick(['neighbours', 'seam', 'added-sharp'] as const, rng)
-  if (variant === 'neighbours') {
+  if (lv === 4) {
+    // Circle geometry: neighbour pairs, the enharmonic seam, the added sharp.
+    const variant = pick(['neighbours', 'seam', 'added-sharp'] as const, rng)
+    if (variant === 'neighbours') {
+      const k = pick(CIRCLE_KEYS, rng)
+      const [down, up] = neighborsOf(k.major)
+      const pairLabel = (a: string, b: string) => `${uni(a)} and ${uni(b)}`
+      const answer = pairLabel(down, up)
+      const pool = CIRCLE_KEYS.map((c) => pairLabel(...neighborsOf(c.major)))
+      return {
+        kind: 'circle-of-fifths',
+        prompt: `Which two keys sit either side of ${majorLabel(k.major)} on the circle?`,
+        answer,
+        options: makeOptions(pool, answer, 4, rng),
+        explanation:
+          `${uni(down)} and ${uni(up)} are ${uni(k.major)}'s neighbours — each shares six of its seven notes. ` +
+          'That overlap is why music most often modulates one step around the circle.',
+      }
+    }
+    if (variant === 'seam') {
+      const [from, fromDesc, to, toDesc] = pick(SEAM_PAIRS, rng)
+      const answer = `${to} major`
+      return {
+        kind: 'circle-of-fifths',
+        prompt: `Near six o'clock the sharp and flat sides of the circle overlap. ${from} major is the same piano keys as…?`,
+        answer,
+        options: makeOptions(SEAM_KEY_LABELS, answer, 4, rng),
+        explanation:
+          `${from} major (${fromDesc}) and ${to} major (${toDesc}) are enharmonic — the same piano keys spelled two ways. ` +
+          'Composers pick whichever spelling is easier to read.',
+      }
+    }
+    // added-sharp: set difference between adjacent signatures on the sharp side.
+    const k = pick(CIRCLE_KEYS.filter((c) => c.index < 6), rng)
+    const next = fifthUp(k.major)
+    const here = new Set(sigAccidentals(k.major).names)
+    const answer = sigAccidentals(next).names.find((n) => !here.has(n))!
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `Going clockwise from ${majorLabel(k.major)} to ${majorLabel(next)}, which sharp is added?`,
+      answer,
+      options: makeOptions(SHARP_ORDER, answer, 4, rng),
+      explanation:
+        `Each clockwise step keeps every accidental and adds the next sharp in the fixed order F–C–G–D–A–E–B. ` +
+        `${majorLabel(next)} takes everything from ${majorLabel(k.major)} and adds ${answer}.`,
+    }
+  }
+
+  if (lv === 5) {
+    // Circle distances: two steps, or straight across.
+    const twoStep = rng() < 0.5
+    if (twoStep) {
+      const k = pick(CIRCLE_KEYS, rng)
+      const up = rng() < 0.5
+      const target = up ? fifthUp(fifthUp(k.major)) : fifthDown(fifthDown(k.major))
+      const answer = majorLabel(target)
+      return {
+        kind: 'circle-of-fifths',
+        prompt: `Which key is two fifths ${up ? 'up' : 'down'} from ${majorLabel(k.major)}?`,
+        answer,
+        options: makeOptions(allMajors, answer, 4, rng),
+        explanation:
+          `Two steps ${up ? 'clockwise' : 'anticlockwise'} from ${uni(k.major)} lands on ${uni(target)} — ` +
+          `${up ? 'two more sharps (or two fewer flats)' : 'two more flats (or two fewer sharps)'}, and a whole step ${up ? 'up' : 'down'} in pitch.`,
+      }
+    }
     const k = pick(CIRCLE_KEYS, rng)
-    const [down, up] = neighborsOf(k.major)
-    const pairLabel = (a: string, b: string) => `${uni(a)} and ${uni(b)}`
-    const answer = pairLabel(down, up)
-    const pool = CIRCLE_KEYS.map((c) => pairLabel(...neighborsOf(c.major)))
+    const opposite = CIRCLE_KEYS[(k.index + 6) % 12].major
+    const answer = majorLabel(opposite)
     return {
       kind: 'circle-of-fifths',
-      prompt: `Which two keys sit either side of ${majorLabel(k.major)} on the circle?`,
+      prompt: `Which key sits directly opposite ${majorLabel(k.major)} on the circle (six steps away)?`,
       answer,
-      options: makeOptions(pool, answer, 4, rng),
+      options: makeOptions(allMajors, answer, 4, rng),
       explanation:
-        `${uni(down)} and ${uni(up)} are ${uni(k.major)}'s neighbours — each shares six of its seven notes. ` +
-        'That overlap is why music most often modulates one step around the circle.',
+        `${uni(opposite)} is six fifths from ${uni(k.major)} — a tritone away, the most distant key on the circle. ` +
+        'Opposite keys share almost no notes, which is why the jump sounds so alien.',
     }
   }
-  if (variant === 'seam') {
-    const answer = 'G♭ major'
+
+  // Level 6 — the inner (minor) ring.
+  const variant = pick(['minor-neighbour', 'minor-count', 'minor-reverse'] as const, rng)
+  const allMinors = CIRCLE_KEYS.map((c) => `${uni(c.minor)} minor`)
+  if (variant === 'minor-neighbour') {
+    const k = pick(CIRCLE_KEYS, rng)
+    const up = rng() < 0.5
+    const target = CIRCLE_KEYS[(k.index + (up ? 1 : 11)) % 12]
+    const answer = `${uni(target.minor)} minor`
     return {
       kind: 'circle-of-fifths',
-      prompt: 'At six o\'clock the sharp and flat sides of the circle meet. F♯ major is the same key as…?',
+      prompt: `On the circle's inner ring, which minor key is one step ${up ? 'clockwise' : 'anticlockwise'} from ${uni(k.minor)} minor?`,
       answer,
-      options: makeOptions(['G♭ major', 'E♯ major', 'G major', 'F major', 'D♭ major'], answer, 4, rng),
+      options: makeOptions(allMinors, answer, 4, rng),
       explanation:
-        'F♯ major (six sharps) and G♭ major (six flats) are enharmonic — the same piano keys spelled two ways. ' +
-        'Composers pick whichever spelling is easier to read.',
+        `The inner ring moves in fifths too: ${uni(target.minor)} minor is a fifth ${up ? 'up' : 'down'} from ${uni(k.minor)} minor, ` +
+        `and it shares its signature with ${majorLabel(target.major)}.`,
     }
   }
-  // added-sharp: set difference between adjacent signatures on the sharp side.
-  const k = pick(CIRCLE_KEYS.filter((c) => c.index < 6), rng)
-  const next = fifthUp(k.major)
-  const here = new Set(sigAccidentals(k.major).names)
-  const answer = sigAccidentals(next).names.find((n) => !here.has(n))!
+  const k = pick(CIRCLE_KEYS.filter((c) => c.accidentals.kind !== 'none'), rng)
+  const acc = k.accidentals
+  const word = acc.kind === 'sharps' ? 'sharp' : 'flat'
+  const n = acc.names.length
+  const explanation =
+    `${uni(k.minor)} minor shares its key signature with its relative major, ${majorLabel(k.major)} — ` +
+    `${n} ${word}${n === 1 ? '' : 's'}: ${acc.names.join(', ')}. Minor keys have no signature of their own; they borrow.`
+  if (variant === 'minor-count') {
+    const answer = String(n)
+    return {
+      kind: 'circle-of-fifths',
+      prompt: `How many ${word}s does ${uni(k.minor)} minor have?`,
+      answer,
+      options: makeOptions(['1', '2', '3', '4', '5', '6'], answer, 4, rng),
+      explanation,
+    }
+  }
+  const answer = `${uni(k.minor)} minor`
   return {
     kind: 'circle-of-fifths',
-    prompt: `Going clockwise from ${majorLabel(k.major)} to ${majorLabel(next)}, which sharp is added?`,
+    prompt: `Which minor key has ${n} ${word}${n === 1 ? '' : 's'}?`,
     answer,
-    options: makeOptions(SHARP_ORDER, answer, 4, rng),
-    explanation:
-      `Each clockwise step keeps every accidental and adds the next sharp in the fixed order F–C–G–D–A–E–B. ` +
-      `${majorLabel(next)} takes everything from ${majorLabel(k.major)} and adds ${answer}.`,
+    options: makeOptions(allMinors, answer, 4, rng),
+    explanation,
   }
 }
 
@@ -369,26 +554,53 @@ export function makeCircleQuestion(level: number, rng: Rng = Math.random): Circl
 
 export interface IntervalStaffQuestion {
   kind: 'interval-staff'
-  /** Rendered as two sequential notes, always ascending for readability. */
+  /** Rendered ascending: sequentially, or stacked as one chord when harmonic. */
   midis: [number, number]
+  clef: 'treble' | 'bass'
+  /** Both notes drawn as a single stacked chord (level 6). */
+  harmonic: boolean
   answer: string
   options: string[]
   explanation: string
 }
 
+/**
+ * Levels 1–4 mirror the ear quiz's melodic sets on the treble staff with
+ * natural bottom notes (unchanged). Level 5 adds the bass clef and accidental
+ * bottom notes; level 6 stacks the two notes as one written chord.
+ */
+export const INTERVAL_STAFF_LEVEL_DEFS: {
+  set: number[]
+  clefs: ('treble' | 'bass')[]
+  harmonic: boolean
+  naturalBottom: boolean
+}[] = [
+  { set: INTERVAL_LEVELS[0], clefs: ['treble'], harmonic: false, naturalBottom: true },
+  { set: INTERVAL_LEVELS[1], clefs: ['treble'], harmonic: false, naturalBottom: true },
+  { set: INTERVAL_LEVELS[2], clefs: ['treble'], harmonic: false, naturalBottom: true },
+  { set: INTERVAL_LEVELS[3], clefs: ['treble'], harmonic: false, naturalBottom: true },
+  { set: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], clefs: ['treble', 'bass'], harmonic: false, naturalBottom: false },
+  { set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], clefs: ['treble', 'bass'], harmonic: true, naturalBottom: false },
+]
+
 export function makeIntervalStaffQuestion(level: number, rng: Rng = Math.random): IntervalStaffQuestion {
-  const set = INTERVAL_LEVELS[clampLevel(level, INTERVAL_LEVELS.length) - 1]
-  const semitones = pick(set, rng)
-  // Stay in the treble staff and prefer natural bottom notes so the interval
-  // reads cleanly.
-  let root = 60 + Math.floor(rng() * 13)
-  while (!NATURAL_PCS.has(root % 12)) root = 60 + Math.floor(rng() * 13)
+  const def = INTERVAL_STAFF_LEVEL_DEFS[clampLevel(level, INTERVAL_STAFF_LEVEL_DEFS.length) - 1]
+  const semitones = pick(def.set, rng)
+  const clef = def.clefs.length === 1 ? def.clefs[0] : pick(def.clefs, rng)
+  // Keep the bottom note inside the chosen staff.
+  const lo = clef === 'treble' ? 60 : 43
+  let root = lo + Math.floor(rng() * 13)
+  if (def.naturalBottom) {
+    while (!NATURAL_PCS.has(root % 12)) root = lo + Math.floor(rng() * 13)
+  }
   const answer = INTERVAL_LABELS[semitones]
   return {
     kind: 'interval-staff',
     midis: [root, root + semitones],
+    clef,
+    harmonic: def.harmonic,
     answer,
-    options: makeOptions(set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
+    options: makeOptions(def.set.map((s) => INTERVAL_LABELS[s]), answer, 4, rng),
     explanation: `On the staff, count letter names from the bottom note up, inclusive — line-space-line — to get the number. ${INTERVAL_EXPLANATIONS[semitones]}`,
   }
 }
@@ -404,27 +616,62 @@ export interface ChordSpellingQuestion {
   explanation: string
 }
 
-export const CHORD_SPELLING_LEVELS: ChordQualityId[][] = [
-  ['major', 'minor'],
-  ['major', 'minor', 'diminished', 'augmented'],
-  ['major', 'minor', 'dominant 7th', 'major 7th', 'minor 7th'],
+const SPELLING_ROOTS = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb']
+
+/** All twelve conventional major-key roots (F♯ over G♭, D♭ over C♯). */
+const ALL_SPELLING_ROOTS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F']
+
+/**
+ * Levels 1–3 unchanged. Level 4 adds the colour chords (half-diminished,
+ * major 6th) on the familiar roots; level 5 keeps the common qualities but
+ * spans all twelve roots. 'diminished 7th' is deliberately absent — its
+ * double-flat 7th can't be spelled without 𝄫.
+ */
+export const CHORD_SPELLING_LEVEL_DEFS: { qualities: ChordQualityId[]; roots: string[] }[] = [
+  { qualities: ['major', 'minor'], roots: SPELLING_ROOTS },
+  { qualities: ['major', 'minor', 'diminished', 'augmented'], roots: SPELLING_ROOTS },
+  { qualities: ['major', 'minor', 'dominant 7th', 'major 7th', 'minor 7th'], roots: SPELLING_ROOTS },
+  {
+    qualities: [
+      'major',
+      'minor',
+      'diminished',
+      'augmented',
+      'dominant 7th',
+      'major 7th',
+      'minor 7th',
+      'half-diminished',
+      'major 6th',
+    ],
+    roots: SPELLING_ROOTS,
+  },
+  { qualities: ['major', 'minor', 'dominant 7th', 'major 7th', 'minor 7th'], roots: ALL_SPELLING_ROOTS },
 ]
 
-const SPELLING_ROOTS = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb']
+/** Quality sets per level (kept as a derived view for tests and callers). */
+export const CHORD_SPELLING_LEVELS: ChordQualityId[][] = CHORD_SPELLING_LEVEL_DEFS.map((d) => d.qualities)
 
 const spellChord = (root: string, quality: ChordQualityId): string =>
   getChord(root, quality, 0)
     .noteNames.map((n) => Note.pitchClass(n).replace('#', '♯').replace('b', '♭'))
     .join(' – ')
 
+/** tonal spells a few extreme combinations with 𝄫/𝄪 (e.g. E♭dim's B𝄫) — never show those. */
+const hasDoubleAccidental = (root: string, quality: ChordQualityId): boolean =>
+  getChord(root, quality, 0).noteNames.some((n) => n.includes('bb') || n.includes('##'))
+
 export function makeChordSpellingQuestion(level: number, rng: Rng = Math.random): ChordSpellingQuestion {
-  const set = CHORD_SPELLING_LEVELS[clampLevel(level, CHORD_SPELLING_LEVELS.length) - 1]
-  const quality = pick(set, rng)
-  const root = pick(SPELLING_ROOTS, rng)
+  const def = CHORD_SPELLING_LEVEL_DEFS[clampLevel(level, CHORD_SPELLING_LEVEL_DEFS.length) - 1]
+  let quality = pick(def.qualities, rng)
+  let root = pick(def.roots, rng)
+  while (hasDoubleAccidental(root, quality)) {
+    quality = pick(def.qualities, rng)
+    root = pick(def.roots, rng)
+  }
   const chord = getChord(root, quality, 0)
   const answer = spellChord(root, quality)
   // Distractors: same root, different qualities — the confusable spellings.
-  const pool = set.map((q) => spellChord(root, q))
+  const pool = def.qualities.filter((q) => !hasDoubleAccidental(root, q)).map((q) => spellChord(root, q))
   return {
     kind: 'chord-spelling',
     symbol: chord.symbol,
@@ -445,55 +692,86 @@ export interface ChordFunctionQuestion {
   explanation: string
 }
 
-const FUNCTION_KEYS_BY_LEVEL: string[][] = [
-  ['C', 'G', 'F'],
-  ['C', 'G', 'D', 'F', 'Bb', 'A'],
-  ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb'],
+type DegreeQuality = 'major' | 'minor' | 'diminished'
+
+/** Diatonic triads as [roman numeral, tonal interval from the tonic, quality]. */
+const MAJOR_DEGREES: [string, string, DegreeQuality][] = [
+  ['I', '1P', 'major'],
+  ['ii', '2M', 'minor'],
+  ['iii', '3M', 'minor'],
+  ['IV', '4P', 'major'],
+  ['V', '5P', 'major'],
+  ['vi', '6M', 'minor'],
+  ['vii°', '7M', 'diminished'],
 ]
 
-/** Diatonic triads asked about, as [roman numeral, scale degree, quality]. */
-const DEGREES: [string, number, 'major' | 'minor'][] = [
-  ['I', 0, 'major'],
-  ['ii', 2, 'minor'],
-  ['IV', 5, 'major'],
-  ['V', 7, 'major'],
-  ['vi', 9, 'minor'],
+/** Harmonic-minor convention: V is major (raised leading tone). */
+const MINOR_DEGREES: [string, string, DegreeQuality][] = [
+  ['i', '1P', 'minor'],
+  ['ii°', '2M', 'diminished'],
+  ['III', '3m', 'major'],
+  ['iv', '4P', 'minor'],
+  ['V', '5P', 'major'],
+  ['VI', '6m', 'major'],
+  ['VII', '7m', 'major'],
 ]
 
-export const CHORD_FUNCTION_LEVEL_COUNT = FUNCTION_KEYS_BY_LEVEL.length
+const MAJOR_FUNCTION_KEYS = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb']
+const MINOR_FUNCTION_KEYS = ['A', 'E', 'D', 'G', 'C', 'B']
+
+interface ChordFunctionVariant {
+  mode: 'major' | 'minor'
+  keys: string[]
+  numerals: string[]
+}
+
+/**
+ * Levels 1–3 unchanged (major keys, the classic five degrees, primary-only in
+ * easy keys at level 1). Level 4 adds iii and vii°; level 5 moves to minor
+ * keys with a starter set; level 6 mixes both modes with all seven degrees.
+ */
+export const CHORD_FUNCTION_LEVEL_DEFS: { variants: ChordFunctionVariant[] }[] = [
+  { variants: [{ mode: 'major', keys: ['C', 'G', 'F'], numerals: ['I', 'IV', 'V'] }] },
+  { variants: [{ mode: 'major', keys: ['C', 'G', 'D', 'F', 'Bb', 'A'], numerals: ['I', 'ii', 'IV', 'V', 'vi'] }] },
+  { variants: [{ mode: 'major', keys: MAJOR_FUNCTION_KEYS, numerals: ['I', 'ii', 'IV', 'V', 'vi'] }] },
+  { variants: [{ mode: 'major', keys: MAJOR_FUNCTION_KEYS, numerals: MAJOR_DEGREES.map(([n]) => n) }] },
+  { variants: [{ mode: 'minor', keys: MINOR_FUNCTION_KEYS, numerals: ['i', 'iv', 'V', 'VI'] }] },
+  {
+    variants: [
+      { mode: 'major', keys: MAJOR_FUNCTION_KEYS, numerals: MAJOR_DEGREES.map(([n]) => n) },
+      { mode: 'minor', keys: MINOR_FUNCTION_KEYS, numerals: MINOR_DEGREES.map(([n]) => n) },
+    ],
+  },
+]
+
+export const CHORD_FUNCTION_LEVEL_COUNT = CHORD_FUNCTION_LEVEL_DEFS.length
 
 export function makeChordFunctionQuestion(level: number, rng: Rng = Math.random): ChordFunctionQuestion {
-  const lv = clampLevel(level, FUNCTION_KEYS_BY_LEVEL.length)
-  const keys = FUNCTION_KEYS_BY_LEVEL[lv - 1]
-  const key = pick(keys, rng)
-  const degrees = lv === 1 ? DEGREES.filter(([n]) => ['I', 'IV', 'V'].includes(n)) : DEGREES
-  const [numeral, semis, quality] = pick(degrees, rng)
+  const def = CHORD_FUNCTION_LEVEL_DEFS[clampLevel(level, CHORD_FUNCTION_LEVEL_DEFS.length) - 1]
+  const variant = def.variants.length === 1 ? def.variants[0] : pick(def.variants, rng)
+  const key = pick(variant.keys, rng)
+  const table = variant.mode === 'major' ? MAJOR_DEGREES : MINOR_DEGREES
+  const degrees = table.filter(([n]) => variant.numerals.includes(n))
+  const [numeral, interval, quality] = pick(degrees, rng)
   // Transpose by interval (not semitones) so spellings stay diatonic (Bb major → Eb for IV, not D#).
-  const chordName = (s: number, q: 'major' | 'minor') =>
-    `${Note.pitchClass(Note.transpose(key, intervalName(s)))} ${q}`
-  const answer = chordName(semis, quality)
-  const pool = degrees.map(([, s, q]) => chordName(s, q))
-  const degreeNumber = { 0: 1, 2: 2, 5: 4, 7: 5, 9: 6 }[semis]
-  const rootName = Note.pitchClass(Note.transpose(key, intervalName(semis)))
+  const chordName = (iv: string, q: DegreeQuality) => `${Note.pitchClass(Note.transpose(key, iv))} ${q}`
+  const answer = chordName(interval, quality)
+  const pool = degrees.map(([, iv, q]) => chordName(iv, q))
+  const degreeNumber = Number(interval[0])
+  const rootName = Note.pitchClass(Note.transpose(key, interval))
+  let qualityNote = 'Upper-case numerals are major chords, lower-case are minor.'
+  if (quality === 'diminished') {
+    qualityNote = 'The ° marks a diminished triad — minor, with the fifth lowered too.'
+  } else if (variant.mode === 'minor' && numeral === 'V') {
+    qualityNote = 'V stays major even in minor keys — the raised leading tone (harmonic minor) keeps its pull home.'
+  }
   return {
     kind: 'chord-function',
-    prompt: `In the key of ${key} major, which chord is ${numeral}?`,
+    prompt: `In the key of ${key} ${variant.mode}, which chord is ${numeral}?`,
     answer,
     options: makeOptions(pool, answer, 4, rng),
     explanation:
-      `${numeral} means "the triad built on scale degree ${degreeNumber}" — in ${key} major that root is ${rootName}. ` +
-      'Upper-case numerals are major chords, lower-case are minor.',
-  }
-}
-
-/** Semitone offset → tonal interval name for diatonic degrees used above. */
-function intervalName(semitones: number): string {
-  switch (semitones) {
-    case 0: return '1P'
-    case 2: return '2M'
-    case 5: return '4P'
-    case 7: return '5P'
-    case 9: return '6M'
-    default: return '1P'
+      `${numeral} means "the triad built on scale degree ${degreeNumber}" — in ${key} ${variant.mode} that root is ${rootName}. ` +
+      qualityNote,
   }
 }

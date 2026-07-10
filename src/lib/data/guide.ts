@@ -17,7 +17,7 @@ export type GuideLink =
   | { kind: 'lesson'; lessonId: string; label: string }
   | { kind: 'song'; songId: string; label: string }
   | { kind: 'quiz'; mode: QuizModeId; level: number; label: string }
-  | { kind: 'rhythm'; level: 1 | 2 | 3 | 4; label: string }
+  | { kind: 'rhythm'; level: 1 | 2 | 3 | 4 | 5; label: string }
   | { kind: 'sight'; level: SightLevel; label: string }
   | { kind: 'scale'; root: string; type: ScaleTypeId; label: string }
   | { kind: 'chord'; root: string; quality: ChordQualityId; label: string }
@@ -113,7 +113,7 @@ export const METHOD_GUIDE_STAGE: Record<string, string> = {
 const lesson = (lessonId: string, label: string): GuideLink => ({ kind: 'lesson', lessonId, label })
 const song = (songId: string, label: string): GuideLink => ({ kind: 'song', songId, label })
 const quiz = (mode: QuizModeId, level: number, label: string): GuideLink => ({ kind: 'quiz', mode, level, label })
-const rhythm = (level: 1 | 2 | 3 | 4, label: string): GuideLink => ({ kind: 'rhythm', level, label })
+const rhythm = (level: 1 | 2 | 3 | 4 | 5, label: string): GuideLink => ({ kind: 'rhythm', level, label })
 const sight = (level: SightLevel, label: string): GuideLink => ({ kind: 'sight', level, label })
 
 // Resources that recur across stages.
@@ -644,12 +644,19 @@ export const GUIDE_STAGES: GuideStage[] = [
       song('when-the-saints-stride', 'When the Saints — stride version'),
     ],
     ear: [
-      quiz('chords', 4, 'Chord qualities — level 4 (everything)'),
-      quiz('scale-type', 4, 'Scale types — modes and blues by ear'),
+      quiz('chords', 4, 'Chord qualities — level 4 (all ten qualities)'),
+      quiz('chords', 5, 'Chord qualities — level 5 (voiced in inversions)'),
+      quiz('intervals', 5, 'Intervals — level 5 (harmonic: both notes at once)'),
+      quiz('scale-type', 5, 'Scale types — all the modes by ear'),
       quiz('cadence', 3, 'Cadences — including the deceptive V → vi'),
+      quiz('cadence', 4, 'Cadences — the same four, in minor keys'),
       quiz('rhythm-dictation', 4, 'Rhythm dictation — swing patterns'),
+      quiz('rhythm-dictation', 5, 'Rhythm dictation — sixteenths and 3/4 time'),
     ],
-    rhythm: [rhythm(4, 'Rhythm — level 4 (keep swing honest)')],
+    rhythm: [
+      rhythm(4, 'Rhythm — level 4 (keep swing honest)'),
+      rhythm(5, 'Rhythm — level 5 (sixteenths and 3/4)'),
+    ],
     sight: [sight(5, 'Sight-reading — level 5 (hands together)')],
     theory: [
       {
@@ -686,7 +693,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           { kind: 'scale', root: 'F', type: 'lydian', label: 'F Lydian — all white keys from F' },
           { kind: 'scale', root: 'E', type: 'phrygian', label: 'E Phrygian — all white keys from E' },
           { kind: 'scale', root: 'B', type: 'locrian', label: 'B Locrian — all white keys from B' },
-          quiz('scale-type', 4, 'Quiz: name the scale type by ear'),
+          quiz('scale-type', 6, 'Quiz: name the scale type by ear — all eleven'),
         ],
       },
       {

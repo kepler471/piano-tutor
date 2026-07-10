@@ -436,14 +436,19 @@ The `#/...` paths are in-app links — open the app and paste one after its URL,
 
 **Ear**
 
-- Chord qualities — level 4 (everything) — `#/quizzes?mode=chords&level=4&from=guide`
-- Scale types — modes and blues by ear — `#/quizzes?mode=scale-type&level=4&from=guide`
+- Chord qualities — level 4 (all ten qualities) — `#/quizzes?mode=chords&level=4&from=guide`
+- Chord qualities — level 5 (voiced in inversions) — `#/quizzes?mode=chords&level=5&from=guide`
+- Intervals — level 5 (harmonic: both notes at once) — `#/quizzes?mode=intervals&level=5&from=guide`
+- Scale types — all the modes by ear — `#/quizzes?mode=scale-type&level=5&from=guide`
 - Cadences — including the deceptive V → vi — `#/quizzes?mode=cadence&level=3&from=guide`
+- Cadences — the same four, in minor keys — `#/quizzes?mode=cadence&level=4&from=guide`
 - Rhythm dictation — swing patterns — `#/quizzes?mode=rhythm-dictation&level=4&from=guide`
+- Rhythm dictation — sixteenths and 3/4 time — `#/quizzes?mode=rhythm-dictation&level=5&from=guide`
 
 **Rhythm**
 
 - Rhythm — level 4 (keep swing honest) — `#/rhythm?level=4&from=guide`
+- Rhythm — level 5 (sixteenths and 3/4) — `#/rhythm?level=5&from=guide`
 
 **Sight-reading**
 
@@ -467,7 +472,7 @@ Play the white keys from D to D and you get Dorian — a minor scale with a brig
 - F Lydian — all white keys from F — `#/scales?root=F&type=lydian&from=guide`
 - E Phrygian — all white keys from E — `#/scales?root=E&type=phrygian&from=guide`
 - B Locrian — all white keys from B — `#/scales?root=B&type=locrian&from=guide`
-- Quiz: name the scale type by ear — `#/quizzes?mode=scale-type&level=4&from=guide`
+- Quiz: name the scale type by ear — all eleven — `#/quizzes?mode=scale-type&level=6&from=guide`
 
 ### Where to go from here
 

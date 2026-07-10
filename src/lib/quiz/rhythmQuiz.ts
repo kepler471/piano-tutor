@@ -16,7 +16,7 @@ export interface RhythmDictationQuestion {
   explanation: string
 }
 
-export const RHYTHM_DICTATION_LEVELS = [1, 2, 3, 4] as const
+export const RHYTHM_DICTATION_LEVELS = [1, 2, 3, 4, 5] as const
 
 function shuffle<T>(arr: readonly T[], rng: Rng): T[] {
   const out = [...arr]
@@ -31,11 +31,16 @@ export function makeRhythmDictationQuestion(
   level: number,
   rng: Rng = Math.random,
 ): RhythmDictationQuestion {
-  const lv = Math.max(1, Math.min(4, Math.floor(level))) as 1 | 2 | 3 | 4
+  const lv = Math.max(1, Math.min(RHYTHM_DICTATION_LEVELS.length, Math.floor(level))) as RhythmPattern['level']
   const pool = RHYTHM_PATTERNS.filter((p) => p.level === lv)
   const shuffled = shuffle(pool, rng)
   const answer = shuffled[0]
-  const options = shuffle(shuffled.slice(0, Math.min(3, shuffled.length)), rng)
+  // Distractors must share the answer's meter — otherwise a 3/4 answer
+  // could be picked by its time signature without listening.
+  const sameMeter = shuffled.filter(
+    (p) => p.timeSignature[0] === answer.timeSignature[0] && p.timeSignature[1] === answer.timeSignature[1],
+  )
+  const options = shuffle(sameMeter.slice(0, Math.min(3, sameMeter.length)), rng)
   const explanation = `"${answer.label}".${answer.hint ? ` ${answer.hint}` : ''}`
   return { kind: 'rhythm-dictation', answer, options, explanation }
 }

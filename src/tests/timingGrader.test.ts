@@ -93,7 +93,7 @@ describe('rhythm patterns', () => {
   })
 
   it('every level has at least two patterns', () => {
-    for (const level of [1, 2, 3, 4]) {
+    for (const level of [1, 2, 3, 4, 5]) {
       expect(RHYTHM_PATTERNS.filter((p) => p.level === level).length).toBeGreaterThanOrEqual(2)
     }
   })

@@ -16,7 +16,7 @@ export const CHORD_QUALITIES: { id: ChordQualityId; tonalType: string; suffix: s
   { id: 'major 6th', tonalType: '6', suffix: '6', size: 4 },
 ]
 
-const INVERSION_LABELS = ['root position', '1st inversion', '2nd inversion', '3rd inversion']
+export const INVERSION_LABELS = ['root position', '1st inversion', '2nd inversion', '3rd inversion']
 
 /** tonal returns pitch classes; stack them ascending starting at the root in octave 4. */
 function stackAscending(pitchClasses: string[], rootOctave = 4): string[] {

@@ -219,7 +219,8 @@
           await playChord(question.midis, { duration: 1.8 })
           break
         case 'interval':
-          await playSequence(question.midis, 40)
+          if (question.harmonic) await playChord(question.midis, { duration: 1.8 })
+          else await playSequence(question.midis, 40)
           break
         case 'echo':
           await playSequence(question.midis, 60)
@@ -230,9 +231,12 @@
         case 'cadence':
           await playChordSequence(question.chords, 40)
           break
-        case 'rhythm-dictation':
-          await playSong(question.answer.events.map((e) => ({ midi: 75, ...e })), 84, question.answer.swing)
+        case 'rhythm-dictation': {
+          // Sixteenth-note patterns get a slower click so the ear can keep up.
+          const tempo = question.answer.events.some((e) => e.durationBeats <= 0.25 + 1e-6) ? 72 : 84
+          await playSong(question.answer.events.map((e) => ({ midi: 75, ...e })), tempo, question.answer.swing)
           break
+        }
       }
     } finally {
       playing = false
@@ -265,12 +269,14 @@
         }
       case 'interval-staff':
         return {
-          clef: 'treble',
+          clef: question.clef,
           keySignature: 'C',
-          events: [
-            { keys: [midiToVexKey(question.midis[0])], duration: 'h' },
-            { keys: [midiToVexKey(question.midis[1])], duration: 'h' },
-          ],
+          events: question.harmonic
+            ? [{ keys: [midiToVexKey(question.midis[0]), midiToVexKey(question.midis[1])], duration: 'w' }]
+            : [
+                { keys: [midiToVexKey(question.midis[0])], duration: 'h' },
+                { keys: [midiToVexKey(question.midis[1])], duration: 'h' },
+              ],
         }
       default:
         return null
