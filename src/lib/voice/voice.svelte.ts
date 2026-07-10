@@ -21,6 +21,7 @@ import { logMiss } from './missLog'
 import { loadModelArchive } from './modelLoader'
 import { buildGrammar, parseTranscript } from './parser'
 import { SCOPE_PHRASES, SPOKEN_HELP_EXAMPLES } from './phrases'
+import { isStaleChunkError } from './staleChunk'
 import { tts } from './tts'
 
 /**
@@ -32,6 +33,7 @@ import { tts } from './tts'
 
 const VOSK_SAMPLE_RATE = 16000
 const STORAGE_KEY = 'piano-tutor.voice-enabled'
+const RELOAD_KEY = 'piano-tutor.voice-chunk-reload'
 const captureProcessorUrl = assetUrl('worklets/capture-processor.js')
 
 export type VoiceStatus =
@@ -187,6 +189,79 @@ async function handleUnknown(text: string, seq: number): Promise<void> {
 // Recognition pipeline
 // ---------------------------------------------------------------------------
 
+/**
+ * Loads the lazily-split vosk-browser chunk (~6 MB — it inlines its Kaldi
+ * WASM worker and would otherwise bloat the main bundle for users who never
+ * enable voice). The chunk is hash-named and excluded from the SW precache,
+ * so when a GitHub Pages deploy replaces it while this client still runs the
+ * previous app shell, the import 404s. Recover with a one-shot reload: nudge
+ * the service worker to update, persist the enabled flag so voice resumes
+ * automatically, and load the fresh shell whose vosk chunk exists.
+ */
+async function loadVoskModule(): Promise<typeof import('vosk-browser')> {
+  try {
+    const mod = await import('vosk-browser')
+    clearReloadFlag()
+    return mod
+  } catch (err) {
+    if (isStaleChunkError(err) && !reloadAttempted()) {
+      markReloadAttempted()
+      persist(true)
+      await tryActivateUpdatedSW()
+      location.reload()
+      await new Promise<never>(() => {}) // page is unloading; never settle
+    }
+    throw err
+  }
+}
+
+/** Best-effort: ask the SW registration to update and give the new worker a
+ * moment to activate, so the reload serves the fresh app shell. */
+async function tryActivateUpdatedSW(): Promise<void> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    if (!reg) return
+    await reg.update()
+    const sw = reg.installing ?? reg.waiting
+    if (!sw) return
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 3000)
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'activated' || sw.state === 'redundant') {
+          clearTimeout(timer)
+          resolve()
+        }
+      })
+    })
+  } catch {
+    // reload anyway
+  }
+}
+
+function reloadAttempted(): boolean {
+  try {
+    return sessionStorage.getItem(RELOAD_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function markReloadAttempted(): void {
+  try {
+    sessionStorage.setItem(RELOAD_KEY, '1')
+  } catch {
+    // best-effort
+  }
+}
+
+function clearReloadFlag(): void {
+  try {
+    sessionStorage.removeItem(RELOAD_KEY)
+  } catch {
+    // best-effort
+  }
+}
+
 function handleFinal(text: string): void {
   const intent = parseTranscript(text, { armed: convo.isArmed() })
   if (!intent) return // no wake word — silently ignore
@@ -260,9 +335,7 @@ async function enable(opts: { announce?: boolean } = {}): Promise<void> {
       modelProgress = 0
       const url = await loadModelArchive((p) => (modelProgress = p))
       status = 'loading'
-      // Dynamic import: vosk-browser inlines its Kaldi WASM worker (~6 MB)
-      // and would otherwise bloat the main bundle for users who never enable voice.
-      const { createModel } = await import('vosk-browser')
+      const { createModel } = await loadVoskModule()
       model = await createModel(url)
     } else {
       status = 'loading'
@@ -314,7 +387,11 @@ async function enable(opts: { announce?: boolean } = {}): Promise<void> {
   } catch (err) {
     console.error('[voice] enable failed:', err)
     status = 'error'
-    errorMessage = err instanceof Error ? err.message : String(err)
+    errorMessage = isStaleChunkError(err)
+      ? 'Could not download the voice recognizer. Check your connection and reload the page.'
+      : err instanceof Error
+        ? err.message
+        : String(err)
     if (holdingMic) {
       holdingMic = false
       mic.release()

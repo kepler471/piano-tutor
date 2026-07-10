@@ -83,6 +83,9 @@ export default defineConfig({
           'worklets/**',
           // The lazy vosk chunk is ~6 MB — too big to precache on every first
           // visit; the assets runtime route below picks it up on first use.
+          // Consequence: a deploy can 404 the hash an old precached shell
+          // still references — voice.svelte.ts (loadVoskModule) recovers from
+          // that with a one-shot reload.
           'assets/vosk-*.js',
         ],
         // ⚠️ workbox inlines these urlPattern functions into the generated SW
