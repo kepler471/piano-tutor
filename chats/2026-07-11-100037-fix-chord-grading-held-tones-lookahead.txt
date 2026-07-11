@@ -1,0 +1,537 @@
+# Chat export — 3c96390a-0a53-4a2f-8174-51033d2a5f3f — exported 2026-07-11T09:01:11.314Z
+
+❯ When trying to get the app to listen to me playing chords, it is really bad, I am playing the correct chords, but it is either mishearing them or because my timing is out it does not seem to be able to hear them very well. I was trying this specifically on the cadence tests
+
+⏺ I'll dig into the chord-detection path (mic → Basic Pitch worker → poly filter → fusion → matcher) and the cadence lesson specifically to figure out where correct chords could be getting lost.
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/audio/polyFilter.ts)
+
+  ⎿  1	export interface RawPolyNote {
+     2	  pitchMidi: number
+     3	  amplitude: number
+     4	  startTimeSeconds: number
+     5	  durationSeconds: number
+     … +27 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/fusion.ts)
+
+  ⎿  1	import type { NoteSource } from '../audio/noteEvents'
+     2	
+     3	/**
+     4	 * Mono/poly fusion for chord practice ('mic-fused' routing): the mono
+     5	 * tracker hears the most prominent line ~10 ms after the onset, while Basic
+     … +53 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/audio/basicPitch.worker.ts)
+
+  ⎿  1	/// <reference lib="webworker" />
+     2	/**
+     3	 * Polyphonic note detection worker: Spotify Basic Pitch on the TF.js WASM
+     4	 * backend. Basic Pitch is an offline model, so we adapt it to streaming with
+     5	 * sliding-window inference: every ~0.5 s of new audio, run the model over the
+     … +162 more lines
+
+⏺ Now let me look at how the cadence lesson grades chords — the matcher and the lesson player.
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts)
+
+  ⎿  1	import type { LessonStep } from '../data/lessons/types'
+     2	
+     3	export type StepResult = 'pending' | 'correct' | 'corrected' | 'skipped'
+     4	
+     5	export interface OnsetOutcome {
+     … +98 more lines
+
+⏺ Bash(grep -rn "cadence" /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src --include="*.ts" --include="…)
+
+  ⎿  /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/detection.test.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/earQuiz.test.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/noiseFloor.test.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/theoryQuiz.test.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/glossary.test.ts
+     … +16 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/data/lessons/cadences.ts)
+
+  ⎿  1	import { Note } from 'tonal'
+     2	import type { Finger } from '../../theory/types'
+     3	import type { Lesson, LessonStep } from './types'
+     4	
+     5	/**
+     … +74 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/routing.ts)
+
+  ⎿  1	import type { NoteSource } from '../audio/noteEvents'
+     2	
+     3	/** Which input is actively feeding grading/display. */
+     4	export type ActiveSource = 'midi' | 'mic-mono' | 'mic-poly' | 'mic-fused' | 'none'
+     5	
+     … +43 more lines
+
+⏺ Bash(ls /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/screens/ /Users/steli/src/piano-tutor/.claud…)
+
+  ⎿  /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/:
+     fusion.ts
+     midi.svelte.ts
+     midiParse.ts
+     noteInput.svelte.ts
+     … +15 more lines
+
+⏺ Bash(grep -rn "LessonPlayer\|lessonPlayer" /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src --include…)
+
+  ⎿  /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/voiceDispatcher.test.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/screens/Practice.svelte
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/voice/dispatcher.ts
+     /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/guideProgress.ts
+
+⏺ Bash(ls /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/)
+
+  ⎿  BackToGuide.svelte
+     CircleOfFifthsWheel.svelte
+     EchoPlayer.svelte
+     GlossText.svelte
+     GrandSheetMusic.svelte
+     … +13 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  1	<script lang="ts">
+     2	  import GlossText from './GlossText.svelte'
+     3	  import InputPicker from './InputPicker.svelte'
+     4	  import PianoKeyboard from './PianoKeyboard.svelte'
+     5	  import SheetMusic from './SheetMusic.svelte'
+     … +428 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts)
+
+  ⎿  1	import { mic } from '../audio/mic.svelte'
+     2	import { monoPitch, onNoteEvent, startMonoDetection, stopMonoDetection } from '../audio/monoPitch.svelte'
+     3	import type { NoteEvent, NoteEventListener } from '../audio/noteEvents'
+     4	import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '../audio/polyPitch.svelte'
+     5	import { settings } from '../settings.svelte'
+     … +82 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/audio/polyPitch.svelte.ts)
+
+  ⎿  1	import { mic } from './mic.svelte'
+     2	import type { NoteEvent, NoteEventListener } from './noteEvents'
+     3	import * as playback from './playback'
+     4	import { Resampler } from './resample'
+     5	import { assetUrl } from '../assetUrl'
+     … +120 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/audio/monoTracker.ts)
+
+  ⎿  1	import { PitchDetector } from 'pitchy'
+     2	import { NoiseFloor } from './noiseFloor'
+     3	import { frequencyToMidi, type NoteEvent } from './noteEvents'
+     4	
+     5	export interface MonoTrackerOptions {
+     … +196 more lines
+
+⏺ I've traced the whole chord-grading path (mic → mono tracker + Basic Pitch worker → fuser → `StepMatcher` → LessonPlayer). Your chords almost certainly *are* being heard — but three design interactions specific to the cadence lessons make it look deaf or wrong. Here's the diagnosis, ranked.
+  
+  ## 1. The lesson tells you to hold the common tone — the grader requires you to re-strike it
+  
+  The cadence tips say *"Notice the common tone held between chords — keep that finger down."* But grading is onset-based: `StepMatcher` (`src/lib/practice/matcher.ts:92`) only completes a step when **every** midi in it produces a fresh note-on. A held note produces no new onset from either detector — the mono tracker only reports pitch *changes*, and Basic Pitch only fires on onset activations (the worker's `EDGE_SEC` guard at `basicPitch.worker.ts:133` deliberately drops sustained-note re-detections in later windows).
+  
+  Concretely in the C cadence: I = {C4,E4,G4}, IV = {C4,F4,A4}. If you hold C4 into chord IV as instructed, the IV step sits at 2/3 collected **forever**. Following the pedagogy makes the grader deaf to the chord. (Same with G4 held from V into the final I.)
+  
+  ## 2. Lookahead-2 skipping turns stray notes into "it skipped my chord"
+  
+  `LessonPlayer.svelte:54` creates the matcher with `lookahead: 2` — designed for lossy fast *melodic* playing. On cadences it misfires badly because adjacent chords share tones:
+  
+  - While stuck on IV (see issue 1), any stray **G4** — a ringing harmonic from chord I, or a mono-tracker flicker — matches V via lookahead and marks IV *skipped*.
+  - A stray **E4** (still resonating from chord I) matches the final I two steps ahead and skips **both** IV and V in one shot.
+  
+  So the failure you experience is: play I (works), hold the common tone into IV (stuck), play V — and its first detected note "skips" IV, which renders as a missed/grey chord. That reads exactly as "it can't hear my chords."
+  
+  ## 3. The mono tracker is being fed chords it can't represent, and its errors count as wrong notes
+  
+  In the default `mic-fused` mode both detectors forward (`routing.ts:38`). The MPM mono detector is monophonic; on a triad it locks onto whichever periodicity wins — often a chord tone (harmless), but also **the common-period subharmonic** of the mixture (for C3-E3-G3 in the left-hand segment that's around C1–C2, which is inside the accepted MIDI range) or fifth-locks. Every such misdetection hits `matcher.onOnset` and flashes as a *wrong note* even though your chord was correct — that's the "mishearing" you're seeing. The tracker's own doc comment (`monoTracker.ts:113`) acknowledges exactly this failure mode, but in fused mode those events still grade.
+  
+  ## Why "timing" seems to matter
+  
+  It doesn't, directly — the matcher is wait-don't-fail with no clock. What you're feeling is **poly lag**: Basic Pitch reports land 0.5–1.5 s behind your playing. If you play the cadence in tempo (the lesson suggests 60 BPM), chord N's poly notes arrive while you're already on chord N+1, feeding the lookahead-skip machinery in issue 2. Pausing ~2 s between chords masks the bugs, which is why it feels timing-sensitive. (The "chord notes land about a second behind" hint in LessonPlayer only renders for `hand === 'both'` segments, so cadences never show it.)
+  
+  ## What I'd change
+  
+  1. **Carry held common tones**: in chord lessons, pre-seed each step's `collected` set with the midis shared with the just-completed step (matches the "keep that finger down" pedagogy), or equivalently only require onsets for the *changed* notes.
+  2. **Disable lookahead for chord steps** (`lookahead: 0` when any step has `midis.length > 1`) — the skip heuristic is a melody-mode tool and is actively harmful here.
+  3. **Don't let mono misdetections grade as wrong in fused mode** — e.g. in fused mode, only count a mono onset as "wrong" if poly corroborates it, or at minimum filter mono onsets that are subharmonically related to the expected chord.
+  
+  All three are in pure, vitest-covered modules (`matcher.ts`, `fusion.ts`/routing), so they're testable without a mic. Want me to implement them? I'd start with 1 and 2, which I'm confident fix the "skipped/deaf chord" experience, and treat 3 as a follow-up since it touches detection heuristics.
+
+❯ Ok it seems like different tests might all need to use the listening features in very particular ways. Have a look at improving this across the board
+
+⏺ The scope has widened from cadences to every feature that listens to the mic. I'll explore how each consumer (lessons, songs, sight-reading, rhythm, quizzes, libraries) configures the listening stack, then design a unified improvement.
+
+⏺ Agent(Survey listening-stack consumers)
+
+⏺ Agent(Survey matcher/fusion tests + data)
+
+  ⎿  I now have a comprehensive picture. Here is the structured report.
+     
+     ---
+     
+     # Chord-tracking / grading exploration report
+     … +150 more lines
+
+  ⎿  I have a complete picture. Here is the inventory.
+     
+     # Note-input / listening consumer inventory
+     
+     ## Core plumbing (shared substrate)
+     … +101 more lines
+
+⏺ Agent(Design unified grading plan)
+
+  ⎿  The Write tool isn't available in this read-only context, so I'll deliver the plan directly.
+     
+     # Implementation Plan: Fix chord tracking in cadence/chordal practice
+     
+     ## Verified diagnosis notes (adjustments to the given direction)
+     … +144 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts)
+
+  ⎿  82	  it('a repeated note matches the current step, never skips', () => {
+     83	    const m = new StepMatcher(mel(67, 67, 69), { lookahead: 1 })
+     84	    expect(m.onOnset(67)).toEqual({ advanced: true, wrong: false, done: false })
+     85	    expect(m.results[0]).toBe('correct')
+     86	    expect(m.skips).toBe(0)
+     … +100 more lines
+
+⏺ Write(/Users/steli/.claude/plans/ok-it-seems-like-flickering-rain.md)
+
+  ⎿  File created successfully at: /Users/steli/.claude/plans/ok-it-seems-like-flickering-rain.md (file state is current in your context — no need to Read it back)
+
+⏺ ToolSearch({"query":"select:ExitPlanMode","max_results":1})
+
+  ⎿  (no output)
+
+⏺ ExitPlanMode({"plan":"# Unify and fix mic listening/grading across all practice features\n\n#…)
+
+  ⎿  User has approved your plan. You can now start coding. Start with updating your todo list if applicable
+     
+     Your plan has been saved to: /Users/steli/.claude/plans/ok-it-seems-like-flickering-rain.md
+     You can refer back to it if needed during implementation.
+     
+     … +83 more lines
+
+⏺ Plan approved. Starting with the pure matcher changes and tests.
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts has been updated successfully. (file state is current in your context — no need to Read it bac…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts has been updated successfully. (file state is current in your context — no need to Read it bac…
+
+⏺ Now the lookahead guard and the carry logic:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts has been updated successfully. (file state is current in your context — no need to Read it bac…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/matcher.ts has been updated successfully. (file state is current in your context — no need to Read it bac…
+
+⏺ Now the tests. First rewrite the one pinned test that skips over a chord, then add the new blocks:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts)
+
+  ⎿  1	import { describe, expect, it } from 'vitest'
+     2	import { StepMatcher } from '../lib/practice/matcher'
+     3	import type { LessonStep } from '../lib/data/lessons'
+     4	import { allLessons, makeSightReadingLesson } from '../lib/data/lessons'
+     5	
+     … +5 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts)
+
+  ⎿  176	
+     177	describe('StepMatcher (chords)', () => {
+     178	  const chord: LessonStep[] = [{ midis: [60, 64, 67], fingers: [1, 3, 5] }]
+     179	
+     180	  it('collects chord tones in any order before advancing', () => {
+     … +54 more lines
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/matcher.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+
+⏺ Bash(npx vitest run src/tests/matcher.test.ts 2>&1 | tail -20)
+
+  ⎿  (node:5082) ExperimentalWarning: CommonJS module /opt/homebrew/lib/node_modules/npm/node_modules/debug/src/node.js is loading ES Module /opt/homebrew/lib/node_modules/npm/node_modules/supports-color/i…
+     Support for loading ES Module in require() is an experimental feature and might change at any time
+     (Use `node --trace-warnings ...` to show where the warning was created)
+     
+      RUN  v3.2.6 /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors
+     … +10 more lines
+
+⏺ All 34 matcher tests pass, including the previously pinned lookahead behaviors. Now the pure policy module:
+
+⏺ Write(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/grading.ts)
+
+  ⎿  File created successfully at: /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/practice/grading.ts (file state is current in your context — no need to Read it back)
+
+⏺ Write(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/grading.test.ts)
+
+  ⎿  File created successfully at: /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/grading.test.ts (file state is current in your context — no need to Read it back)
+
+⏺ Bash(npx vitest run src/tests/grading.test.ts 2>&1 | tail -8)
+
+  ⎿  (Use `node --trace-warnings ...` to show where the warning was created)
+      ✓ src/tests/grading.test.ts (14 tests) 3ms
+     
+      Test Files  1 passed (1)
+           Tests  14 passed (14)
+     … +2 more lines
+
+⏺ Pure layers done and green. Now the hub helper:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts has been updated successfully. (file state is current in your context — no need to Read …
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts has been updated successfully. (file state is current in your context — no need to Read …
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/noteInput.svelte.ts has been updated successfully. (file state is current in your context — no need to Read …
+
+⏺ Now wire up LessonPlayer:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Now the timing block — gate on `timingGradable` and make `timingUngraded` carry a reason:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/LessonPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read…
+
+⏺ Now SongPlayer. Let me read the relevant sections first:
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  1	<script lang="ts">
+     2	  import GrandSheetMusic from './GrandSheetMusic.svelte'
+     3	  import InputPicker from './InputPicker.svelte'
+     4	  import PianoKeyboard from './PianoKeyboard.svelte'
+     5	  import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
+     … +135 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  190	      loggedDone = true
+     191	      // Rhythm read-through grade, relative to the run's own first note.
+     192	      // Suppressed on mic-poly input: its 0.5–1.5 s detection latency makes
+     193	      // millisecond grading meaningless. A lookahead-skip advances the cursor
+     194	      // twice on one onset, so the length check fails and the run simply
+     … +70 more lines
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read i…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read i…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read i…
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/SongPlayer.svelte has been updated successfully. (file state is current in your context — no need to Read i…
+
+⏺ Bash(npm test 2>&1 | tail -25)
+
+  ⎿  Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+     Element: No context for txtCanvas. Returning empty text metrics.
+     Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+     Element: No context for txtCanvas. Returning empty text metrics.
+     Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+     … +19 more lines
+
+⏺ Bash(npm run check 2>&1 | tail -10)
+
+  ⎿  > piano-tutor@0.0.0 check
+     > svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json
+     
+     1783699739453 START "/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors"
+     1783699739460 ERROR "src/tests/grading.test.ts" 46:6 "Type '(LessonStep | { midis: number[]; fingers: number[]; })[]' is not assignable to type 'LessonStep[]'.\n  Type 'LessonStep | { midis: number[];…
+     … +3 more lines
+
+⏺ A type-widening issue in the test's inline literal — fixing:
+
+⏺ Edit(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/grading.test.ts)
+
+  ⎿  The file /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/tests/grading.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+
+⏺ Bash(npm run check 2>&1 | tail -4)
+
+  ⎿  > svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json
+     
+     1783699759751 START "/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors"
+     1783699759759 COMPLETED 2326 FILES 0 ERRORS 0 WARNINGS 0 FILES_WITH_PROBLEMS
+
+⏺ Skill(verify Verify the cadence-C lesson chord-grading fixes: lag hint on single-hand chordal segment, and matcher behavior wi…)
+
+  ⎿  Launching skill: verify
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/midi.svelte.ts)
+
+  ⎿  1	import type { NoteEventListener } from '../audio/noteEvents'
+     2	import { parseMidiMessage } from './midiParse'
+     3	
+     4	/**
+     5	 * Web MIDI input: device discovery, hot-plug handling, and a NoteEvent
+     … +100 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/lib/input/midiParse.ts)
+
+  ⎿  1	import type { NoteEvent } from '../audio/noteEvents'
+     2	
+     3	const MIDI_MIN = 21
+     4	const MIDI_MAX = 108
+     5	
+     … +30 more lines
+
+⏺ Read(/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/components/InputPicker.svelte)
+
+  ⎿  1	<script lang="ts">
+     2	  import { mic } from '../lib/audio/mic.svelte'
+     3	  import { monoPitch } from '../lib/audio/monoPitch.svelte'
+     4	  import { polyPitch } from '../lib/audio/polyPitch.svelte'
+     5	  import { midi } from '../lib/input/midi.svelte'
+     … +128 more lines
+
+⏺ Now I need the practice deep-link shape:
+
+⏺ Bash(grep -n "currentParams\|lesson" /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors/src/screens/Practic…)
+
+  ⎿  6:  import { allLessons, type Lesson } from '../lib/data/lessons'
+     12:  import { currentParams, navigate } from '../router.svelte'
+     17:  const lessons = allLessons()
+     18:  const methods = [...new Set(lessons.map((l) => l.method))]
+     19:  const keys = ['All', ...new Set(lessons.map((l) => l.keySignature.replace(/m$/, '')))]
+     … +15 more lines
+
+⏺ Bash((npm run dev > /private/tmp/claude-501/-Users-steli-src-piano-tutor/3c96390a-0a53-4a2f-8174-51033d2a5f3f/scratchpad/dev.…)
+
+  ⎿  http://localhost:5174/piano-tutor/
+
+⏺ Write(/private/tmp/claude-501/-Users-steli-src-piano-tutor/3c96390a-0a53-4a2f-8174-51033d2a5f3f/scratchpad/verify-cadence.mjs)
+
+  ⎿  File created successfully at: /private/tmp/claude-501/-Users-steli-src-piano-tutor/3c96390a-0a53-4a2f-8174-51033d2a5f3f/scratchpad/verify-cadence.mjs (file state is current in your context — no need t…
+
+⏺ Bash(cd /private/tmp/claude-501/-Users-steli-src-piano-tutor/3c96390a-0a53-4a2f-8174-51033d2a5f3f/scratchpad && node verify-c…)
+
+  ⎿  lag hint visible before listening (single-hand chordal segment): true
+     lag hint hidden on MIDI: true
+     after I: Progress: 1 / 4
+     after IV (C held, never re-struck): Progress: 2 / 4
+     after V: Progress: 3 / 4
+     … +5 more lines
+
+⏺ All end-to-end checks pass. Cleaning up the dev server:
+
+⏺ Bash(lsof -ti :5174 | xargs kill 2>/dev/null; git -C /Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-errors sta…)
+
+  ⎿  M src/components/LessonPlayer.svelte
+      M src/components/SongPlayer.svelte
+      M src/lib/input/noteInput.svelte.ts
+      M src/lib/practice/matcher.ts
+      M src/tests/matcher.test.ts
+     … +2 more lines
+
+⏺ The chord-grading fixes are implemented, tested, and verified end-to-end in the real app. The cadence drill now completes cleanly when you hold common tones, and stray tones can no longer make it mark your chords as "missed".
+  
+  ## What changed
+  
+  **`src/lib/practice/matcher.ts`** (pure logic, both fixes vitest-covered):
+  - New `carryHeldTones` option: when a chord step completes, tones it shares with the next chord are pre-collected — matching the lesson's own "keep that finger down" instruction. A guard only carries proper subsets, so a repeated identical chord (the blues-comp lesson does this) still requires a full re-strike.
+  - Lookahead skipping is now chord-aware: a stray tone can never skip past a chord step. This was the "phantom missed chord" — a ringing harmonic from the previous chord matched a future step and greyed out the one you were playing.
+  
+  **`src/lib/practice/grading.ts`** (new shared policy module):
+  - `shouldGradeOnset` — in fused mic mode on a chord step, the mono detector's misdetections (subharmonics, fifth-locks — it fundamentally can't hear a triad) no longer flash wrong or count as mistakes; mono only gives instant positive feedback and poly does the full grading.
+  - `timingGradable` — one rule for when millisecond timing is meaningful: never on `mic-poly`, and not on `mic-fused` when the material has chords (they advance on the laggy poly path). SongPlayer previously only suppressed `mic-poly`; LessonPlayer suppressed nothing.
+  
+  **Wiring** — LessonPlayer and SongPlayer both use the shared helpers now; SongPlayer gained the detector-restart-on-needs-change behavior LessonPlayer already had (fixes the Hands switch not upgrading to chord detection); and the "chord detection runs about a second behind" hint now shows on single-hand chordal segments like the cadences, with a nudge to give each chord a moment.
+  
+  ## Verification
+  
+  - 834 unit tests pass (48 in the touched suites, including a golden replay of your exact failure: fused-mic cadence with held tones, a subharmonic misdetection, and a ringing-G flicker → all four chords `correct`, 0 mistakes, 0 skips). `npm run check` clean.
+  - Drove the real app with Playwright using an injected fake MIDI device: played the C cadence holding the common tones (C into IV, G into the final I) — completed with "no wrong notes!"; a stray G during chord IV flagged as wrong but did not skip the chord; the lag hint appears in mic mode and hides on MIDI; zero console errors.
+  
+  One thing to know when you try it on the mic: chord notes still confirm ~1 second behind your playing (that's Basic Pitch's window, unchanged) — but now waiting on a chord can't be derailed, and the correct chord always completes. Worth a real-mic run on the cadence drill to confirm it feels right; the changes are uncommitted on the `chord-tracking-errors` worktree whenever you want to review or commit.
+
+❯ /export-chat
+
+⏺ Bash(date +%Y-%m-%d-%H%M%S)
+
+  ⎿  2026-07-11-100037
+
+⏺ Bash(node scripts/exportChat.mjs "chats/2026-07-11-100037-fix-chord-grading-held-tones-lookahead.txt" "3c96390a-0a53-4a2f-817…)
+
+  ⎿  Error: Exit code 1
+     node:internal/modules/cjs/loader:1242
+       throw err;
+       ^
+     
+     … +12 more lines
+
+⏺ The export script isn't in this worktree's branch point. Checking the main checkout:
+
+⏺ Bash(ls /Users/steli/src/piano-tutor/scripts/exportChat.mjs 2>&1; ls scripts/)
+
+  ⎿  /Users/steli/src/piano-tutor/scripts/exportChat.mjs
+     generateGuideMd.ts
+     midiToCatalog.ts
+
+⏺ The script exists on main but not on this branch (worktree branched before it was added). Running it from the main checkout, outputting into this worktree:
+
+⏺ Bash(node /Users/steli/src/piano-tutor/scripts/exportChat.mjs "/Users/steli/src/piano-tutor/.claude/worktrees/chord-tracking-…)
