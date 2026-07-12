@@ -5,7 +5,7 @@ import { onPolyEvent, polyPitch, startPolyDetection, stopPolyDetection } from '.
 import { settings } from '../settings.svelte'
 import { MonoPolyFuser } from './fusion'
 import { midi, onMidiEvent } from './midi.svelte'
-import { chooseSource, shouldForward, type ActiveSource } from './routing'
+import { chooseSource, expectedMicSource, shouldForward, type ActiveSource } from './routing'
 
 /**
  * Unified note-input hub: one subscription point over MIDI, mic-mono and
@@ -66,6 +66,19 @@ function stop(): void {
   active = 'none'
 }
 
+/**
+ * Restart the mic detector when the material's needs changed mid-session
+ * (e.g. moving to a hands-together segment, or a Hands switch making a song
+ * chordal). No-op on MIDI or when not listening.
+ */
+function ensureDetector(preferred: 'mono' | 'poly'): void {
+  const isMic = active !== 'midi' && active !== 'none'
+  if (isMic && active !== expectedMicSource(preferred, settings.fusion)) {
+    stop()
+    void start(preferred)
+  }
+}
+
 export const noteInput = {
   get activeSource() {
     return active
@@ -83,4 +96,5 @@ export const noteInput = {
   },
   start,
   stop,
+  ensureDetector,
 }

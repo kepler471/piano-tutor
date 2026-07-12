@@ -165,20 +165,12 @@ describe('StepMatcher skippedMidis', () => {
     expect(m.skippedMidis).toEqual([])
   })
 
-  it('returns the midis of skipped steps in step order, including chord tones', () => {
-    const m = new StepMatcher(
-      [
-        { midis: [60], fingers: [1] },
-        { midis: [62, 65], fingers: [1, 3] },
-        { midis: [67], fingers: [5] },
-        { midis: [69], fingers: [5] },
-      ],
-      { lookahead: 2 },
-    )
+  it('returns the midis of skipped steps in step order', () => {
+    const m = new StepMatcher(mel(60, 62, 67, 69), { lookahead: 2 })
     expect(m.onOnset(67).skipped).toBe(2)
     m.onOnset(69)
     expect(m.done).toBe(true)
-    expect(m.skippedMidis).toEqual([60, 62, 65])
+    expect(m.skippedMidis).toEqual([60, 62])
   })
 })
 
@@ -198,6 +190,112 @@ describe('StepMatcher (chords)', () => {
     const m = new StepMatcher(chord)
     expect(m.onOnset(62).wrong).toBe(true)
     expect(m.remaining).toEqual(new Set([60, 64, 67]))
+  })
+})
+
+// I–IV–V–I in C with beginner voicings: adjacent chords share common tones.
+const cadenceC: LessonStep[] = [
+  { midis: [60, 64, 67], fingers: [1, 3, 5] },
+  { midis: [60, 65, 69], fingers: [1, 4, 5] },
+  { midis: [59, 62, 67], fingers: [1, 3, 5] },
+  { midis: [60, 64, 67], fingers: [1, 3, 5] },
+]
+
+const playAll = (m: StepMatcher, midis: number[]) => midis.map((n) => m.onOnset(n))
+
+describe('StepMatcher carryHeldTones', () => {
+  it('completes a cadence with common tones held down (the cadence-lesson bug)', () => {
+    const m = new StepMatcher(cadenceC, { lookahead: 2, carryHeldTones: true })
+    playAll(m, [60, 64, 67]) // I
+    playAll(m, [65, 69]) // IV — C held from I, never re-struck
+    expect(m.cursor).toBe(2)
+    playAll(m, [59, 62, 67]) // V — no common tone with IV
+    playAll(m, [60, 64]) // final I — G held from V
+    expect(m.done).toBe(true)
+    expect(m.results).toEqual(['correct', 'correct', 'correct', 'correct'])
+    expect(m.mistakes).toBe(0)
+    expect(m.skips).toBe(0)
+  })
+
+  it('accepts a re-strike of a carried tone', () => {
+    const m = new StepMatcher(cadenceC, { carryHeldTones: true })
+    playAll(m, [60, 64, 67])
+    playAll(m, [60, 65, 69]) // C re-struck anyway
+    expect(m.cursor).toBe(2)
+    expect(m.mistakes).toBe(0)
+  })
+
+  it('excludes carried tones from remaining', () => {
+    const m = new StepMatcher(cadenceC, { carryHeldTones: true })
+    playAll(m, [60, 64, 67])
+    expect(m.remaining).toEqual(new Set([65, 69]))
+  })
+
+  it('a repeated identical chord must be fully re-struck', () => {
+    const steps: LessonStep[] = [
+      { midis: [60, 64, 67], fingers: [1, 3, 5] },
+      { midis: [60, 64, 67], fingers: [1, 3, 5] },
+    ]
+    const m = new StepMatcher(steps, { carryHeldTones: true })
+    playAll(m, [60, 64, 67])
+    expect(m.remaining).toEqual(new Set([60, 64, 67]))
+    expect(m.onOnset(60).advanced).toBe(false)
+    playAll(m, [64, 67])
+    expect(m.done).toBe(true)
+  })
+
+  it('a single note shared with the previous chord needs a fresh onset', () => {
+    const steps: LessonStep[] = [
+      { midis: [60, 64, 67], fingers: [1, 3, 5] },
+      { midis: [60], fingers: [1] },
+    ]
+    const m = new StepMatcher(steps, { carryHeldTones: true })
+    playAll(m, [60, 64, 67])
+    expect(m.done).toBe(false)
+    expect(m.remaining).toEqual(new Set([60]))
+    expect(m.onOnset(60).done).toBe(true)
+  })
+
+  it('does not carry out of a skipped step', () => {
+    const steps: LessonStep[] = [
+      { midis: [60], fingers: [1] },
+      { midis: [60, 64], fingers: [1, 3] },
+    ]
+    const m = new StepMatcher(steps, { lookahead: 1, carryHeldTones: true })
+    // 64 skips step 0 into the chord; the skipped step's 60 must not seed it.
+    expect(m.onOnset(64)).toEqual({ advanced: false, wrong: false, done: false, skipped: 1 })
+    expect(m.remaining).toEqual(new Set([60]))
+  })
+
+  it('is off by default: held common tones are not carried', () => {
+    const m = new StepMatcher(cadenceC)
+    playAll(m, [60, 64, 67])
+    expect(m.remaining).toEqual(new Set([60, 65, 69]))
+  })
+})
+
+describe('StepMatcher chord-aware lookahead', () => {
+  it('a stray tone matching a later chord never skips the current chord', () => {
+    const m = new StepMatcher(cadenceC, { lookahead: 2, carryHeldTones: true })
+    playAll(m, [60, 64, 67]) // I complete, cursor on IV
+    // Ringing G from chord I matches V at depth 1 — previously skipped IV.
+    expect(m.onOnset(67)).toEqual({ advanced: false, wrong: true, done: false })
+    // Stray E matches the final I at depth 2 — previously skipped IV and V.
+    expect(m.onOnset(64)).toEqual({ advanced: false, wrong: true, done: false })
+    expect(m.skips).toBe(0)
+    expect(m.cursor).toBe(1)
+  })
+
+  it('cannot skip past a chord step from a melodic step', () => {
+    const steps: LessonStep[] = [
+      { midis: [60], fingers: [1] },
+      { midis: [62, 65], fingers: [1, 3] },
+      { midis: [67], fingers: [5] },
+    ]
+    const m = new StepMatcher(steps, { lookahead: 2 })
+    m.onOnset(60)
+    expect(m.onOnset(67)).toEqual({ advanced: false, wrong: true, done: false })
+    expect(m.skips).toBe(0)
   })
 })
 

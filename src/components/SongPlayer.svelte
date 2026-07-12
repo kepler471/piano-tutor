@@ -7,6 +7,7 @@
   import { beatsPerMeasure, type Song } from '../lib/data/songs/types'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
   import { midiToNameInKey, type HighlightState } from '../lib/notation/vexScore'
+  import { shouldGradeOnset, timingGradable } from '../lib/practice/grading'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import { songPrefs } from '../lib/practice/songPrefs.svelte'
@@ -124,6 +125,7 @@
   $effect(() => {
     return onInput((ev) => {
       if (ev.kind !== 'on' || matcher.done) return
+      if (!shouldGradeOnset(ev, matcher.current, noteInput.activeSource)) return
       const outcome = matcher.onOnset(ev.midi)
       version++
       if (outcome.advanced) advanceTimes.push(ev.tMs ?? performance.now())
@@ -189,13 +191,13 @@
     if (done && steps.length > 0 && !loggedDone) {
       loggedDone = true
       // Rhythm read-through grade, relative to the run's own first note.
-      // Suppressed on mic-poly input: its 0.5–1.5 s detection latency makes
-      // millisecond grading meaningless. A lookahead-skip advances the cursor
-      // twice on one onset, so the length check fails and the run simply
-      // isn't timing-graded.
+      // Suppressed when step advance depends on laggy poly detection (see
+      // timingGradable). A lookahead-skip advances the cursor twice on one
+      // onset, so the length check fails and the run simply isn't
+      // timing-graded.
       if (
         metronomeOn &&
-        noteInput.activeSource !== 'mic-poly' &&
+        timingGradable(steps, noteInput.activeSource) &&
         steps.length > 1 &&
         steps.every((s) => s.startBeat !== undefined) &&
         advanceTimes.length === steps.length
@@ -249,6 +251,13 @@
   }
 
   const needsChords = $derived(steps.some((s) => s.midis.length > 1))
+
+  // If the material's detection needs change while listening on the mic
+  // (e.g. a Hands switch making the part chordal), restart the detector.
+  $effect(() => {
+    void noteInput.activeSource
+    noteInput.ensureDetector(needsChords ? 'poly' : 'mono')
+  })
 
   // Next-step suggestions for the completion card: the following section
   // (when practising by section), then hands-together (when on one hand).
