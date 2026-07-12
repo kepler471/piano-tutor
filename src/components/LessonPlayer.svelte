@@ -6,10 +6,9 @@
   import { setMetronomeBpm, startMetronome, stopMetronome } from '../lib/audio/metronome'
   import { playChord, playChordSequence, playSequence } from '../lib/audio/playback'
   import { noteInput, onInput } from '../lib/input/noteInput.svelte'
-  import { expectedMicSource } from '../lib/input/routing'
-  import { settings } from '../lib/settings.svelte'
   import type { Lesson } from '../lib/data/lessons'
   import { midiToNameInKey, scoreFromSteps, type HighlightState } from '../lib/notation/vexScore'
+  import { shouldGradeOnset, timingGradable } from '../lib/practice/grading'
   import { addRecord } from '../lib/practice/history.svelte'
   import { StepMatcher } from '../lib/practice/matcher'
   import { gradeTiming } from '../lib/practice/timingGrader'
@@ -38,6 +37,7 @@
   let showKeyboard = $state(false)
   // Hands-together segments override to chord detection when on the mic.
   const effectiveMode = $derived(segment.detectionMode ?? lesson.detectionMode)
+  const chordal = $derived(segment.steps.some((s) => s.midis.length > 1))
 
   let version = $state(0) // bumped on every matcher mutation to drive reactivity
   let resetKey = $state(0)
@@ -48,22 +48,24 @@
   // svelte-ignore state_referenced_locally
   let bpm = $state(lesson.tempoBpm)
 
-  // Recreated whenever the lesson, segment, or resetKey changes.
+  // Recreated whenever the lesson, segment, or resetKey changes. Chordal
+  // segments carry held common tones ("keep that finger down") — a held key
+  // never re-onsets, on mic or MIDI.
   const matcher = $derived.by(() => {
     void resetKey
-    return new StepMatcher(lesson.segments[segIndex].steps, { lookahead: 2 })
+    return new StepMatcher(lesson.segments[segIndex].steps, { lookahead: 2, carryHeldTones: chordal })
   })
 
   // Wall-clock times of each step advance — graded against the beat grid
   // when the metronome is on and the material carries startBeats.
   let advanceTimes: number[] = []
   let timingPct = $state<number | null>(null)
-  let timingUngraded = $state(false)
+  let timingUngraded = $state<string | null>(null)
   $effect(() => {
     void matcher
     advanceTimes = []
     timingPct = null
-    timingUngraded = false
+    timingUngraded = null
   })
 
   function restartSegment(index = segIndex) {
@@ -81,6 +83,7 @@
     // connected, otherwise the lesson's designated mic detector.
     return onInput((ev) => {
       if (ev.kind !== 'on' || matcher.done) return
+      if (!shouldGradeOnset(ev, matcher.current, noteInput.activeSource)) return
       const outcome = matcher.onOnset(ev.midi)
       version++
       if (outcome.advanced) advanceTimes.push(ev.tMs ?? performance.now())
@@ -97,13 +100,8 @@
   // If the segment's detection needs change while listening on the mic
   // (e.g. moving to a hands-together segment), restart with the right detector.
   $effect(() => {
-    const mode = effectiveMode
-    const activeSource = noteInput.activeSource
-    const isMic = activeSource !== 'midi' && activeSource !== 'none'
-    if (isMic && activeSource !== expectedMicSource(mode, settings.fusion)) {
-      noteInput.stop()
-      void noteInput.start(mode)
-    }
+    void noteInput.activeSource
+    noteInput.ensureDetector(effectiveMode)
   })
 
   $effect(() => {
@@ -186,7 +184,9 @@
       // the length check fails and the run simply isn't timing-graded.
       const steps = segment.steps
       if (metronomeOn && steps.length > 1 && steps.every((s) => s.startBeat !== undefined)) {
-        if (advanceTimes.length === steps.length) {
+        if (!timingGradable(steps, noteInput.activeSource)) {
+          timingUngraded = 'mic chord detection is too slow to time — connect a MIDI keyboard for a rhythm score.'
+        } else if (advanceTimes.length === steps.length) {
           const beatMs = 60000 / bpm
           const anchor = advanceTimes[0] - steps[0].startBeat! * beatMs
           const result = gradeTiming(
@@ -197,7 +197,7 @@
           )
           timingPct = Math.round(result.accuracy * 100)
         } else if (matcher.skips > 0) {
-          timingUngraded = true
+          timingUngraded = 'some notes slipped by; play it again for a rhythm score.'
         }
       }
       addRecord({
@@ -324,11 +324,11 @@
   </div>
 
   <InputPicker preferred={effectiveMode} />
-  {#if effectiveMode === 'poly' && noteInput.activeSource !== 'midi' && segment.hand === 'both'}
+  {#if effectiveMode === 'poly' && noteInput.activeSource !== 'midi'}
     <p class="hint">
-      🎹 Hands-together grading works best with a MIDI keyboard —
+      🎹 Chord grading works best with a MIDI keyboard —
       {noteInput.activeSource === 'mic-fused'
-        ? 'the mic grades the top line instantly, but the remaining chord notes land about a second behind.'
+        ? 'the mic hears one note instantly, but the remaining chord notes land about a second behind. Give each chord a moment before moving on.'
         : 'mic chord detection runs about a second behind your playing.'}
     </p>
   {/if}
@@ -343,7 +343,7 @@
       {#if timingPct !== null}
         Timing: {timingPct}% in the pocket.
       {:else if timingUngraded}
-        Timing not graded — some notes slipped by; play it again for a rhythm score.
+        Timing not graded — {timingUngraded}
       {/if}
       {#if segIndex < lesson.segments.length - 1}
         <button class="primary" onclick={() => restartSegment(segIndex + 1)}>
