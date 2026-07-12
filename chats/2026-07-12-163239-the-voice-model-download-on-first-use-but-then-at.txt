@@ -1,0 +1,321 @@
+╭─── Claude Code v2.1.206 ─────────────────────────────────────────────────────╮
+│                                                    │ What's new              │
+│                Welcome back Stelios!               │ Added directory path s… │
+│                                                    │ Added a `/doctor` chec… │
+│                      ▗ ▗   ▖ ▖                     │ `/commit-push-pr` now … │
+│                                                    │ /release-notes for more │
+│                        ▘▘ ▝▝                       │                         │
+│    Fable 5 · Claude Max · steliosdg@gmail.com's    │                         │
+│    Organization                                    │                         │
+│    ~/…/.claude/worktrees/voice-model-error-pages   │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+❯ The voice model download on first use but then at 100% it shows an error and  
+  I can't use the voice model. This is appearing on the deployed version. The   
+  error shown is:                                                               
+                                                                                
+  error loading dynamically imported module:                                    
+  https://kepler471.github.io/piano-tutor/assets/vosk-Dloz6gaQ.js               
+
+⏺ The voice model downloads fine but the lazily-loaded vosk JS chunk fails to
+  import — let me check how that chunk is built/served and whether it actually
+  exists on the deployed site.
+
+  Searched for 1 pattern, read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Root cause confirmed. Now let me look at the import site in voice.svelte.ts to
+  design a fix.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(src/lib/voice/staleChunk.ts)
+  ⎿  Wrote 17 lines to src/lib/voice/staleChunk.ts
+       1 /**
+         . This happens
+       3  * on GitHub Pages when a deploy replaces the hashed assets whil
+       4  * still running the previous app shell (served from the SW prec
+         ache): the
+         Ignores), so
+       6  * its first use after a deploy 404s. Browsers phrase the TypeEr
+       7  * differently:
+       8  *   Chrome:  "Failed to fetch dynamically imported module: …"
+      10  *   Safari:  "Importing a module script failed."
+     … +12 lines (ctrl+o to expand)
+
+⏺ Now wire the recovery into voice.svelte.ts:
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line
+      21  import { loadModelArchive } from './modelLoader'
+      22  import { buildGrammar, parseTranscript } from './parser'
+      23  import { SCOPE_PHRASES, SPOKEN_HELP_EXAMPLES } from './phrases'
+      24 +import { isStaleChunkError } from './staleChunk'               
+      25  import { tts } from './tts'
+      26  
+      27  /**
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line
+      33  
+      34  const VOSK_SAMPLE_RATE = 16000
+      35  const STORAGE_KEY = 'piano-tutor.voice-enabled'
+      36 +const RELOAD_KEY = 'piano-tutor.voice-chunk-reload'            
+      37  const captureProcessorUrl = assetUrl('worklets/capture-processo
+          r.js')
+      38  
+      39  export type VoiceStatus =
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 73 lines
+      189  // Recognition pipeline
+      190  // -----------------------------------------------------------
+           ----------------
+      191  
+      192 +/**                                                           
+      193 + * Loads the lazily-split vosk-browser chunk (~6 MB — it inlin
+          +es its Kaldi                                                  
+      194 + * WASM worker and would otherwise bloat the main bundle for u
+          +sers who never                                                
+      195 + * enable voice). The chunk is hash-named and excluded from th
+          +e SW precache,                                                
+      196 + * so when a GitHub Pages deploy replaces it while this client
+          + still runs the                                               
+      197 + * previous app shell, the import 404s. Recover with a one-sho
+          +t reload: nudge                                               
+      198 + * the service worker to update, persist the enabled flag so v
+          +oice resumes                                                  
+      199 + * automatically, and load the fresh shell whose vosk chunk ex
+          +ists.                                                         
+      200 + */                                                           
+      201 +async function loadVoskModule(): Promise<typeof import('vosk-b
+          +rowser')> {                                                   
+      202 +  try {                                                       
+      203 +    const mod = await import('vosk-browser')                  
+      204 +    clearReloadFlag()                                         
+      205 +    return mod                                                
+      206 +  } catch (err) {                                             
+      207 +    if (isStaleChunkError(err) && !reloadAttempted()) {       
+      208 +      markReloadAttempted()                                   
+      209 +      persist(true)                                           
+      210 +      await tryActivateUpdatedSW()                            
+      211 +      location.reload()                                       
+      212 +      await new Promise<never>(() => {}) // page is unloading;
+          + never settle                                                 
+      213 +    }                                                         
+      214 +    throw err                                                 
+      215 +  }                                                           
+      216 +}                                                             
+      217 +                                                              
+      218 +/** Best-effort: ask the SW registration to update and give th
+          +e new worker a                                                
+      219 + * moment to activate, so the reload serves the fresh app shel
+          +l. */                                                         
+      220 +async function tryActivateUpdatedSW(): Promise<void> {        
+      221 +  try {                                                       
+      222 +    const reg = await navigator.serviceWorker?.getRegistration
+          +()                                                            
+      223 +    if (!reg) return                                          
+      224 +    await reg.update()                                        
+      225 +    const sw = reg.installing ?? reg.waiting                  
+      226 +    if (!sw) return                                           
+      227 +    await new Promise<void>((resolve) => {                    
+      228 +      const timer = setTimeout(resolve, 3000)                 
+      229 +      sw.addEventListener('statechange', () => {              
+      230 +        if (sw.state === 'activated' || sw.state === 'redundan
+          +t') {                                                         
+      231 +          clearTimeout(timer)                                 
+      232 +          resolve()                                           
+      233 +        }                                                     
+      234 +      })                                                      
+      235 +    })                                                        
+      236 +  } catch {                                                   
+      237 +    // reload anyway                                          
+      238 +  }                                                           
+      239 +}                                                             
+      240 +                                                              
+      241 +function reloadAttempted(): boolean {                         
+      242 +  try {                                                       
+      243 +    return sessionStorage.getItem(RELOAD_KEY) === '1'         
+      244 +  } catch {                                                   
+      245 +    return false                                              
+      246 +  }                                                           
+      247 +}                                                             
+      248 +                                                              
+      249 +function markReloadAttempted(): void {                        
+      250 +  try {                                                       
+      251 +    sessionStorage.setItem(RELOAD_KEY, '1')                   
+      252 +  } catch {                                                   
+      253 +    // best-effort                                            
+      254 +  }                                                           
+      255 +}                                                             
+      256 +                                                              
+      257 +function clearReloadFlag(): void {                            
+      258 +  try {                                                       
+      259 +    sessionStorage.removeItem(RELOAD_KEY)                     
+      260 +  } catch {                                                   
+      261 +    // best-effort                                            
+      262 +  }                                                           
+      263 +}                                                             
+      264 +                                                              
+      265  function handleFinal(text: string): void {
+      266    const intent = parseTranscript(text, { armed: convo.isArmed(
+           ) })
+      267    if (!intent) return // no wake word — silently ignore
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 1 line, removed 3 lines
+      335        modelProgress = 0
+      336        const url = await loadModelArchive((p) => (modelProgress
+            = p))
+      337        status = 'loading'
+      338 -      // Dynamic import: vosk-browser inlines its Kaldi WASM w
+          -orker (~6 MB)                                                 
+      339 -      // and would otherwise bloat the main bundle for users w
+          -ho never enable voice.                                        
+      340 -      const { createModel } = await import('vosk-browser')    
+      338 +      const { createModel } = await loadVoskModule()          
+      339        model = await createModel(url)
+      340      } else {
+      341        status = 'loading'
+
+⏺ Now give a friendlier error message when recovery isn't possible (e.g. it
+  already reloaded once, or the user is offline):
+
+⏺ Update(src/lib/voice/voice.svelte.ts)
+  ⎿  Added 5 lines, removed 1 line
+      387    } catch (err) {
+      388      console.error('[voice] enable failed:', err)
+      389      status = 'error'
+      390 -    errorMessage = err instanceof Error ? err.message : String
+          -(err)                                                         
+      390 +    errorMessage = isStaleChunkError(err)                     
+      391 +      ? 'Could not download the voice recognizer. Check your c
+          +onnection and reload the page.'                               
+      392 +      : err instanceof Error                                  
+      393 +        ? err.message                                         
+      394 +        : String(err)                                         
+      395      if (holdingMic) {
+      396        holdingMic = false
+      397        mic.release()
+
+⏺ Add the cross-reference in vite.config.ts and a unit test for the error
+  matcher:
+
+⏺ Update(vite.config.ts)
+  ⎿  Added 3 lines
+      83            'worklets/**',
+      84            // The lazy vosk chunk is ~6 MB — too big to precache
+           on every first
+      85            // visit; the assets runtime route below picks it up 
+          on first use.
+      86 +          // Consequence: a deploy can 404 the hash an old prec
+         +ached shell                                                    
+      87 +          // still references — voice.svelte.ts (loadVoskModule
+         +) recovers from                                                
+      88 +          // that with a one-shot reload.                      
+      89            'assets/vosk-*.js',
+      90          ],
+      91          // ⚠️ workbox inlines these urlPattern functions into t
+          he generated SW
+
+⏺ Write(src/tests/staleChunk.test.ts)
+  ⎿  Wrote 29 lines to src/tests/staleChunk.test.ts
+       1 import { describe, expect, it } from 'vitest'
+       2 import { isStaleChunkError } from '../lib/voice/staleChunk'
+       3 
+       5   it('matches each browser wording for a failed dynamic import',
+          () => {
+       6     // Chrome
+       7     expect(
+       8       isStaleChunkError(
+         le: https://x/assets/vosk-Dloz6gaQ.js'),
+      10       ),
+     … +27 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Checks pass. Let me run the full test suite to make sure nothing else is
+  affected, and also verify the build still produces the expected chunk layout:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Done — root cause found and a recovery implemented. All 813 tests pass, npm 
+  run check is clean, and the build still splits the vosk chunk correctly.
+
+  What was wrong
+
+  The error is a stale-deploy race, not a problem with the model download:
+
+  - The service worker precaches the app shell, but assets/vosk-*.js is
+  deliberately excluded from the precache (it's ~6 MB; vite.config.ts
+  globIgnores). It's only cached at runtime the first time it's fetched.
+  - A returning visitor therefore gets the old app shell from the SW precache.
+  When they enable voice for the first time, the old shell dynamically imports
+  the old vosk chunk hash — but each GitHub Pages deploy deletes the previous
+  hashed assets. I confirmed this live: the deployed site currently ships
+  vosk-RkwoQNwM.js, while your browser requested vosk-Dloz6gaQ.js, which now
+  returns 404.
+  - The model download reaches 100% fine because its filename
+  (vosk-model-small-en-us-0.15.tar.gz) is version-stable across deploys; only
+  the JS chunk hash moved.
+
+  Since you deploy on every push to main, any user who loads the app and enables
+  voice for the first time after a subsequent deploy would hit this.
+
+  The fix
+
+  - src/lib/voice/voice.svelte.ts — the vosk import now goes through a new
+  loadVoskModule(): if the import fails with a stale-chunk TypeError, it
+  persists the voice-enabled flag (so enabling resumes automatically), nudges
+  the service worker to update (bounded 3 s wait for activation), and reloads
+  the page once. A sessionStorage flag prevents reload loops; if it still fails
+  after the reload (e.g. genuinely offline), the HUD shows a readable message
+  instead of the raw browser error.
+  - src/lib/voice/staleChunk.ts — pure isStaleChunkError() helper matching the
+  Chrome/Firefox/Safari wordings of a failed dynamic import, unit-tested in
+  src/tests/staleChunk.test.ts.
+  - vite.config.ts — comment on the globIgnores entry cross-referencing the
+  recovery.
+
+  One note for the affected device right now: a plain page reload already fixes
+  it (the new SW has taken over, and the fresh shell points at the live chunk) —
+  the code change makes that recovery automatic for everyone after the next
+  deploy. I haven't committed anything; say the word if you'd like a commit.
+
+✻ Cooked for 4m 53s
+※ recap: Fixed the deployed voice-model error: stale service-worker shells requested a deleted vosk chunk, so the app now auto-reloads once to recover. All tests and checks pass; next action is committing and pushing the change if you want it deployed. (disable recaps in /config)
+
+❯ commit and merge into main                                                    
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ I'm on branch worktree-voice-model-error-pages; main is checked out in the
+  primary worktree. I'll commit here, then fast-forward main there.
+
+  Committed 8192c08, merged worktree-voice-model-error-pages (ctrl+o to expand)
+
+⏺ Committed and merged. Main is now at 8192c08 — the fast-forward was clean (the
+  primary checkout only had untracked chat logs, nothing conflicting).
+
+  I haven't pushed: the GitHub Actions workflow deploys on every push to main,
+  so pushing publishes the fix to the live site. Run git push from the main
+  checkout (or tell me to) when you want it deployed. Once it's live, the
+  currently-affected device just needs one manual reload — after that, future
+  deploys recover automatically.
+
+✻ Cogitated for 42s
+
+※ recap: Fixed the deployed voice-enable error (stale vosk chunk after a deploy) with an auto-reload recovery, committed, and merged into main. Next action: push main to deploy it, then reload the affected device once. (disable recaps in /config)
+
+❯ /export-chat                                                                  
+  ⎿  1 skill available
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The export script isn't in this worktree — checking whether it exists on main
+  (this branch forked earlier):
+
+  Ran 1 shell command (ctrl+o to expand)
+
+✻ Cogitated for 6m 24s
