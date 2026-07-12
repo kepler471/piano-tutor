@@ -1,0 +1,197 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.205
+           Fable 5 · Claude Max
+  ▘▘ ▝▝    ~/src/piano-tutor
+
+
+❯ what is going on with npm run dev                                             
+
+⏺ Let me check what's happening with the dev server.
+
+  Listed 1 directory, ran 5 shell commands (ctrl+o to expand)
+
+⏺ Fixed — npm run dev works again. The problem was that vite-plugin-pwa (added
+  in the recently merged PWA work) was in package.json but not installed in this
+  checkout's node_modules, so Vite couldn't load vite.config.ts and died with
+  ERR_MODULE_NOT_FOUND. This happens when a branch that added dependencies is
+  merged from a worktree — the worktree had its own node_modules, but the main
+  checkout was never re-installed.
+
+  I ran npm install, then verified the server starts cleanly (Vite ready in ~200
+  ms, responding with HTTP 200 on http://localhost:5173) and stopped my test
+  instance so the port is free for you.
+
+✻ Baked for 1m 28s
+
+※ recap: You asked why npm run dev was broken; it failed due to a missing dependency, which I installed and verified the server now starts cleanly. Next action: just run npm run dev yourself, it works. (disable recaps in /config)
+
+❯ what is vite?                                                                 
+
+⏺ Vite is the build tool and dev server this project uses — it's the thing npm 
+  run dev actually starts.
+
+  It does two jobs:
+
+  1. Dev server (npm run dev): serves your app at http://localhost:5173 while
+  you work. It's fast because it doesn't bundle everything upfront — it serves
+  each file on demand as native ES modules and only transforms what the browser
+  asks for (e.g., compiling your .svelte files to JS on the fly). That's why it
+  starts in ~200 ms. It also does hot module replacement: when you save a file,
+  the change appears in the browser almost instantly without a full page reload.
+  2. Bundler (npm run build): for production it compiles and bundles everything
+  into optimized static files in dist/ — minified JS/CSS with hashed filenames,
+  ready to upload to any static host.
+
+  It's also the plugin host: your vite.config.ts wires in the Svelte plugin (so
+  Vite understands .svelte files) and vite-plugin-pwa (which generates the
+  service worker that makes the app installable and offline-capable — the
+  dependency that was missing earlier).
+
+  The name is French for "fast" (pronounced "veet"). It was created by Evan You,
+  the author of Vue, as a modern replacement for older, slower bundlers like
+  Webpack, and it's now the standard tool for Svelte, Vue, and much of the React
+  ecosystem.
+
+✻ Baked for 11s
+
+❯ explain the app architecture. Note that I am not a web dev                    
+
+⏺ Here's the big picture, in plain terms.
+
+  The one-sentence version
+
+  The whole app is a single web page that runs entirely in your browser —
+  there's no server, no account, no internet needed once it's loaded. Everything
+  (listening to your piano, drawing sheet music, tracking progress) happens on
+  your machine.
+
+  The layers
+
+  1. Screens and navigation.
+  The app is built with Svelte, a framework that turns code into interactive web
+  pages. Each screen you see (Home, a scale drill, the song player, quizzes,
+  settings) is a file in src/screens/. A small "router" reads the part of the
+  URL after the # and decides which screen to show — that's why the back button
+  works and you can bookmark a specific drill.
+
+  2. Ears — the microphone pipeline. This is the heart of the app, in
+  src/lib/audio/. Since your piano has no cable to the computer, the app listens
+  through the mic and figures out what notes you played. It actually has two
+  ears working in parallel:
+
+  - A fast ear for single notes: analyzes the audio many times a second and
+  answers "what one pitch is sounding right now?" Nearly instant, which is what
+  makes note-by-note feedback feel responsive. It has guards against being
+  fooled — it ignores steady background hum, and waits a few frames before
+  trusting a note so it doesn't flicker between octaves.
+  - A smart ear for chords: a small machine-learning model (Spotify's "Basic
+  Pitch") that can hear several notes at once. It's slower, so it runs in a
+  background thread and its results arrive with a slight delay. A filter strips
+  out "ghost" notes — overtones a real piano string produces that aren't notes
+  you actually pressed.
+
+  For chord practice the two are fused: the fast ear grades the first note
+  instantly, the smart ear fills in the rest of the chord, and a small referee
+  makes sure the same note isn't counted twice.
+
+  3. Voice — hands-free control (src/lib/voice/). A speech recognizer (Vosk)
+  runs locally in your browser — no audio ever leaves your machine. It listens
+  for "piano, …" and then a command like "show me D major." The recognizer is
+  deliberately restricted to a fixed vocabulary of command words, so your piano
+  playing and room chatter get discarded instead of misheard as commands. If a
+  phrase doesn't match any known pattern, a second, fuzzier matcher compares its
+  meaning against example phrasings and may ask "…did you mean X?" out loud.
+  There's also conversational polish: it can handle "no, D minor" as a
+  correction, and re-prompts with examples if it didn't understand you.
+
+  4. Eyes — the sheet music (src/lib/notation/). A library called VexFlow draws
+  the staves, notes, and fingering numbers. One file in the app translates "here
+  is a scale / song / your transcription" into a drawing; everything else just
+  hands it data.
+
+  5. Brains — music theory and content (src/lib/theory/, src/lib/data/). Scales
+  and chords are computed from music theory rules (via a library called tonal),
+  so all 36 scales × 12 roots exist without anyone typing them in. Fingerings,
+  though, are hand-written from standard teaching charts, because "which finger
+  goes where" is a human convention, not math. Songs live in a graded catalog —
+  some hand-arranged, some imported from public-domain MIDI files.
+
+  6. Memory — practice tracking (src/lib/practice/). Your completed drills,
+  streaks, levels, and per-song tempo preferences are saved in the browser's
+  local storage on your machine. The practice matcher follows a "wait, don't
+  fail" philosophy: a wrong note flashes red but the cursor just waits for the
+  right one.
+
+  Two ideas that shape the whole codebase
+
+  Heavy things run off to the side. The ML models (chord detection, speech
+  recognition) are big and slow, so they run in Web Workers — separate
+  background threads — keeping the page itself smooth. They're also only
+  downloaded when first needed.
+
+  The tricky logic is kept "pure." All the subtle code — pitch tracking, chord
+  filtering, command parsing, practice grading — is written so it doesn't touch
+  the browser, mic, or screen at all: data in, data out. That means automated
+  tests can feed it synthetic audio or fake transcripts and verify it behaves,
+  without a human sitting at a piano. The rule in this repo is: if detection
+  logic changes, extend those tests rather than trusting manual mic testing.
+
+  Offline
+
+  The app is a PWA (installable web app): after the first visit, a service
+  worker caches the app and its models, so it works with no connection —
+  important since the models are 40+ MB and you don't want to re-download them
+  every practice session.
+
+✻ Brewed for 28s
+
+※ recap: You asked about your piano tutor app: I fixed npm run dev (a missing dependency needed npm install) and explained what Vite is and how the app is architected. Nothing is pending; the dev server works. (disable recaps in /config)
+
+❯ what does a service worker do?                                                
+
+⏺ A service worker is a small script that the browser installs alongside your
+  app and runs in the background, separate from the page itself. Its defining
+  power: it sits between your app and the network, like a programmable
+  middleman. Every time the app requests a file — a script, an image, a 40 MB
+  speech model — the request passes through the service worker first, and it
+  gets to decide: fetch it from the internet, or serve a saved copy from local
+  cache?
+
+  That's what makes your app work offline. Here's the lifecycle in your case:
+
+  1. First visit (online): the page loads normally, and the service worker
+  installs itself. It immediately downloads and caches the "app shell" — the
+  core HTML, JavaScript, and CSS.
+  2. While you use the app: as bigger pieces get fetched for the first time (the
+  chord-detection model, the WASM binaries, the piano sound samples), the
+  service worker quietly stores a copy of each in a local cache.
+  3. Every later visit — even with no internet: requests are answered from the
+  cache. The app doesn't know or care that it's offline. This strategy is called
+  cache-first: check the cache, only go to the network for things not seen
+  before.
+
+  It also lives longer than the page. Close the tab, and the service worker (and
+  its caches) stay installed. It's also what makes the app installable — the
+  "Add to Home Screen / Dock" behavior where it opens in its own window like a
+  native app. That whole package (service worker + install manifest) is what
+  "PWA" — Progressive Web App — means.
+
+  In this project you don't write the service worker by hand: vite-plugin-pwa
+  (the package that was missing yesterday) generates it at build time from rules
+  in vite.config.ts. Those rules encode a few deliberate choices:
+
+  - The service worker is disabled during development — you always want fresh
+  code while developing, and stale caches are a classic source of "why isn't my
+  change showing up?!" confusion.
+  - The Vosk speech model is deliberately excluded, because the app already
+  caches it through a different mechanism (with a progress bar); letting the
+  service worker cache it too would store the 41 MB twice.
+  - The cached model/WASM folders don't have versioned filenames, so the config
+  has a note to bump the cache name whenever those files are re-copied —
+  otherwise users would keep getting the old cached copies forever.
+
+  One mental model to take away: the browser's normal cache is a suggestion
+  ("maybe keep this around"); a service worker cache is a guarantee ("this file
+  is stored until my code deletes it"). That guarantee is what turns a web page
+  into something you can trust to work on a plane.
+
+✻ Baked for 18s
