@@ -517,6 +517,67 @@ const ENTRIES: GlossaryEntry[] = [
       'Moving each note of a chord to the nearest note of the next chord, so changes glide instead of jump.',
   },
   {
+    id: 'roman numeral',
+    term: 'Roman numeral',
+    short:
+      'A chord named by its seat in the key: I, ii, iii, IV… Upper-case means major, lower-case minor, ° diminished. "IV" is F in C major and C in G major.',
+    aliases: ['roman numerals'],
+  },
+  {
+    id: 'diatonic',
+    term: 'Diatonic',
+    short:
+      'Made only from the notes of the current key. The seven diatonic chords of a key are the ones built on its own scale notes.',
+    aliases: ['diatonic chords', 'diatonic chord', 'diatonic triads'],
+  },
+  {
+    id: 'leading tone',
+    term: 'Leading tone',
+    short:
+      'The 7th note of the scale, one semitone below the tonic (B in C major). It aches to resolve upward — the pull inside every V chord.',
+    aliases: ['leading tones', 'leading note'],
+  },
+  {
+    id: 'slash chord',
+    term: 'Slash chord',
+    short:
+      'A chord symbol like C/E: the letter before the slash is the chord, the letter after is the bass note — here C major with E on the bottom.',
+    aliases: ['slash chords', 'slash symbol', 'slash names'],
+  },
+  {
+    id: 'chord progression',
+    term: 'Chord progression',
+    short:
+      'A repeating sequence of chords — the harmonic route a song travels. Usually named in roman numerals, like I–V–vi–IV.',
+    aliases: ['chord progressions', 'progression', 'progressions'],
+  },
+  {
+    id: 'chord symbol',
+    term: 'Chord symbol',
+    short:
+      'Shorthand above the music naming a chord: C, Cm, C7, Cmaj7, C/E. It says what harmony to play but leaves the voicing and pattern to you.',
+    aliases: ['chord symbols'],
+  },
+  {
+    id: 'block chord',
+    term: 'Block chord',
+    short: 'All the notes of a chord played at exactly the same time — the solid opposite of a broken chord.',
+    aliases: ['block chords', 'solid chord'],
+  },
+  {
+    id: 'alberti bass',
+    term: 'Alberti bass',
+    short:
+      'A left-hand pattern that breaks each chord bottom–top–middle–top, over and over — the sparkling engine of Mozart-era accompaniment.',
+  },
+  {
+    id: 'lead sheet',
+    term: 'Lead sheet',
+    short:
+      'A song written as just a melody line with chord symbols above it. You supply the left hand, the voicings and the pattern yourself.',
+    aliases: ['lead sheets', 'fake book'],
+  },
+  {
     id: 'comping',
     term: 'Comping',
     short:

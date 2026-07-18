@@ -9,6 +9,7 @@ import {
   INTERVAL_LEVELS,
   type Rng,
 } from '../ear/quiz'
+import { MAJOR_DEGREES, MINOR_DEGREES, type DegreeQuality } from './progressions'
 import type { ChordQualityId } from './types'
 
 /**
@@ -692,29 +693,7 @@ export interface ChordFunctionQuestion {
   explanation: string
 }
 
-type DegreeQuality = 'major' | 'minor' | 'diminished'
-
-/** Diatonic triads as [roman numeral, tonal interval from the tonic, quality]. */
-const MAJOR_DEGREES: [string, string, DegreeQuality][] = [
-  ['I', '1P', 'major'],
-  ['ii', '2M', 'minor'],
-  ['iii', '3M', 'minor'],
-  ['IV', '4P', 'major'],
-  ['V', '5P', 'major'],
-  ['vi', '6M', 'minor'],
-  ['vii°', '7M', 'diminished'],
-]
-
-/** Harmonic-minor convention: V is major (raised leading tone). */
-const MINOR_DEGREES: [string, string, DegreeQuality][] = [
-  ['i', '1P', 'minor'],
-  ['ii°', '2M', 'diminished'],
-  ['III', '3m', 'major'],
-  ['iv', '4P', 'minor'],
-  ['V', '5P', 'major'],
-  ['VI', '6m', 'major'],
-  ['VII', '7m', 'major'],
-]
+// Degree tables live in progressions.ts, shared with the chord-path lesson generators.
 
 const MAJOR_FUNCTION_KEYS = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb']
 const MINOR_FUNCTION_KEYS = ['A', 'E', 'D', 'G', 'C', 'B']

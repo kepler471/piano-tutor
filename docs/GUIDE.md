@@ -251,6 +251,7 @@ Almost every simple piece is built from three chords: the tonic (I), subdominant
 - Quiz: which chord is V? — `#/quizzes?mode=chord-function&level=1&from=guide`
 - Quiz: spell the chord — `#/quizzes?mode=chord-spelling&level=1&from=guide`
 - Hear I–IV–V in the 12-bar blues — `#/songs?song=twelve-bar-blues-c&from=guide`
+- Go deeper: the Chord Path course — `#/chord-path?from=guide`
 
 ### A week at this stage (~40 min/day)
 
@@ -340,6 +341,7 @@ Add one more third on top of a triad and you get a seventh chord — the sound o
 - G7 in the chord library — `#/chords?root=G&quality=dominant%207th&from=guide`
 - Hear 7th chords in the ear quiz — `#/quizzes?mode=chords&level=3&from=guide`
 - Quiz: spell the 7th chords — `#/quizzes?mode=chord-spelling&level=3&from=guide`
+- Chord Path unit 6 — sevenths in depth — `#/chord-path?from=guide&unit=unit-6`
 
 ### The circle of fifths
 

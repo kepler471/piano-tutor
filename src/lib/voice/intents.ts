@@ -10,9 +10,10 @@ export type Intent =
   | { kind: 'wake' } // wake word alone — "Yes?" + armed window
   | {
       kind: 'navigate'
-      route: '/' | '/guide' | '/scales' | '/chords' | '/circle' | '/practice' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/tuner'
+      route: '/' | '/guide' | '/chord-path' | '/scales' | '/chords' | '/circle' | '/practice' | '/ear' | '/quizzes' | '/rhythm' | '/songs' | '/play' | '/tuner'
     }
   | { kind: 'show-stage'; stage: number } // "show stage two" — guide (cross-screen capable)
+  | { kind: 'show-unit'; unit: number } // "show unit two" — chord path (cross-screen capable)
   | { kind: 'metronome'; action: 'start' | 'stop'; bpm?: number }
   | { kind: 'set-bpm'; bpm?: number; delta?: number } // scope decides which bpm; delta for "slower"/"faster"
   | { kind: 'stop-all' } // "piano, stop"
@@ -49,6 +50,7 @@ export type Intent =
 export const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
   '/': 'Home',
   '/guide': 'the Guide',
+  '/chord-path': 'the Chord Path',
   '/quizzes': 'Quizzes',
   '/ear': 'Ear Training',
   '/rhythm': 'the Rhythm Trainer',
@@ -64,6 +66,7 @@ export const SCREEN_NAME_FOR_ROUTE: Record<string, string> = {
 /** Where an intent can be fulfilled if no active scope handles it. */
 export const ROUTE_FOR_KIND: Partial<Record<Intent['kind'], string>> = {
   'show-stage': '/guide',
+  'show-unit': '/chord-path',
   'show-scale': '/scales',
   'show-chord': '/chords',
   'set-inversion': '/chords',

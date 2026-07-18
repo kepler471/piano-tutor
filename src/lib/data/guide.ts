@@ -52,12 +52,15 @@ export interface GuideStage {
   moveOnWhen: string[]
 }
 
+/** Curricula that link out to practice material and want a breadcrumb back. */
+export type GuideSource = 'guide' | 'chord-path'
+
 /**
  * Hash href for a guide link, e.g. '#/practice?lesson=scale-C-major&from=guide'.
- * Every link carries from=guide so target screens can offer a way back.
+ * Every link carries a from= param so target screens can offer a way back.
  */
-export function guideHref(link: GuideLink): string {
-  const from = { from: 'guide' }
+export function guideHref(link: GuideLink, source: GuideSource = 'guide'): string {
+  const from = { from: source }
   switch (link.kind) {
     case 'lesson':
       return '#' + buildHash('/practice', { lesson: link.lessonId, ...from })
@@ -74,15 +77,15 @@ export function guideHref(link: GuideLink): string {
     case 'chord':
       return '#' + buildHash('/chords', { root: link.root, quality: link.quality, ...from })
     case 'route':
-      return '#' + buildHash(...splitRoute(link.route))
+      return '#' + buildHash(...splitRoute(link.route, source))
   }
 }
 
 /** '/quizzes?mode=echo' → ['/quizzes', {mode: 'echo', from: 'guide'}] */
-function splitRoute(route: string): [string, Record<string, string>] {
+function splitRoute(route: string, source: GuideSource): [string, Record<string, string>] {
   const qIndex = route.indexOf('?')
   const path = qIndex === -1 ? route : route.slice(0, qIndex)
-  const params: Record<string, string> = { from: 'guide' }
+  const params: Record<string, string> = { from: source }
   if (qIndex !== -1) {
     for (const pair of route.slice(qIndex + 1).split('&')) {
       const [k, v = ''] = pair.split('=')
@@ -444,6 +447,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           quiz('chord-function', 1, 'Quiz: which chord is V?'),
           quiz('chord-spelling', 1, 'Quiz: spell the chord'),
           song('twelve-bar-blues-c', 'Hear I–IV–V in the 12-bar blues'),
+          { kind: 'route', route: '/chord-path', label: 'Go deeper: the Chord Path course' },
         ],
       },
     ],
@@ -526,6 +530,7 @@ export const GUIDE_STAGES: GuideStage[] = [
           { kind: 'chord', root: 'G', quality: 'dominant 7th', label: 'G7 in the chord library' },
           quiz('chords', 3, 'Hear 7th chords in the ear quiz'),
           quiz('chord-spelling', 3, 'Quiz: spell the 7th chords'),
+          { kind: 'route', route: '/chord-path?unit=unit-6', label: 'Chord Path unit 6 — sevenths in depth' },
         ],
       },
       {
