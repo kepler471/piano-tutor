@@ -188,6 +188,7 @@ const NAV_TARGETS: [string, Intent & { kind: 'navigate' }][] = [
   ['home', { kind: 'navigate', route: '/' }],
   ['guide', { kind: 'navigate', route: '/guide' }],
   ['learning guide', { kind: 'navigate', route: '/guide' }],
+  ['chord path', { kind: 'navigate', route: '/chord-path' }],
   ['scales', { kind: 'navigate', route: '/scales' }],
   ['chords', { kind: 'navigate', route: '/chords' }],
   ['circle of fifths', { kind: 'navigate', route: '/circle' }],
@@ -269,6 +270,14 @@ function parseCommand(tokens: string[]): Intent {
     const next = tokens[stageIdx + 1]
     const stage = next && /^\d+$/.test(next) ? parseInt(next, 10) : next ? UNITS[next] : undefined
     if (stage !== undefined) return { kind: 'show-stage', stage }
+  }
+
+  // Chord-path units: "show unit two" (navigates to the chord path if needed).
+  const unitIdx = tokens.indexOf('unit')
+  if (unitIdx !== -1) {
+    const next = tokens[unitIdx + 1]
+    const unit = next && /^\d+$/.test(next) ? parseInt(next, 10) : next ? UNITS[next] : undefined
+    if (unit !== undefined) return { kind: 'show-unit', unit }
   }
 
   // Metronome / tempo.
@@ -405,7 +414,7 @@ export function buildGrammar(lessons: { title: string; method: string }[]): stri
     hey okay ok
     go to open show me the a an of screen page
     home scales chords circle fifths practice free play tuner note detector
-    guide learning stage stages ear training rhythm songs quizzes
+    guide learning stage stages unit units path ear training rhythm songs quizzes
     start stop turn off on cancel quiet be help what can i say you do commands
     metronome tempo speed at set slower faster slow down up
     record recording clear copy notes score

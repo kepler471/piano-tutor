@@ -15,6 +15,8 @@ export function describeIntent(intent: Intent): string {
       return `open ${SCREEN_NAME_FOR_ROUTE[intent.route] ?? 'that screen'}`
     case 'show-stage':
       return `open stage ${intent.stage}`
+    case 'show-unit':
+      return `open unit ${intent.unit}`
     case 'metronome':
       if (intent.action === 'stop') return 'stop the metronome'
       return intent.bpm !== undefined ? `start the metronome at ${intent.bpm}` : 'start the metronome'

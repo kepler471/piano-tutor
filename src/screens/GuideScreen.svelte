@@ -9,9 +9,8 @@
 
 <script lang="ts">
   import GlossText from '../components/GlossText.svelte'
+  import LinkChips from '../components/LinkChips.svelte'
   import { guideHref, type GuideLink, type GuideStage } from '../lib/data/guide'
-  import { guideItemStats } from '../lib/practice/guideProgress'
-  import { practiceHistory } from '../lib/practice/history.svelte'
   import { SCOPE_PHRASES } from '../lib/voice/phrases'
   import { registerVoiceCommands } from '../lib/voice/voice.svelte'
   import { currentParams } from '../router.svelte'
@@ -44,17 +43,6 @@
 
   function groups(stage: GuideStage): { label: string; links: GuideLink[] }[] {
     return LINK_GROUPS.map((g) => ({ label: g.label, links: stage[g.key] })).filter((g) => g.links.length > 0)
-  }
-
-  // The guide data stays progress-blind; the screen derives "practiced"
-  // badges from the history log (null for reference-only links).
-  function stats(link: GuideLink) {
-    return guideItemStats(link, practiceHistory.records, new Date())
-  }
-
-  function badgeTitle(s: NonNullable<ReturnType<typeof stats>>): string {
-    const when = s.lastAt ? ` — last on ${new Date(s.lastAt).toLocaleDateString()}` : ''
-    return `Practiced ${s.count} time${s.count === 1 ? '' : 's'}${when}`
   }
 
   $effect(() =>
@@ -109,15 +97,7 @@
           {#each groups(stage) as group (group.label)}
             <div class="link-group">
               <span class="group-label">{group.label}</span>
-              <div class="chips">
-                {#each group.links as link (link.label)}
-                  {@const s = stats(link)}
-                  <a class="chip" class:practiced={s?.recent} href={guideHref(link)}>
-                    {link.label}{#if s && s.count > 0}<span class="tick" title={badgeTitle(s)}>
-                        ✓{s.count > 1 ? `×${s.count}` : ''}</span>{/if}
-                  </a>
-                {/each}
-              </div>
+              <LinkChips links={group.links} href={(l: GuideLink) => guideHref(l)} />
             </div>
           {/each}
 
@@ -126,15 +106,7 @@
               <h3>{section.title}</h3>
               <p><GlossText text={section.body} /></p>
               {#if section.links.length}
-                <div class="chips">
-                  {#each section.links as link (link.label)}
-                    {@const s = stats(link)}
-                    <a class="chip" class:practiced={s?.recent} href={guideHref(link)}>
-                      {link.label}{#if s && s.count > 0}<span class="tick" title={badgeTitle(s)}>
-                          ✓{s.count > 1 ? `×${s.count}` : ''}</span>{/if}
-                    </a>
-                  {/each}
-                </div>
+                <LinkChips links={section.links} href={(l: GuideLink) => guideHref(l)} />
               {/if}
             </div>
           {/each}
@@ -232,38 +204,6 @@
     font-size: 13px;
     font-weight: 600;
     color: #64748b;
-  }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .chip {
-    display: inline-block;
-    padding: 4px 10px;
-    border: 1px solid #dbeafe;
-    border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
-    font-size: 13px;
-    text-decoration: none;
-  }
-  .chip:hover {
-    background: #dbeafe;
-  }
-  .chip.practiced {
-    border-color: #86efac;
-    background: #f0fdf4;
-    color: #15803d;
-  }
-  .chip.practiced:hover {
-    background: #dcfce7;
-  }
-  .tick {
-    margin-left: 5px;
-    font-size: 12px;
-    color: #16a34a;
-    font-weight: 600;
   }
   .theory p {
     color: #334155;

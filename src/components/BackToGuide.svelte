@@ -2,16 +2,20 @@
   import { currentParams } from '../router.svelte'
 
   /**
-   * Breadcrumb back to the learning guide, shown only when the user arrived
-   * via a guide deep link (?from=guide). Plain hash link — browser back works
-   * the same way.
+   * Breadcrumb back to the curriculum the user came from, shown only when
+   * they arrived via a deep link (?from=guide or ?from=chord-path). Plain
+   * hash link — browser back works the same way.
    */
-  const fromGuide = $derived(currentParams().from === 'guide')
+  const SOURCES: Record<string, { href: string; label: string }> = {
+    guide: { href: '#/guide', label: '← Back to the learning guide' },
+    'chord-path': { href: '#/chord-path', label: '← Back to the chord path' },
+  }
+  const source = $derived(SOURCES[currentParams().from ?? ''])
 </script>
 
-{#if fromGuide}
+{#if source}
   <p class="back">
-    <a href="#/guide">← Back to the learning guide</a>
+    <a href={source.href}>{source.label}</a>
   </p>
 {/if}
 

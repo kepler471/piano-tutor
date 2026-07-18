@@ -4,6 +4,7 @@
   import VoiceHud from './components/VoiceHud.svelte'
   import Home from './screens/Home.svelte'
   import GuideScreen from './screens/GuideScreen.svelte'
+  import ChordPathScreen from './screens/ChordPathScreen.svelte'
   import ScalesLibrary from './screens/ScalesLibrary.svelte'
   import CircleOfFifths from './screens/CircleOfFifths.svelte'
   import ChordsLibrary from './screens/ChordsLibrary.svelte'
@@ -18,6 +19,7 @@
   const links = [
     { route: '/', label: 'Home' },
     { route: '/guide', label: 'Guide' },
+    { route: '/chord-path', label: 'Chord Path' },
     { route: '/scales', label: 'Scales' },
     { route: '/chords', label: 'Chords' },
     { route: '/circle', label: 'Circle of 5ths' },
@@ -46,6 +48,8 @@
 <main>
   {#if route === '/guide'}
     <GuideScreen />
+  {:else if route === '/chord-path'}
+    <ChordPathScreen />
   {:else if route === '/scales'}
     <ScalesLibrary />
   {:else if route === '/chords'}

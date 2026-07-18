@@ -3,6 +3,7 @@
   import GlossText from '../components/GlossText.svelte'
   import LessonPlayer from '../components/LessonPlayer.svelte'
   import { METHOD_GUIDE_STAGE } from '../lib/data/guide'
+  import { METHOD_CHORD_UNIT } from '../lib/data/chordPath'
   import { allLessons, type Lesson } from '../lib/data/lessons'
   import { getProgress, recordRun, setLevel, STREAK_TO_LEVEL_UP } from '../lib/practice/progress.svelte'
   import { makeSightReading, SIGHT_LEVELS, type SightLevel } from '../lib/sightread/generator'
@@ -122,8 +123,22 @@
       'Triad arpeggios up and down — the wrist-lateral motion behind accompaniment patterns and virtuosic passages alike.',
     'Broken chords':
       'Triads played note by note through every inversion — early-grades staple for hand shape and inversions.',
+    'Triad drills':
+      'Block triads in root position — the basic chord shapes and the four qualities side by side.',
+    Inversions:
+      'The same triad rearranged so any note can be on the bottom — the key to smooth chord changes.',
+    'Diatonic chords':
+      'The seven chords that live inside one key, built on each scale note and named with roman numerals.',
     'Cadence drills':
       'I–IV–V–I chord progressions in comfortable voicings — the harmony behind most songs you know.',
+    'Cadence types':
+      'The four classic phrase endings — authentic, plagal, half and deceptive — played and compared.',
+    Progressions:
+      'The workhorse chord loops of pop, doo-wop and blues, voiced so each change barely moves the hand.',
+    'Seventh chords':
+      'Four-note chords — maj7, m7, 7 and m7♭5 — and the V7→I resolution that drives tonal music.',
+    Accompaniment:
+      'Left-hand patterns over a progression — block, broken, Alberti and stride — plus playing from a lead sheet.',
     'Jazz & blues':
       'Blues scales, ii–V–I guide tones and 12-bar comping — the entry points into jazz piano.',
     'Sight-reading':
@@ -203,6 +218,9 @@
         {method}
         {#if METHOD_GUIDE_STAGE[method]}
           <a class="guide-chip" href={`#/guide?stage=${METHOD_GUIDE_STAGE[method]}`}>Guide →</a>
+        {/if}
+        {#if METHOD_CHORD_UNIT[method]}
+          <a class="guide-chip" href={`#/chord-path?unit=${METHOD_CHORD_UNIT[method]}`}>Chord path →</a>
         {/if}
       </h2>
       <p class="hint"><GlossText text={METHOD_BLURBS[method]} /></p>

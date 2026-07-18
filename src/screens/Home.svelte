@@ -25,6 +25,11 @@
       highlight: true,
     },
     {
+      route: '/chord-path',
+      title: 'Chord Path',
+      desc: 'A guided course on chords: build them, connect them, learn why progressions work, and end up accompanying songs from chord symbols.',
+    },
+    {
       route: '/scales',
       title: 'Scales',
       desc: 'All major and minor scales with sheet music and standard fingering, one octave up and down.',

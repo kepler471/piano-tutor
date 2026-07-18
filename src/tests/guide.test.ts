@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { METHOD_CHORD_UNIT } from '../lib/data/chordPath'
 import { GUIDE_STAGES, METHOD_GUIDE_STAGE, guideHref, type GuideLink } from '../lib/data/guide'
 import { allLessons } from '../lib/data/lessons'
 import { RHYTHM_PATTERNS } from '../lib/data/rhythms'
@@ -17,6 +18,7 @@ import { getScale } from '../lib/theory/scales'
 const KNOWN_ROUTES = new Set([
   '/',
   '/guide',
+  '/chord-path',
   '/scales',
   '/chords',
   '/circle',
@@ -99,10 +101,11 @@ describe('guide link integrity', () => {
     }
   })
 
-  it('route links target known routes', () => {
+  it('route links target known routes (query strings allowed)', () => {
     for (const { stageId, link } of allLinks) {
       if (link.kind !== 'route') continue
-      expect(KNOWN_ROUTES.has(link.route), `${stageId}: route ${link.route}`).toBe(true)
+      const path = link.route.split('?')[0]
+      expect(KNOWN_ROUTES.has(path), `${stageId}: route ${link.route}`).toBe(true)
     }
   })
 
@@ -132,10 +135,13 @@ describe('method → guide-stage chips', () => {
     }
   })
 
-  it('every lesson method (plus sight-reading) has a mapping', () => {
+  it('every lesson method (plus sight-reading) has a mapping in the guide or the chord path', () => {
     const methods = new Set([...allLessons().map((l) => l.method), 'Sight-reading'])
     for (const method of methods) {
-      expect(METHOD_GUIDE_STAGE[method], `method '${method}' missing from METHOD_GUIDE_STAGE`).toBeDefined()
+      expect(
+        METHOD_GUIDE_STAGE[method] ?? METHOD_CHORD_UNIT[method],
+        `method '${method}' missing from METHOD_GUIDE_STAGE and METHOD_CHORD_UNIT`,
+      ).toBeDefined()
     }
   })
 })

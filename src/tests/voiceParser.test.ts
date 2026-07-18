@@ -121,6 +121,24 @@ describe('guide stages', () => {
   })
 })
 
+describe('chord path units', () => {
+  it('open chord path navigates', () => {
+    expect(parseTranscript('piano open the chord path')).toEqual({ kind: 'navigate', route: '/chord-path' })
+  })
+  it('show unit two', () => {
+    expect(parseTranscript('piano show unit two')).toEqual({ kind: 'show-unit', unit: 2 })
+  })
+  it('open unit five', () => {
+    expect(parseTranscript('piano open unit five')).toEqual({ kind: 'show-unit', unit: 5 })
+  })
+  it('bare "unit seven" while armed', () => {
+    expect(parseTranscript('unit seven', { armed: true })).toEqual({ kind: 'show-unit', unit: 7 })
+  })
+  it('unit without a number falls through to unknown', () => {
+    expect(parseTranscript('piano show the unit')).toEqual({ kind: 'unknown', text: 'show the unit' })
+  })
+})
+
 describe('scales', () => {
   it('show me the d major scale', () => {
     expect(parseTranscript('piano show me the d major scale')).toEqual({

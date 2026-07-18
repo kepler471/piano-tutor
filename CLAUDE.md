@@ -144,6 +144,15 @@ WASM — dynamically imported, fully offline against vendored model files).
   integrity-tested against the lesson/song/quiz registries (`src/tests/guide.test.ts`).
   Deliberately static data — GuideScreen derives "practiced ✓" badges from history via
   `practice/guideProgress.ts`; never add tracking to the guide data itself.
+- `src/lib/data/chordPath.ts` — the chord path (`/chord-path`): a 7-unit topic curriculum on
+  chords (triads → inversions → diatonic/roman numerals → cadences → progressions → sevenths
+  → accompaniment/lead sheets) that reuses the guide's types, `guideHref(link, source)` and
+  badge machinery. Same rules as the guide (static, integrity-tested in
+  `src/tests/chordPath.test.ts`) plus one more: `practice`/`check` links must be badge-able
+  (lesson/quiz kinds); browse links belong in `theory[]`. Its drills live in
+  `lessons/{triads,inversions,diatonic,progressions,sevenths,accompaniment}.ts`, generated
+  via `theory/progressions.ts` (`diatonicTriad`, minimal-movement `closestInversion`);
+  `METHOD_CHORD_UNIT` drives the Practice screen's "Chord path →" chips.
 - `src/lib/quiz/` + `src/lib/theory/quiz.ts` + `src/lib/ear/quiz.ts` — pure quiz generators
   (11 modes) behind `/quizzes` (`/ear` is an alias route).
 - `src/lib/transcribe/` — `cluster.ts` (Tier A: onsets → chords, no rhythm) and `quantize.ts`

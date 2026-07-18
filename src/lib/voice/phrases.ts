@@ -26,6 +26,7 @@ export const SCOPE_PHRASES: Record<string, string[]> = {
   'Lesson': ['demo', 'restart', 'next part', 'metronome on at eighty', 'slower / faster', 'start listening'],
   'Free Play': ['melody mode / chord mode', 'start listening', 'record at one hundred', 'stop recording', 'clear', 'copy the notes'],
   'Guide': ['show stage two', 'open stage four'],
+  'Chord Path': ['show unit two', 'open unit five'],
   'Circle': ['show me e flat', 'b major', 'go back'],
   'Quizzes': ['hear it again', 'next'],
   'Note Detector': ['start listening', 'stop listening'],
